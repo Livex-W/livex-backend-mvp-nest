@@ -1,0 +1,140 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: livex_db
+    env_file:
+      - ${ENV_FILE:-.env.production}   # <- aquí están tus POSTGRES_*
+    environment:
+      PGTZ: America/Bogota              # (opcional) algo que NO pise POSTGRES_*
+    ports:
+      - "5432:5432"
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # Usa las variables del contenedor. Ojo con los $$ para que Compose no las expanda.
+      test: ["CMD-SHELL", "PGUSER=$${POSTGRES_USER:-postgres} PGDATABASE=$${POSTGRES_DB:-postgres} pg_isready -q"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - livex_net
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: livex_rabbit
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-livex}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-livex}
+    ports:
+      - "5672:5672"    # AMQP
+      - "15672:15672"  # UI
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - livex_net
+
+  # SMTP para pruebas (solo dev/staging)
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: livex_mailpit
+    profiles: ["dev", "staging"]
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # UI
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "-", "http://localhost:8025/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - livex_net
+
+  # Emulador local de Azure Storage (opcional, útil en dev)
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite
+    container_name: livex_azurite
+    profiles: ["dev"]
+    command: "azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0"
+    ports:
+      - "10000:10000" # Blob
+      - "10001:10001" # Queue
+    volumes:
+      - azurite_data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "-", "http://localhost:10000/devstoreaccount1?comp=list || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - livex_net
+
+  # API (backend)
+  app:
+    build:
+      context: .
+      target: ${BUILD_TARGET:-dev}
+    container_name: livex_api
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - ${ENV_FILE:-.env.development}
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: ${PORT:-3000}
+    ports:
+      - "${PORT:-3000}:3000"
+    command: ["sh", "-c", "${APP_COMMAND:-npm run dev}"]
+    volumes:
+      - type: bind
+        source: .
+        target: /app
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - livex_net
+
+  # Worker (consumidor de colas/webhooks)
+  worker:
+    build:
+      context: .
+      target: ${BUILD_TARGET:-dev}
+    container_name: livex_worker
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - ${ENV_FILE:-.env.development}
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+    command: ["sh", "-c", "${WORKER_COMMAND:-npm run worker:dev}"]
+    volumes:
+      - type: bind
+        source: .
+        target: /app
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"process.exit(0)\""]  # placeholder
+    networks:
+      - livex_net
+
+volumes:
+  dbdata:
+  azurite_data:
+
+networks:
+  livex_net:
+    name: livex_network
+    driver: bridge
