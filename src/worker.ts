@@ -1,8 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-// src/worker.ts
-import amqplib from "amqplib";
+import * as amqplib from "amqplib";
 import { Pool } from "pg";
 
 // ---- ENV ----
@@ -45,12 +43,16 @@ async function main() {
 
     console.log("[worker] listo. Esperando mensajes…");
 
-    ch.consume(Q_PROCESS, async (msg) => {
+    // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-misused-promises
+    await ch.consume(Q_PROCESS, async (msg: amqplib.ConsumeMessage | null) => {
         if (!msg) return;
 
         try {
-            const body = JSON.parse(msg.content.toString() || "{}");
-            const eventId: string | undefined = body?.eventId;
+            const rawContent = msg.content.toString("utf-8");
+            const body = (rawContent ? JSON.parse(rawContent) : {}) as {
+                eventId?: string;
+            };
+            const eventId = body.eventId;
 
             if (!eventId) {
                 console.warn("[worker] mensaje sin eventId → ack");
@@ -122,17 +124,21 @@ async function main() {
         console.log("[worker] apagando…");
         try {
             await ch.close();
-        } catch { }
+        } catch { /* empty */ }
         try {
             await conn.close();
-        } catch { }
+        } catch { /* empty */ }
         try {
             await db.end();
-        } catch { }
+        } catch { /* empty */ }
         process.exit(0);
     };
-    process.on("SIGINT", shutdown);
-    process.on("SIGTERM", shutdown);
+    process.on("SIGINT", () => {
+        void shutdown();
+    });
+    process.on("SIGTERM", () => {
+        void shutdown();
+    });
 }
 
 main().catch((e) => {

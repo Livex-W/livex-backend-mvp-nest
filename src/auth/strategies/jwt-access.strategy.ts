@@ -1,0 +1,28 @@
+import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { PassportStrategy } from '@nestjs/passport';
+import { ExtractJwt, Strategy } from 'passport-jwt';
+import { JwtPayload } from '../../common/interfaces/jwt-payload.interface';
+
+@Injectable()
+export class JwtAccessStrategy extends PassportStrategy(Strategy) {
+    constructor(configService: ConfigService) {
+        const secret = configService.get<string>('JWT_SECRET');
+
+        super({
+
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+            jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+            ignoreExpiration: false,
+            secretOrKey: secret ?? 'dev-secret-change-me',
+        });
+    }
+
+    validate(payload: JwtPayload): JwtPayload {
+        if (payload.tokenType !== 'access') {
+            throw new UnauthorizedException('Invalid access token');
+        }
+
+        return payload;
+    }
+}

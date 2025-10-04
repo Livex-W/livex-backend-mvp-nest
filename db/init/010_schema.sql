@@ -30,6 +30,7 @@ $$ LANGUAGE plpgsql;
 CREATE TABLE IF NOT EXISTS users (
   id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   email        citext UNIQUE NOT NULL,
+  password_hash text NOT NULL,
   full_name    text,
   role         user_role NOT NULL DEFAULT 'tourist',
   created_at   timestamptz NOT NULL DEFAULT now(),
