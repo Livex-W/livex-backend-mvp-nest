@@ -17,7 +17,7 @@ services:
       # Usa las variables del contenedor. Ojo con los $$ para que Compose no las expanda.
       test: ["CMD-SHELL", "PGUSER=$${POSTGRES_USER:-postgres} PGDATABASE=$${POSTGRES_DB:-postgres} pg_isready -q"]
       interval: 5s
-      timeout: 5s
+      timeout: 30s
       retries: 10
     networks:
       - livex_net

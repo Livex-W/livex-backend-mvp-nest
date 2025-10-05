@@ -12,6 +12,7 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { CategoriesModule } from './categories/categories.module';
 import { ExperiencesModule } from './experiences/experiences.module';
+import { UploadModule } from './upload/upload.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { ExperiencesModule } from './experiences/experiences.module';
     UsersModule,
     CategoriesModule,
     ExperiencesModule,
+    UploadModule,
   ],
   controllers: [AppController],
   providers: [

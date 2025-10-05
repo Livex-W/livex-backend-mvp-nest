@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 import { Injectable, NotFoundException, BadRequestException, Inject } from '@nestjs/common';
 import { DatabaseClient } from '../database/database.client';
@@ -10,9 +11,11 @@ import {
   UpdateExperienceDto,
   QueryExperiencesDto,
   PresignImageDto,
-  PresignedUrlResponse
+  PresignedUrlResponse,
+  ExperienceImageType
 } from './dto';
-import { randomUUID } from 'crypto';
+import { UploadService, PresignedUrlOptions } from '../upload/upload.service';
+// Removed randomUUID import as we now use professional naming structure
 
 // Interface for PostgreSQL error objects
 interface PostgreSQLError extends Error {
@@ -35,7 +38,8 @@ export class ExperiencesService {
   constructor(
     @Inject(DATABASE_CLIENT) private readonly db: DatabaseClient,
     private readonly paginationService: PaginationService,
-  ) {}
+    private readonly uploadService: UploadService,
+  ) { }
 
   async create(createExperienceDto: CreateExperienceDto): Promise<Experience> {
     const {
@@ -304,29 +308,68 @@ export class ExperiencesService {
     experienceId: string,
     presignDto: PresignImageDto,
   ): Promise<PresignedUrlResponse> {
-    // Verify experience exists
-    await this.findOne(experienceId);
+    // Verify experience exists and get experience data
+    const experience = await this.findOne(experienceId);
 
-    // Generate unique filename
-    const fileExtension = this.getFileExtension(presignDto.content_type);
-    const uniqueFilename = `experiences/${experienceId}/${randomUUID()}.${fileExtension}`;
+    // Validate file type
+    if (!this.uploadService.validateFileType(presignDto.content_type)) {
+      throw new BadRequestException('Invalid file type. Only images are allowed.');
+    }
 
-    // For now, return a mock presigned URL
-    // In production, you would integrate with AWS S3, Google Cloud Storage, etc.
-    const mockPresignedUrl = `https://storage.example.com/upload/${uniqueFilename}?expires=3600`;
-    const mockImageUrl = `https://storage.example.com/${uniqueFilename}`;
+    // Get resort information for professional path structure
+    const resortResult = await this.db.query(
+      `SELECT name FROM resorts WHERE id = $1`,
+      [experience.resort_id],
+    );
 
-    // Store the image record in database
+    if (resortResult.rows.length === 0) {
+      throw new NotFoundException('Resort not found');
+    }
+
+    const resortSlug = this.uploadService.generateSlug(resortResult.rows[0].name);
+    const experienceSlug = this.uploadService.generateSlug(experience.title);
+
+    // Count existing gallery images for proper indexing
+    let galleryIndex = 1;
+    if (presignDto.image_type === ExperienceImageType.GALLERY) {
+      const countResult = await this.db.query(
+        `SELECT COUNT(*) as count FROM experience_images 
+         WHERE experience_id = $1 AND url LIKE '%/gallery/%'`,
+        [experienceId],
+      );
+      galleryIndex = parseInt(countResult.rows[0].count) + 1;
+    }
+
+    // Generate professional blob path
+    const blobPath = this.uploadService.generateExperienceBlobPath(
+      resortSlug,
+      experienceSlug,
+      presignDto.image_type || 'gallery',
+      presignDto.filename,
+      galleryIndex,
+    );
+
+    // Generate presigned URL using Azure Blob Storage
+    const options: PresignedUrlOptions = {
+      containerName: 'livex-media',
+      fileName: blobPath,
+      contentType: presignDto.content_type,
+      expiresInMinutes: 60,
+    };
+
+    const result = await this.uploadService.generatePresignedUrl(options);
+
+    // Store the image record in database with the actual blob URL
     await this.db.query(
-      `INSERT INTO experience_images (experience_id, url, sort_order) 
-       VALUES ($1, $2, $3)`,
-      [experienceId, mockImageUrl, presignDto.sort_order || 0],
+      `INSERT INTO experience_images (experience_id, url, sort_order, image_type) 
+       VALUES ($1, $2, $3, $4)`,
+      [experienceId, result.blobUrl, presignDto.sort_order || 0, presignDto.image_type || 'gallery'],
     );
 
     return {
-      upload_url: mockPresignedUrl,
-      image_url: mockImageUrl,
-      expires_in: 3600, // 1 hour
+      upload_url: result.uploadUrl,
+      image_url: result.blobUrl,
+      expires_in: result.expiresIn,
     };
   }
 
@@ -345,13 +388,114 @@ export class ExperiencesService {
     return result.rows;
   }
 
-  private getFileExtension(contentType: string): string {
-    const extensions: Record<string, string> = {
-      'image/jpeg': 'jpg',
-      'image/png': 'png',
-      'image/webp': 'webp',
-    };
+  /**
+   * Delete an experience image
+   */
+  async deleteExperienceImage(experienceId: string, imageId: string): Promise<void> {
+    // Verify experience exists
+    await this.findOne(experienceId);
 
-    return extensions[contentType] || 'jpg';
+    // Get image record
+    const result = await this.db.query<ExperienceImage>(
+      `SELECT * FROM experience_images WHERE id = $1 AND experience_id = $2`,
+      [imageId, experienceId],
+    );
+
+    if (result.rows.length === 0) {
+      throw new NotFoundException('Image not found');
+    }
+
+    const image = result.rows[0];
+
+    // Extract blob name from URL and delete from Azure
+    const blobName = this.uploadService.extractBlobNameFromUrl(image.url);
+    if (blobName) {
+      try {
+        await this.uploadService.deleteFile('livex-media', blobName);
+      } catch (error) {
+        // Log error but don't fail the operation if blob doesn't exist
+        console.warn(`Failed to delete blob ${blobName}:`, error instanceof Error ? error.message : 'Unknown error');
+      }
+    }
+
+    // Remove from database
+    await this.db.query(
+      `DELETE FROM experience_images WHERE id = $1`,
+      [imageId],
+    );
+  }
+
+  /**
+   * Upload experience image directly through API
+   */
+  async uploadExperienceImage(
+    experienceId: string,
+    file: any,
+    sortOrder?: number,
+    imageType?: string,
+  ): Promise<{ image_url: string }> {
+    // Verify experience exists and get experience data
+    const experience = await this.findOne(experienceId);
+
+    // Validate file
+    if (!file) {
+      throw new BadRequestException('No file provided');
+    }
+
+    // Validate file type
+    if (!this.uploadService.validateFileType(file.mimetype)) {
+      throw new BadRequestException('Invalid file type. Only images are allowed.');
+    }
+
+    // Get resort information for professional path structure
+    const resortResult = await this.db.query(
+      `SELECT name FROM resorts WHERE id = $1`,
+      [experience.resort_id],
+    );
+
+    if (resortResult.rows.length === 0) {
+      throw new NotFoundException('Resort not found');
+    }
+
+    const resortSlug = this.uploadService.generateSlug(resortResult.rows[0].name);
+    const experienceSlug = this.uploadService.generateSlug(experience.title);
+    const finalImageType = (imageType === 'hero' ? 'hero' : 'gallery');
+
+    // Count existing gallery images for proper indexing
+    let galleryIndex = 1;
+    if (finalImageType === 'gallery') {
+      const countResult = await this.db.query(
+        `SELECT COUNT(*) as count FROM experience_images 
+         WHERE experience_id = $1 AND url LIKE '%/gallery/%'`,
+        [experienceId],
+      );
+      galleryIndex = parseInt(countResult.rows[0].count) + 1;
+    }
+
+    // Generate professional blob path
+    const blobPath = this.uploadService.generateExperienceBlobPath(
+      resortSlug,
+      experienceSlug,
+      finalImageType,
+      file.originalname || 'image',
+      galleryIndex,
+    );
+
+    // Upload file directly to Azure
+    const imageUrl = await this.uploadService.uploadFile(
+      'livex-media',
+      blobPath,
+      file.buffer,
+      file.mimetype,
+    );
+
+    // Store the image record in database
+    await this.db.query(
+      `INSERT INTO experience_images (experience_id, url, sort_order, image_type) 
+       VALUES ($1, $2, $3, $4)`,
+      [experienceId, imageUrl, sortOrder || 0, finalImageType],
+    );
+
+    return { image_url: imageUrl };
   }
 }

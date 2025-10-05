@@ -8,14 +8,17 @@ import {
   Delete,
   Query,
   ParseUUIDPipe,
+  ParseBoolPipe,
   HttpCode,
   HttpStatus,
-  ParseBoolPipe,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ExperiencesService } from './experiences.service';
-import { 
-  CreateExperienceDto, 
-  UpdateExperienceDto, 
+import {
+  CreateExperienceDto,
+  UpdateExperienceDto,
   QueryExperiencesDto,
   PresignImageDto,
   PresignedUrlResponse
@@ -23,9 +26,9 @@ import {
 import { ExperienceWithImages } from './entities/experience.entity';
 import { PaginatedResult } from '../common/interfaces/pagination.interface';
 
-@Controller('v1/experiences')
+@Controller('api/v1/experiences')
 export class ExperiencesController {
-  constructor(private readonly experiencesService: ExperiencesService) {}
+  constructor(private readonly experiencesService: ExperiencesService) { }
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -76,5 +79,26 @@ export class ExperiencesController {
     @Body() presignDto: PresignImageDto,
   ): Promise<PresignedUrlResponse> {
     return this.experiencesService.presignImageUpload(id, presignDto);
+  }
+
+  @Delete(':id/images/:imageId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteExperienceImage(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('imageId', ParseUUIDPipe) imageId: string,
+  ): Promise<void> {
+    return this.experiencesService.deleteExperienceImage(id, imageId);
+  }
+
+  @Post(':id/images/upload')
+  @HttpCode(HttpStatus.CREATED)
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadExperienceImage(
+    @Param('id', ParseUUIDPipe) id: string,
+    @UploadedFile() file: any,
+    @Body('sort_order') sortOrder?: number,
+    @Body('image_type') imageType?: string,
+  ): Promise<{ image_url: string }> {
+    return this.experiencesService.uploadExperienceImage(id, file, sortOrder, imageType);
   }
 }

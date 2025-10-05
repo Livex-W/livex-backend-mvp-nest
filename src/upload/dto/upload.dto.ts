@@ -4,11 +4,7 @@ export enum ImageType {
   JPEG = 'image/jpeg',
   PNG = 'image/png',
   WEBP = 'image/webp',
-}
-
-export enum ExperienceImageType {
-  HERO = 'hero',
-  GALLERY = 'gallery',
+  GIF = 'image/gif',
 }
 
 export class PresignImageDto {
@@ -21,18 +17,24 @@ export class PresignImageDto {
   content_type: ImageType;
 
   @IsOptional()
-  @IsEnum(ExperienceImageType)
-  image_type?: ExperienceImageType = ExperienceImageType.GALLERY;
+  @IsString()
+  container?: string;
 
   @IsOptional()
   @IsInt()
-  @Min(0)
-  @Max(999)
-  sort_order?: number = 0;
+  @Min(1)
+  @Max(1440) // Max 24 hours
+  expires_in_minutes?: number = 60;
 }
 
 export interface PresignedUrlResponse {
   upload_url: string;
   image_url: string;
   expires_in: number;
+}
+
+export class DirectUploadDto {
+  @IsOptional()
+  @IsString()
+  container?: string;
 }
