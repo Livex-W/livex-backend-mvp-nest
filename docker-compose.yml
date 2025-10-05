@@ -134,10 +134,14 @@ services:
     image: nginx:1.27-alpine
     container_name: livex_nginx
     depends_on:
-      - app
-      - rabbitmq
-      - mailpit
-      - azurite
+      app:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      mailpit:
+        condition: service_healthy
+      azurite:
+        condition: service_healthy
     ports:
       - "80:80"
     volumes:
