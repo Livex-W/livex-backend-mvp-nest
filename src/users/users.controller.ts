@@ -4,7 +4,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { JwtPayload } from '../common/interfaces/jwt-payload.interface';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 
-@Controller('v1/user')
+@Controller('api/v1/user')
 export class UsersController {
   constructor(private readonly usersService: UsersService) { }
 

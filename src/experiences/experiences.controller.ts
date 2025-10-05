@@ -26,7 +26,7 @@ import {
 import { ExperienceWithImages } from './entities/experience.entity';
 import { PaginatedResult } from '../common/interfaces/pagination.interface';
 
-@Controller('v1/experiences')
+@Controller('api/v1/experiences')
 export class ExperiencesController {
   constructor(private readonly experiencesService: ExperiencesService) { }
 
