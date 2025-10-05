@@ -130,6 +130,25 @@ services:
     networks:
       - livex_net
 
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: livex_nginx
+    depends_on:
+      - app
+      - rabbitmq
+      - mailpit
+      - azurite
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      # Descomenta si usas Basic Auth:
+      # - ./nginx/htpasswd:/etc/nginx/htpasswd:ro
+    # restart: unless-stopped
+    networks:
+      - livex_net
+
 volumes:
   dbdata:
   azurite_data:
