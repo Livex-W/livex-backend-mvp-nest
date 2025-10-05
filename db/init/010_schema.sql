@@ -558,3 +558,15 @@ ALTER TABLE experiences
 -- (Opcional) Índices adicionales útiles
 CREATE INDEX IF NOT EXISTS idx_experiences_price_currency ON experiences(price_cents, currency);
 CREATE INDEX IF NOT EXISTS idx_resorts_status_active ON resorts(status, is_active);
+
+
+-- Monitoreo y Limpieza
+-- Cleanup Job (recomendado)
+
+-- -- Limpiar refresh tokens expirados (cron job)
+-- DELETE FROM refresh_tokens
+-- WHERE expires_at < NOW() - INTERVAL '1 day';
+
+-- -- Limpiar password reset tokens usados/expirados
+-- DELETE FROM password_reset_tokens
+-- WHERE used_at IS NOT NULL OR expires_at < NOW();
