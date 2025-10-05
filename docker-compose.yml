@@ -48,9 +48,9 @@ services:
       - "1025:1025"  # SMTP
       - "8025:8025"  # UI
     healthcheck:
-      test: ["CMD", "wget", "-qO", "-", "http://localhost:8025/healthz"]
+      test: ["CMD", "wget", "-qO", "-", "http://127.0.0.1:8025/healthz"]
       interval: 10s
-      timeout: 5s
+      timeout: 10s
       retries: 10
     networks:
       - livex_net
@@ -67,7 +67,7 @@ services:
     volumes:
       - azurite_data:/data
     healthcheck:
-      test: ["CMD", "wget", "-qO", "-", "http://localhost:10000/devstoreaccount1?comp=list || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:10000/ >/dev/null 2>&1 || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -135,9 +135,6 @@ services:
     container_name: livex_nginx
     depends_on:
       - app
-      - rabbitmq
-      - mailpit
-      - azurite
     ports:
       - "80:80"
     volumes:
