@@ -89,9 +89,11 @@ CREATE TABLE IF NOT EXISTS experience_images (
   experience_id  uuid NOT NULL REFERENCES experiences(id) ON DELETE CASCADE,
   url            text NOT NULL,
   sort_order     integer NOT NULL DEFAULT 0,
+  image_type     VARCHAR(20) DEFAULT 'gallery' CHECK (image_type IN ('hero', 'gallery')),
   created_at     timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_images_experience ON experience_images(experience_id);
+CREATE INDEX IF NOT EXISTS idx_experience_images_type ON experience_images(experience_id, image_type);
 
 CREATE TABLE IF NOT EXISTS availability_slots (
   id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),

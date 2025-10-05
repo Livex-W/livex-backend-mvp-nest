@@ -161,3 +161,5 @@ VALUES
 -- )
 -- INSERT INTO commissions (booking_id, rate_bps, commission_cents, status)
 -- VALUES ((SELECT id FROM b), 1000, 12000, 'accrued'::commission_status);
+
+UPDATE experience_images SET image_type = 'gallery' WHERE image_type IS NULL;
