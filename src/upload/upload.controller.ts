@@ -16,7 +16,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { UploadService, PresignedUrlOptions, PresignedUrlResult } from './upload.service';
 import { PresignImageDto, PresignedUrlResponse } from './dto/upload.dto';
 
-@Controller('v1/upload')
+@Controller('api/v1/upload')
 export class UploadController {
   constructor(private readonly uploadService: UploadService) {}
 

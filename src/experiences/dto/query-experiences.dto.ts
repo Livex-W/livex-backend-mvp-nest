@@ -35,19 +35,29 @@ export class QueryExperiencesDto extends PaginationDto {
   min_rating?: number;
 
   @IsOptional()
-  @Transform(({ value }) => {
+  @Transform(({ value }): string[] => {
     if (typeof value === 'string') {
       return value.split(',').map(item => item.trim().toUpperCase());
     }
-    return Array.isArray(value) ? value : [];
+    return Array.isArray(value) ? value as string[] : [];
   })
   currencies?: string[];
 
   @IsOptional()
-  @Transform(({ value }) => value === 'true' || value === true)
+  @Transform(({ value }) => {
+    if (value === undefined || value === null || value === '') {
+      return undefined;
+    }
+    return value === 'true' || value === true;
+  })
   has_images?: boolean;
 
   @IsOptional()
-  @Transform(({ value }) => value === 'true' || value === true)
+  @Transform(({ value }) => {
+    if (value === undefined || value === null || value === '') {
+      return undefined;
+    }
+    return value === 'true' || value === true;
+  })
   include_images?: boolean;
 }

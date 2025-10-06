@@ -16,7 +16,7 @@ import { CreateCategoryDto, UpdateCategoryDto, QueryCategoriesDto } from './dto'
 import { Category } from './entities/category.entity';
 import { PaginatedResult } from '../common/interfaces/pagination.interface';
 
-@Controller('v1/categories')
+@Controller('api/v1/categories')
 export class CategoriesController {
   constructor(private readonly categoriesService: CategoriesService) {}
 

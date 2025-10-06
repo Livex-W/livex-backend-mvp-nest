@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { Controller, Get, Header, HttpCode, HttpStatus } from '@nestjs/common';
 import { MetricsService } from '../services/metrics.service';
 import { CustomLoggerService } from '../services/logger.service';
@@ -18,7 +20,7 @@ export class MetricsController {
   async getMetrics(): Promise<string> {
     try {
       const metrics = await this.metricsService.getMetrics();
-      
+
       this.logger.debug('Metrics endpoint accessed', {
         metricsSize: metrics.length,
       });
@@ -38,7 +40,7 @@ export class MetricsController {
   async getMetricsAsJson(): Promise<any> {
     try {
       const metrics = await this.metricsService.getMetricsAsJson();
-      
+
       this.logger.debug('Metrics JSON endpoint accessed', {
         metricsCount: metrics.length,
       });
@@ -58,16 +60,16 @@ export class MetricsController {
   @Get('health')
   @SkipThrottle()
   @HttpCode(HttpStatus.OK)
-  async getHealth(): Promise<any> {
+  getHealth(): any {
     try {
       const healthMetrics = this.metricsService.getHealthMetrics();
-      
+
       // Determine health status based on memory usage
       const memoryUsage = healthMetrics.memory as any;
       const memoryUsagePercent = (memoryUsage.heapUsed / memoryUsage.heapTotal) * 100;
-      
+
       const status = memoryUsagePercent > 90 ? 'unhealthy' : 'healthy';
-      
+
       const response = {
         status,
         timestamp: new Date().toISOString(),
@@ -111,11 +113,11 @@ export class MetricsController {
   @Get('health/ready')
   @SkipThrottle()
   @HttpCode(HttpStatus.OK)
-  async getReadiness(): Promise<any> {
+  getReadiness(): any {
     try {
       // Check if the application is ready to serve requests
       // This could include database connectivity, external service checks, etc.
-      
+
       const checks = {
         database: { status: 'pass' }, // TODO: Add actual database check
         storage: { status: 'pass' },  // TODO: Add actual storage check
@@ -155,7 +157,7 @@ export class MetricsController {
   @Get('health/live')
   @SkipThrottle()
   @HttpCode(HttpStatus.OK)
-  async getLiveness(): Promise<any> {
+  getLiveness(): any {
     try {
       // Simple liveness check - if we can respond, we're alive
       const response = {
