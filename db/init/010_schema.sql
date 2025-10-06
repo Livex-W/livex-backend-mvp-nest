@@ -9,6 +9,9 @@ DO $$ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_role') THEN
         CREATE TYPE user_role AS ENUM ('tourist','resort','admin');
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'resort_status') THEN
+        CREATE TYPE resort_status AS ENUM ('draft','under_review','active','rejected');
+    END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'experience_status') THEN
         CREATE TYPE experience_status AS ENUM ('draft','under_review','active','rejected');
     END IF;
@@ -52,6 +55,7 @@ CREATE TABLE IF NOT EXISTS resorts (
   longitude      numeric(9,6),
   owner_user_id  uuid REFERENCES users(id) ON DELETE SET NULL,
   is_active      boolean NOT NULL DEFAULT true,
+  status          resort_status NOT NULL DEFAULT 'draft',
   created_at     timestamptz NOT NULL DEFAULT now(),
   updated_at     timestamptz NOT NULL DEFAULT now()
 );

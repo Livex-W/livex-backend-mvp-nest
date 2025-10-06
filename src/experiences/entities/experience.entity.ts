@@ -1,3 +1,5 @@
+export type ExperienceStatus = 'draft' | 'under_review' | 'active' | 'rejected';
+
 export interface Experience {
   id: string;
   resort_id: string;
@@ -10,9 +12,12 @@ export interface Experience {
   includes?: string;
   excludes?: string;
   main_image_url?: string;
-  status: 'draft' | 'under_review' | 'active' | 'rejected';
+  status: ExperienceStatus;
   rating_avg: number;
   rating_count: number;
+  approved_by?: string;
+  approved_at?: Date;
+  rejection_reason?: string;
   created_at: Date;
   updated_at: Date;
 }

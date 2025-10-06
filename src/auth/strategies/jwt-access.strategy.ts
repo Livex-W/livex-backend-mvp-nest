@@ -18,11 +18,15 @@ export class JwtAccessStrategy extends PassportStrategy(Strategy) {
         });
     }
 
-    validate(payload: JwtPayload): JwtPayload {
+    validate(payload: JwtPayload): JwtPayload & { id: string } {
         if (payload.tokenType !== 'access') {
             throw new UnauthorizedException('Invalid access token');
         }
 
-        return payload;
+        // Map 'sub' to 'id' for easier access in controllers
+        return {
+            ...payload,
+            id: payload.sub,
+        };
     }
 }

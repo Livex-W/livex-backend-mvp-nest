@@ -38,6 +38,7 @@ import { PaginationService } from './services/pagination.service';
     LoggingInterceptor,
     ThrottlerModule,
     PaginationService,
+    DatabaseModule,
   ],
 })
 export class CommonModule {}

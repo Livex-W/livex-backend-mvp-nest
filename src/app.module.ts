@@ -17,6 +17,8 @@ import { CategoriesModule } from './categories/categories.module';
 import { ExperiencesModule } from './experiences/experiences.module';
 import { AvailabilityModule } from './availability/availability.module';
 import { UploadModule } from './upload/upload.module';
+import { ResortsModule } from './resorts/resorts.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -31,6 +33,8 @@ import { UploadModule } from './upload/upload.module';
     ExperiencesModule,
     AvailabilityModule,
     UploadModule,
+    ResortsModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [
