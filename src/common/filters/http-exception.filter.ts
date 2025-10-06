@@ -4,9 +4,10 @@ import {
   ArgumentsHost,
   HttpException,
   HttpStatus,
-  Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+import { ThrottlerException } from '@nestjs/throttler';
+import { CustomLoggerService } from '../services/logger.service';
 
 export interface ErrorResponse {
   code: string;
@@ -17,16 +18,34 @@ export interface ErrorResponse {
   path: string;
 }
 
+export interface ValidationErrorDetail {
+  field: string;
+  value: unknown;
+  constraints: string[];
+}
+
+interface RequestWithUser extends Request {
+  user?: {
+    id: string;
+    role: string;
+  };
+  requestId?: string;
+}
+
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
-  private readonly logger = new Logger(HttpExceptionFilter.name);
+  private readonly logger = new CustomLoggerService();
+
+  constructor() {
+    this.logger.setContext('HttpExceptionFilter');
+  }
 
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
-    const request = ctx.getRequest<Request>();
+    const request = ctx.getRequest<RequestWithUser>();
 
-    const requestId = request.headers['x-request-id'] as string || 'unknown';
+    const requestId = request.requestId || request.headers['x-request-id'] as string || 'unknown';
     const timestamp = new Date().toISOString();
     const path = request.url;
 
@@ -35,7 +54,16 @@ export class HttpExceptionFilter implements ExceptionFilter {
     let message: string;
     let details: unknown;
 
-    if (exception instanceof HttpException) {
+    if (exception instanceof ThrottlerException) {
+      // Handle rate limiting exceptions
+      status = HttpStatus.TOO_MANY_REQUESTS;
+      code = 'RATE_LIMITED';
+      message = exception.message || 'Rate limit exceeded';
+      details = {
+        retryAfter: '60 seconds',
+        limit: 'Check X-RateLimit-* headers',
+      };
+    } else if (exception instanceof HttpException) {
       status = exception.getStatus();
       const exceptionResponse = exception.getResponse();
       
@@ -43,7 +71,15 @@ export class HttpExceptionFilter implements ExceptionFilter {
         const responseObj = exceptionResponse as Record<string, unknown>;
         code = this.getErrorCode(status, responseObj.error as string);
         message = (responseObj.message as string) || exception.message;
-        details = responseObj.details || responseObj.message;
+        
+        // Handle validation errors specially
+        if (status === 400 && Array.isArray(responseObj.message)) {
+          code = 'VALIDATION_ERROR';
+          message = 'Validation failed';
+          details = this.formatValidationErrors(responseObj.message as string[]);
+        } else {
+          details = responseObj.details || responseObj.message;
+        }
       } else {
         code = this.getErrorCode(status);
         message = String(exceptionResponse);
@@ -56,10 +92,16 @@ export class HttpExceptionFilter implements ExceptionFilter {
       
       // Log the full error for debugging
       const errorMessage = exception instanceof Error ? exception.message : String(exception);
-      this.logger.error(
-        `Unhandled exception: ${errorMessage}`,
-        exception instanceof Error ? exception.stack : undefined,
-        { requestId, path },
+      this.logger.logError(
+        exception instanceof Error ? exception : new Error(errorMessage),
+        {
+          requestId,
+          path,
+          method: request.method,
+          userId: request.user?.id,
+          ip: request.ip,
+          userAgent: request.headers['user-agent'],
+        }
       );
     }
 
@@ -72,13 +114,48 @@ export class HttpExceptionFilter implements ExceptionFilter {
       path,
     };
 
-    // Log the error response
-    this.logger.error(
-      `HTTP ${status} ${code}: ${message}`,
-      { requestId, path, details },
-    );
+    // Log the error response (except for validation errors which are expected)
+    if (status >= 500) {
+      this.logger.error(`HTTP ${status} ${code}: ${message}`, undefined, {
+        requestId,
+        path,
+        method: request.method,
+        userId: request.user?.id,
+        details,
+      });
+    } else if (status === 429) {
+      this.logger.logSecurityEvent('RATE_LIMIT_RESPONSE', {
+        requestId,
+        path,
+        method: request.method,
+        userId: request.user?.id,
+        ip: request.ip,
+      });
+    } else {
+      this.logger.warn(`HTTP ${status} ${code}: ${message}`, {
+        requestId,
+        path,
+        method: request.method,
+        userId: request.user?.id,
+      });
+    }
 
     response.status(status).json(errorResponse);
+  }
+
+  private formatValidationErrors(errors: string[]): ValidationErrorDetail[] {
+    return errors.map(error => {
+      // Parse class-validator error format: "property should not be empty"
+      const parts = error.split(' ');
+      const field = parts[0] || 'unknown';
+      const constraint = parts.slice(1).join(' ') || error;
+      
+      return {
+        field,
+        value: undefined, // We don't have access to the actual value here
+        constraints: [constraint],
+      };
+    });
   }
 
   private getErrorCode(status: number, error?: string): string {
