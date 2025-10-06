@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import {
   Controller,
   Get,
@@ -13,8 +16,11 @@ import {
   HttpStatus,
   UseInterceptors,
   UploadedFile,
+  UseGuards,
+  Request,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { Throttle } from '@nestjs/throttler';
 import { ExperiencesService } from './experiences.service';
 import {
   CreateExperienceDto,
@@ -23,12 +29,21 @@ import {
   PresignImageDto,
   PresignedUrlResponse
 } from './dto';
+import { SubmitForReviewDto } from './dto/approve-experience.dto';
 import { ExperienceWithImages } from './entities/experience.entity';
 import { PaginatedResult } from '../common/interfaces/pagination.interface';
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { CustomLoggerService } from '../common/services/logger.service';
 
 @Controller('api/v1/experiences')
+@UseGuards(JwtAuthGuard)
 export class ExperiencesController {
-  constructor(private readonly experiencesService: ExperiencesService) { }
+  constructor(
+    private readonly experiencesService: ExperiencesService,
+    private readonly logger: CustomLoggerService,
+  ) { }
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -100,5 +115,38 @@ export class ExperiencesController {
     @Body('image_type') imageType?: string,
   ): Promise<{ image_url: string }> {
     return this.experiencesService.uploadExperienceImage(id, file, sortOrder, imageType);
+  }
+
+  @Post(':id/submit')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 requests per minute
+  @UseGuards(RolesGuard)
+  @Roles('resort', 'admin')
+  async submitForReview(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() submitDto: SubmitForReviewDto,
+    @Request() req: any
+  ) {
+    this.logger.logRequest({
+      method: 'POST',
+      url: '/api/v1/experiences/:id/submit',
+      userId: req.user.id,
+      role: req.user.role,
+      experienceId: id,
+      notes: submitDto.notes
+    });
+
+    const experience = await this.experiencesService.submitForReview(id, req.user.id, req.user.role);
+
+    this.logger.logResponse({
+      method: 'POST',
+      url: '/api/v1/experiences/:id/submit',
+      userId: req.user.id,
+      experienceId: id,
+      newStatus: experience.status,
+      statusCode: 200
+    });
+
+    return experience;
   }
 }

@@ -498,4 +498,56 @@ export class ExperiencesService {
 
     return { image_url: imageUrl };
   }
+
+  async submitForReview(id: string, userId: string, userRole: string): Promise<Experience> {
+    // First check if experience exists and get current data
+    const currentExperience = await this.findOne(id);
+
+    // Check permissions - only resort owners or admins can submit
+    if (userRole !== 'admin' && userRole !== 'resort') {
+      throw new BadRequestException('Only resort owners or admins can submit experiences for review');
+    }
+
+    // Check current status
+    if (currentExperience.status !== 'draft') {
+      throw new BadRequestException('Only draft experiences can be submitted for review');
+    }
+
+    // Validate that experience has minimum required content
+    if (!currentExperience.title || !currentExperience.description) {
+      throw new BadRequestException('Experience must have title and description before submitting for review');
+    }
+
+    try {
+      const result = await this.db.query(
+        `UPDATE experiences 
+         SET status = 'under_review', updated_at = NOW()
+         WHERE id = $1 
+         RETURNING *`,
+        [id]
+      );
+
+      const experience = result.rows[0] as Experience;
+
+      // Log the business event (assuming logger is available)
+      // this.logger.logBusinessEvent('experience_submitted_for_review', {
+      //   userId,
+      //   experienceId: id,
+      //   experienceTitle: experience.title
+      // });
+
+      return experience;
+    } catch (error: unknown) {
+      const pgError = error as PostgreSQLError;
+      
+      // Log error if logger is available
+      // this.logger.logError(error as Error, {
+      //   userId,
+      //   experienceId: id,
+      //   action: 'submit_for_review'
+      // });
+
+      throw error;
+    }
+  }
 }
