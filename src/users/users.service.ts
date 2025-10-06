@@ -2,6 +2,7 @@ import { Inject, Injectable, NotFoundException, ConflictException } from '@nestj
 import type { QueryResultRow } from 'pg';
 import { DatabaseClient } from '../database/database.client';
 import { DATABASE_CLIENT } from '../database/database.module';
+import { CustomLoggerService } from '../common/services/logger.service';
 import type { UserRole } from '../common/constants/roles';
 import { UserEntity, SafeUser } from './entities/user.entity';
 
@@ -17,7 +18,10 @@ interface UserRow extends QueryResultRow {
 
 @Injectable()
 export class UsersService {
-    constructor(@Inject(DATABASE_CLIENT) private readonly db: DatabaseClient) { }
+    constructor(
+        @Inject(DATABASE_CLIENT) private readonly db: DatabaseClient,
+        private readonly logger: CustomLoggerService,
+    ) { }
 
     async findByEmail(email: string): Promise<UserEntity | null> {
         const result = await this.db.query<UserRow>(
@@ -60,7 +64,17 @@ export class UsersService {
             [params.email, params.passwordHash, params.fullName ?? null, params.role],
         );
 
-        return this.mapRowToEntity(result.rows[0]);
+        const user = this.mapRowToEntity(result.rows[0]);
+
+        // Log business event
+        this.logger.logBusinessEvent('user_created', {
+            userId: user.id,
+            email: user.email,
+            role: user.role,
+            fullName: user.fullName
+        });
+
+        return user;
     }
 
     async updateProfile(
@@ -108,7 +122,17 @@ export class UsersService {
             throw new NotFoundException('User not found');
         }
 
-        return this.mapRowToEntity(result.rows[0]);
+        const updatedUser = this.mapRowToEntity(result.rows[0]);
+
+        // Log business event
+        this.logger.logBusinessEvent('user_profile_updated', {
+            userId,
+            changes: params,
+            email: updatedUser.email,
+            fullName: updatedUser.fullName
+        });
+
+        return updatedUser;
     }
 
     private async assertEmailAvailable(email: string, ownerId?: string): Promise<void> {
@@ -131,6 +155,12 @@ export class UsersService {
         if (result.rowCount === 0) {
             throw new NotFoundException('User not found');
         }
+
+        // Log security event
+        this.logger.logSecurityEvent('password_updated', {
+            userId,
+            timestamp: new Date().toISOString()
+        });
     }
 
     toSafeUser(user: UserEntity): SafeUser {

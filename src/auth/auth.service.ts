@@ -7,6 +7,7 @@ import type { QueryResultRow } from 'pg';
 import { UsersService } from '../users/users.service';
 import { DATABASE_CLIENT } from '../database/database.module';
 import { DatabaseClient } from '../database/database.client';
+import { CustomLoggerService } from '../common/services/logger.service';
 import type { UserEntity } from '../users/entities/user.entity';
 import type { JwtPayload } from '../common/interfaces/jwt-payload.interface';
 import {
@@ -52,6 +53,7 @@ export class AuthService {
         private readonly configService: ConfigService,
         private readonly passwordHashService: PasswordHashService,
         @Inject(DATABASE_CLIENT) private readonly db: DatabaseClient,
+        private readonly logger: CustomLoggerService,
     ) { }
 
     async register(dto: RegisterDto, context: TokenContext): Promise<AuthResult> {
@@ -64,8 +66,17 @@ export class AuthService {
         const user = await this.usersService.createUser({
             email: dto.email,
             passwordHash,
-            fullName: dto.fullName ?? null,
-            role: dto.role ?? 'tourist',
+            fullName: dto.fullName,
+            role: dto.role || 'tourist',
+        });
+
+        // Log successful registration
+        this.logger.logSecurityEvent('user_registered', {
+            userId: user.id,
+            email: user.email,
+            role: user.role,
+            ip: context.ip || undefined,
+            userAgent: context.userAgent || undefined
         });
 
         return this.issueAuthResult(user, context, { rotateFromJti: null });
@@ -79,8 +90,24 @@ export class AuthService {
 
         const isPasswordValid = await this.passwordHashService.comparePassword(dto.password, user.passwordHash);
         if (!isPasswordValid) {
+            // Log failed login attempt
+            this.logger.logSecurityEvent('login_failed', {
+                email: dto.email,
+                reason: 'invalid_password',
+                ip: context.ip || undefined,
+                userAgent: context.userAgent || undefined
+            });
             throw new UnauthorizedException('Invalid credentials');
         }
+
+        // Log successful login
+        this.logger.logSecurityEvent('login_successful', {
+            userId: user.id,
+            email: user.email,
+            role: user.role,
+            ip: context.ip || undefined,
+            userAgent: context.userAgent || undefined
+        });
 
         return this.issueAuthResult(user, context, { rotateFromJti: null });
     }

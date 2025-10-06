@@ -4,6 +4,7 @@ import { BlobServiceClient, ContainerClient, generateBlobSASQueryParameters, Blo
 import { DefaultAzureCredential } from '@azure/identity';
 import { randomUUID } from 'crypto';
 import { AzureConfig } from '../config/azure.config';
+import { CustomLoggerService } from '../common/services/logger.service';
 
 export interface PresignedUrlOptions {
   containerName: string;
@@ -27,7 +28,10 @@ export class UploadService {
   private readonly defaultContainer: string;
   private readonly publicUrl: string;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly customLogger: CustomLoggerService,
+  ) {
     const azureConfig = this.configService.get<AzureConfig>('azure');
     this.accountName = azureConfig?.storageAccountName || this.configService.get<string>('AZURE_STORAGE_ACCOUNT_NAME') || '';
     this.accountKey = azureConfig?.storageAccountKey || this.configService.get<string>('AZURE_STORAGE_ACCOUNT_KEY') || '';
@@ -144,8 +148,27 @@ export class UploadService {
       
       // Return public URL for browser access
       const publicUrl = `${this.publicUrl}/${containerName}/${blobName}`;
+
+      // Log business event with structured logging
+      this.customLogger.logBusinessEvent('file_uploaded', {
+        containerName,
+        fileName: blobName,
+        contentType,
+        fileSize: fileBuffer.length,
+        publicUrl
+      });
+
       return publicUrl;
     } catch (error) {
+      // Log error with structured logging
+      this.customLogger.logError(error as Error, {
+        containerName,
+        fileName,
+        contentType,
+        fileSize: fileBuffer.length,
+        action: 'upload_file'
+      });
+
       this.logger.error(`Failed to upload file: ${error instanceof Error ? error.message : 'Unknown error'}`, error instanceof Error ? error.stack : undefined);
       throw new BadRequestException('Failed to upload file');
     }
@@ -161,7 +184,20 @@ export class UploadService {
 
       await blockBlobClient.deleteIfExists();
       this.logger.debug(`Deleted blob: ${blobName}`);
+
+      // Log business event with structured logging
+      this.customLogger.logBusinessEvent('file_deleted', {
+        containerName,
+        fileName: blobName
+      });
     } catch (error) {
+      // Log error with structured logging
+      this.customLogger.logError(error as Error, {
+        containerName,
+        fileName: blobName,
+        action: 'delete_file'
+      });
+
       this.logger.error(`Failed to delete file: ${error instanceof Error ? error.message : 'Unknown error'}`, error instanceof Error ? error.stack : undefined);
       throw new BadRequestException('Failed to delete file');
     }

@@ -4,6 +4,7 @@ import { Injectable, NotFoundException, BadRequestException, Inject } from '@nes
 import { DatabaseClient } from '../database/database.client';
 import { DATABASE_CLIENT } from '../database/database.module';
 import { PaginationService } from '../common/services/pagination.service';
+import { CustomLoggerService } from '../common/services/logger.service';
 import { PaginatedResult, PaginationOptions } from '../common/interfaces/pagination.interface';
 import { Experience, ExperienceWithImages, ExperienceImage } from './entities/experience.entity';
 import {
@@ -39,6 +40,7 @@ export class ExperiencesService {
     @Inject(DATABASE_CLIENT) private readonly db: DatabaseClient,
     private readonly paginationService: PaginationService,
     private readonly uploadService: UploadService,
+    private readonly logger: CustomLoggerService,
   ) { }
 
   async create(createExperienceDto: CreateExperienceDto): Promise<Experience> {
@@ -76,8 +78,27 @@ export class ExperiencesService {
         ],
       );
 
-      return result.rows[0];
+      const experience = result.rows[0];
+
+      // Log business event
+      this.logger.logBusinessEvent('experience_created', {
+        experienceId: experience.id,
+        resortId: experience.resort_id,
+        title: experience.title,
+        category: experience.category,
+        priceUSD: experience.price_cents / 100
+      });
+
+      return experience;
     } catch (error: unknown) {
+      // Log error
+      this.logger.logError(error as Error, {
+        resortId: resort_id,
+        title,
+        category,
+        action: 'create_experience'
+      });
+
       if (isPostgreSQLError(error) && error.code === '23503') {
         // Foreign key constraint violation
         throw new BadRequestException('Resort not found');
@@ -290,10 +311,24 @@ export class ExperiencesService {
       params,
     );
 
-    return result.rows[0];
+    const updatedExperience = result.rows[0];
+
+    // Log business event
+    this.logger.logBusinessEvent('experience_updated', {
+      experienceId: id,
+      resortId: updatedExperience.resort_id,
+      title: updatedExperience.title,
+      changes: updateExperienceDto,
+      status: updatedExperience.status
+    });
+
+    return updatedExperience;
   }
 
   async remove(id: string): Promise<void> {
+    // Get experience data before deletion for logging
+    const experience = await this.findOne(id);
+
     const result = await this.db.query(
       'DELETE FROM experiences WHERE id = $1',
       [id],
@@ -302,6 +337,14 @@ export class ExperiencesService {
     if (result.rowCount === 0) {
       throw new NotFoundException('Experience not found');
     }
+
+    // Log business event
+    this.logger.logBusinessEvent('experience_deleted', {
+      experienceId: id,
+      resortId: experience.resort_id,
+      title: experience.title,
+      status: experience.status
+    });
   }
 
   async presignImageUpload(
@@ -529,23 +572,22 @@ export class ExperiencesService {
 
       const experience = result.rows[0] as Experience;
 
-      // Log the business event (assuming logger is available)
-      // this.logger.logBusinessEvent('experience_submitted_for_review', {
-      //   userId,
-      //   experienceId: id,
-      //   experienceTitle: experience.title
-      // });
+      // Log the business event
+      this.logger.logBusinessEvent('experience_submitted_for_review', {
+        userId,
+        experienceId: id,
+        experienceTitle: experience.title,
+        resortId: experience.resort_id
+      });
 
       return experience;
     } catch (error: unknown) {
-      const pgError = error as PostgreSQLError;
-      
-      // Log error if logger is available
-      // this.logger.logError(error as Error, {
-      //   userId,
-      //   experienceId: id,
-      //   action: 'submit_for_review'
-      // });
+      // Log error
+      this.logger.logError(error as Error, {
+        userId,
+        experienceId: id,
+        action: 'submit_for_review'
+      });
 
       throw error;
     }

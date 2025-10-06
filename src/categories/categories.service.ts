@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, ConflictException, Inject } from '@nestj
 import { DatabaseClient } from '../database/database.client';
 import { DATABASE_CLIENT } from '../database/database.module';
 import { PaginationService } from '../common/services/pagination.service';
+import { CustomLoggerService } from '../common/services/logger.service';
 import { PaginatedResult, PaginationOptions } from '../common/interfaces/pagination.interface';
 import { Category } from './entities/category.entity';
 import { CreateCategoryDto, UpdateCategoryDto, QueryCategoriesDto } from './dto';
@@ -25,6 +26,7 @@ export class CategoriesService {
   constructor(
     @Inject(DATABASE_CLIENT) private readonly db: DatabaseClient,
     private readonly paginationService: PaginationService,
+    private readonly logger: CustomLoggerService,
   ) {}
 
   async create(createCategoryDto: CreateCategoryDto): Promise<Category> {
@@ -41,8 +43,24 @@ export class CategoriesService {
         [name, finalSlug],
       );
 
-      return result.rows[0];
+      const category = result.rows[0];
+
+      // Log business event
+      this.logger.logBusinessEvent('category_created', {
+        categoryId: category.id,
+        name: category.name,
+        slug: category.slug
+      });
+
+      return category;
     } catch (error: unknown) {
+      // Log error
+      this.logger.logError(error as Error, {
+        name,
+        slug: finalSlug,
+        action: 'create_category'
+      });
+
       if (isPostgreSQLError(error) && error.code === '23505') {
         // Unique constraint violation
         throw new ConflictException('Category with this slug already exists');
@@ -186,8 +204,25 @@ export class CategoriesService {
         params,
       );
 
-      return result.rows[0];
+      const updatedCategory = result.rows[0];
+
+      // Log business event
+      this.logger.logBusinessEvent('category_updated', {
+        categoryId: id,
+        name: updatedCategory.name,
+        slug: updatedCategory.slug,
+        changes: updateCategoryDto
+      });
+
+      return updatedCategory;
     } catch (error: unknown) {
+      // Log error
+      this.logger.logError(error as Error, {
+        categoryId: id,
+        changes: updateCategoryDto,
+        action: 'update_category'
+      });
+
       if (isPostgreSQLError(error) && error.code === '23505') {
         // Unique constraint violation
         throw new ConflictException('Category with this slug already exists');
@@ -197,6 +232,9 @@ export class CategoriesService {
   }
 
   async remove(id: string): Promise<void> {
+    // Get category data before deletion for logging
+    const category = await this.findOne(id);
+
     const result = await this.db.query(
       'DELETE FROM categories WHERE id = $1',
       [id],
@@ -205,6 +243,13 @@ export class CategoriesService {
     if (result.rowCount === 0) {
       throw new NotFoundException('Category not found');
     }
+
+    // Log business event
+    this.logger.logBusinessEvent('category_deleted', {
+      categoryId: id,
+      name: category.name,
+      slug: category.slug
+    });
   }
 
   private generateSlug(name: string): string {
