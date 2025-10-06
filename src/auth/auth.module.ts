@@ -8,12 +8,14 @@ import { PasswordHashService } from './services/password-hash.service';
 import { UsersModule } from '../users/users.module';
 import { JwtAccessStrategy } from './strategies/jwt-access.strategy';
 import { DatabaseModule } from '../database/database.module';
+import { CommonModule } from '../common/common.module';
 
 @Module({
   imports: [
     ConfigModule,
     UsersModule,
     DatabaseModule,
+    CommonModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],
