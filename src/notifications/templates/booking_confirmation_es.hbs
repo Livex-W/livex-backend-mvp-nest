@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confirmación de Reserva - LIVEX</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #007bff; color: white; padding: 20px; text-align: center; }
+        .content { padding: 20px; background: #f9f9f9; }
+        .booking-details { background: white; padding: 15px; border-radius: 5px; margin: 15px 0; }
+        .booking-code { background: #28a745; color: white; padding: 10px; text-align: center; font-weight: bold; border-radius: 5px; }
+        .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>✅ ¡Reserva Confirmada!</h1>
+        </div>
+        
+        <div class="content">
+            <p>Hola <strong>{{customerName}}</strong>,</p>
+            
+            <p>¡Excelente noticia! Tu reserva para <strong>{{experienceName}}</strong> ha sido confirmada exitosamente.</p>
+            
+            <div class="booking-details">
+                <h3>Detalles de tu reserva:</h3>
+                <ul>
+                    <li><strong>Experiencia:</strong> {{experienceName}}</li>
+                    <li><strong>Fecha:</strong> {{bookingDate}}</li>
+                    <li><strong>Hora:</strong> {{bookingTime}}</li>
+                    <li><strong>Número de personas:</strong> {{guestCount}}</li>
+                    <li><strong>Total pagado:</strong> ${{totalAmount}} COP</li>
+                </ul>
+            </div>
+            
+            <div class="booking-code">
+                Código de reserva: {{bookingCode}}
+            </div>
+            
+            <p>Te recomendamos guardar este código de reserva, ya que lo necesitarás el día de tu experiencia.</p>
+            
+            <p>¡Esperamos que disfrutes al máximo tu experiencia con LIVEX!</p>
+            
+            <p>Si tienes alguna pregunta, no dudes en contactarnos.</p>
+        </div>
+        
+        <div class="footer">
+            <p>LIVEX - Experiencias Únicas<br>
+            Este es un email automático, por favor no respondas a este mensaje.</p>
+        </div>
+    </div>
+</body>
+</html>

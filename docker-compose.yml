@@ -130,6 +130,30 @@ services:
     networks:
       - livex_net
 
+  notification-worker:
+    build:
+      context: .
+      target: ${BUILD_TARGET:-dev}
+    container_name: livex_notification-worker
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - ${ENV_FILE:-.env.development}
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+    command: ["sh", "-c", "${WORKER_COMMAND:-npm run notification-worker:dev}"]
+    volumes:
+      - type: bind
+        source: .
+        target: /app
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"process.exit(0)\""]  # placeholder
+    networks:
+      - livex_net
+
   nginx:
     image: nginx:1.27-alpine
     container_name: livex_nginx

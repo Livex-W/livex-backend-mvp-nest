@@ -19,6 +19,7 @@ import { AvailabilityModule } from './availability/availability.module';
 import { UploadModule } from './upload/upload.module';
 import { ResortsModule } from './resorts/resorts.module';
 import { AdminModule } from './admin/admin.module';
+import { NotificationModule } from './notifications/notification.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { AdminModule } from './admin/admin.module';
     UploadModule,
     ResortsModule,
     AdminModule,
+    NotificationModule,
   ],
   controllers: [AppController],
   providers: [
