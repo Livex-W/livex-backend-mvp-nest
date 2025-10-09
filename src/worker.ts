@@ -13,7 +13,7 @@ const EX_DLX = "webhooks.dlx";
 const Q_PROCESS = "webhooks.payments.process";
 const Q_RETRY = "webhooks.payments.retry";
 
-async function connectRabbitWithRetry(retries = 5, delay = 2000): Promise<amqplib.ChannelModel> {
+async function connectRabbitWithRetry(retries = 10, delay = 2000): Promise<amqplib.ChannelModel> {
     for (let attempt = 1; ; attempt += 1) {
         try {
             return await amqplib.connect(AMQP_URL);

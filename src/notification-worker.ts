@@ -54,7 +54,7 @@ async function setupExchangesAndQueues(ch: amqplib.Channel): Promise<void> {
     console.log("[notification-worker] exchanges y colas aseguradas");
 }
 
-async function connectRabbitWithRetry(retries = 5, delay = 2000): Promise<amqplib.ChannelModel> {
+async function connectRabbitWithRetry(retries = 10, delay = 2000): Promise<amqplib.ChannelModel> {
     for (let attempt = 1; ; attempt += 1) {
         try {
             return await amqplib.connect(AMQP_URL);

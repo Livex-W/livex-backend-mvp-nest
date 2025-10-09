@@ -81,6 +81,7 @@ services:
       context: .
       target: ${BUILD_TARGET:-dev}
     container_name: livex_api
+    restart: always
     depends_on:
       db:
         condition: service_healthy
@@ -112,6 +113,7 @@ services:
       context: .
       target: ${BUILD_TARGET:-dev}
     container_name: livex_worker
+    restart: always
     depends_on:
       db:
         condition: service_healthy
@@ -136,6 +138,7 @@ services:
       context: .
       target: ${BUILD_TARGET:-dev}
     container_name: livex_notification-worker
+    restart: always
     depends_on:
       db:
         condition: service_healthy
