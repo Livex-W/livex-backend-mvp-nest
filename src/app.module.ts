@@ -20,12 +20,15 @@ import { UploadModule } from './upload/upload.module';
 import { ResortsModule } from './resorts/resorts.module';
 import { AdminModule } from './admin/admin.module';
 import { NotificationModule } from './notifications/notification.module';
+import { BookingsModule } from './bookings/bookings.module';
+import bookingConfig from './common/config/booking.config';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env.development',
+      load: [bookingConfig],
     }),
     CommonModule,
     AuthModule,
@@ -37,6 +40,7 @@ import { NotificationModule } from './notifications/notification.module';
     ResortsModule,
     AdminModule,
     NotificationModule,
+    BookingsModule,
   ],
   controllers: [AppController],
   providers: [

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import * as amqplib from "amqplib";
 import { Pool } from "pg";
@@ -14,13 +13,26 @@ const EX_DLX = "webhooks.dlx";
 const Q_PROCESS = "webhooks.payments.process";
 const Q_RETRY = "webhooks.payments.retry";
 
+async function connectRabbitWithRetry(retries = 5, delay = 2000): Promise<amqplib.ChannelModel> {
+    for (let attempt = 1; ; attempt += 1) {
+        try {
+            return await amqplib.connect(AMQP_URL);
+        } catch (err) {
+            if (attempt >= retries) throw err;
+            const wait = delay * attempt;
+            console.warn(`[worker] RabbitMQ no disponible (intento ${attempt}) → reintentando en ${wait} ms`);
+            await new Promise(res => setTimeout(res, wait));
+        }
+    }
+}
+
 async function main() {
     // DB
     const db = new Pool({ connectionString: DATABASE_URL });
     await db.query("select 1");
 
     // RabbitMQ
-    const conn = await amqplib.connect(AMQP_URL);
+    const conn = await connectRabbitWithRetry();
     const ch = await conn.createChannel();
 
     await ch.assertExchange(EX_WEBHOOKS, "topic", { durable: true });
@@ -43,7 +55,7 @@ async function main() {
 
     console.log("[worker] listo. Esperando mensajes…");
 
-    // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-misused-promises
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises
     await ch.consume(Q_PROCESS, async (msg: amqplib.ConsumeMessage | null) => {
         if (!msg) return;
 

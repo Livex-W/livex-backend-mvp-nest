@@ -44,6 +44,7 @@ services:
     image: axllent/mailpit:latest
     container_name: livex_mailpit
     profiles: ["dev", "staging"]
+    command: ["--webroot", "/mailpit"]
     ports:
       - "1025:1025"  # SMTP
       - "8025:8025"  # UI

@@ -1,5 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-misused-promises */
 import * as amqplib from "amqplib";
 import { Pool } from "pg";
 import { EmailService } from "./notifications/services/email.service";
@@ -16,6 +15,57 @@ const Q_EMAIL_HIGH = "notifications.email.high";
 const Q_EMAIL_MEDIUM = "notifications.email.medium";
 const Q_EMAIL_LOW = "notifications.email.low";
 const Q_EMAIL_RETRY = "notifications.email.retry";
+const Q_EMAIL_SCHEDULED = "notifications.email.scheduled";
+
+async function setupExchangesAndQueues(ch: amqplib.Channel): Promise<void> {
+    await ch.assertExchange(EX_NOTIFICATIONS, "topic", { durable: true });
+    await ch.assertExchange(EX_DLX, "fanout", { durable: true });
+
+    await ch.assertQueue(Q_EMAIL_HIGH, {
+        durable: true,
+        deadLetterExchange: EX_DLX,
+    });
+    await ch.bindQueue(Q_EMAIL_HIGH, EX_NOTIFICATIONS, "email.high");
+
+    await ch.assertQueue(Q_EMAIL_MEDIUM, {
+        durable: true,
+        deadLetterExchange: EX_DLX,
+    });
+    await ch.bindQueue(Q_EMAIL_MEDIUM, EX_NOTIFICATIONS, "email.medium");
+
+    await ch.assertQueue(Q_EMAIL_LOW, {
+        durable: true,
+        deadLetterExchange: EX_DLX,
+    });
+    await ch.bindQueue(Q_EMAIL_LOW, EX_NOTIFICATIONS, "email.low");
+
+    await ch.assertQueue(Q_EMAIL_SCHEDULED, {
+        durable: true,
+        deadLetterExchange: EX_NOTIFICATIONS,
+    });
+
+    await ch.assertQueue(Q_EMAIL_RETRY, {
+        durable: true,
+        messageTtl: 60000,
+        deadLetterExchange: EX_NOTIFICATIONS,
+    });
+    await ch.bindQueue(Q_EMAIL_RETRY, EX_DLX, "");
+
+    console.log("[notification-worker] exchanges y colas aseguradas");
+}
+
+async function connectRabbitWithRetry(retries = 5, delay = 2000): Promise<amqplib.ChannelModel> {
+    for (let attempt = 1; ; attempt += 1) {
+        try {
+            return await amqplib.connect(AMQP_URL);
+        } catch (err) {
+            if (attempt >= retries) throw err;
+            const wait = delay * attempt;
+            console.warn(`[worker] RabbitMQ no disponible (intento ${attempt}) → reintentando en ${wait} ms`);
+            await new Promise(res => setTimeout(res, wait));
+        }
+    }
+}
 
 async function main() {
     console.log("[notification-worker] iniciando...");
@@ -31,8 +81,10 @@ async function main() {
     console.log("[notification-worker] Email service inicializado");
 
     // RabbitMQ
-    const conn = await amqplib.connect(AMQP_URL);
+    const conn = await connectRabbitWithRetry();
     const ch = await conn.createChannel();
+
+    await setupExchangesAndQueues(ch);
 
     // Configurar prefetch para procesar mensajes de uno en uno por cola
     ch.prefetch(1);
@@ -51,6 +103,7 @@ async function main() {
 
             // Validar que es un job de email
             if (job.type !== 'email') {
+                // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
                 console.warn(`[notification-worker] tipo de job no soportado: ${job.type}`);
                 ch.ack(msg);
                 return;
@@ -87,7 +140,7 @@ async function main() {
                     
                     // Enviar a cola de retry con TTL
                     const retryMessage = Buffer.from(JSON.stringify(job));
-                    await ch.sendToQueue(Q_EMAIL_RETRY, retryMessage, {
+                     ch.sendToQueue(Q_EMAIL_RETRY, retryMessage, {
                         persistent: true,
                         expiration: delay.toString(),
                     });

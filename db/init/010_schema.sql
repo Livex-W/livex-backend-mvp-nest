@@ -10,7 +10,7 @@ DO $$ BEGIN
         CREATE TYPE user_role AS ENUM ('tourist','resort','admin');
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'resort_status') THEN
-        CREATE TYPE resort_status AS ENUM ('draft','under_review','active','rejected');
+        CREATE TYPE resort_status AS ENUM ('draft','under_review','approved','rejected');
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'experience_status') THEN
         CREATE TYPE experience_status AS ENUM ('draft','under_review','active','rejected');
@@ -120,9 +120,10 @@ CREATE TABLE IF NOT EXISTS bookings (
   experience_id  uuid NOT NULL REFERENCES experiences(id) ON DELETE CASCADE,
   slot_id        uuid NOT NULL REFERENCES availability_slots(id) ON DELETE CASCADE,
   adults         integer NOT NULL CHECK (adults >= 0),
-  children       integer NOT NULL CHECK (children >= 0),
+  children       integer NOT NULL DEFAULT 0 CHECK (children >= 0),
   total_cents    integer NOT NULL CHECK (total_cents >= 0),
   currency       text NOT NULL DEFAULT 'COP',
+  idempotency_key text,
   status         booking_status NOT NULL DEFAULT 'pending',
   created_at     timestamptz NOT NULL DEFAULT now(),
   updated_at     timestamptz NOT NULL DEFAULT now(),
@@ -132,6 +133,10 @@ CREATE INDEX IF NOT EXISTS idx_bookings_user ON bookings(user_id);
 CREATE INDEX IF NOT EXISTS idx_bookings_experience ON bookings(experience_id);
 CREATE INDEX IF NOT EXISTS idx_bookings_slot ON bookings(slot_id);
 CREATE INDEX IF NOT EXISTS idx_bookings_status ON bookings(status);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_bookings_idempotency
+  ON bookings(idempotency_key) WHERE idempotency_key IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_bookings_idempotency
+    ON bookings(idempotency_key) WHERE idempotency_key IS NOT NULL;
 CREATE TRIGGER trg_bookings_updated_at BEFORE UPDATE ON bookings
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
@@ -369,7 +374,8 @@ ALTER TABLE bookings
   ADD COLUMN IF NOT EXISTS cancel_reason text,
   ADD COLUMN IF NOT EXISTS completed_at timestamptz,
   ADD COLUMN IF NOT EXISTS subtotal_cents integer NOT NULL DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS tax_cents integer NOT NULL DEFAULT 0;
+  ADD COLUMN IF NOT EXISTS tax_cents integer NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS idempotency_key text;
 CREATE INDEX IF NOT EXISTS idx_bookings_expires_at ON bookings(expires_at);
 
 CREATE TABLE IF NOT EXISTS inventory_locks (

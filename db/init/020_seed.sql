@@ -187,9 +187,9 @@ ON inventory_locks(slot_id, expires_at, consumed_at)
 WHERE consumed_at IS NULL;
 
 -- Add partial index for non-expired bookings
-CREATE INDEX IF NOT EXISTS idx_bookings_non_expired 
-ON bookings(slot_id, expires_at, status) 
-WHERE expires_at IS NULL OR expires_at > now();
+-- CREATE INDEX IF NOT EXISTS idx_bookings_non_expired 
+-- ON bookings(slot_id, expires_at, status) 
+-- WHERE expires_at IS NULL OR expires_at > now();
 
 -- Add comment for documentation
 COMMENT ON INDEX idx_availability_slots_experience_date IS 'Optimizes availability queries by experience and date range';
@@ -197,4 +197,4 @@ COMMENT ON INDEX idx_availability_slots_date IS 'Optimizes calendar view queries
 COMMENT ON INDEX idx_availability_slots_capacity IS 'Optimizes queries filtering by available capacity';
 COMMENT ON INDEX idx_bookings_active_slot IS 'Optimizes remaining capacity calculations for active bookings';
 COMMENT ON INDEX idx_inventory_locks_active_detailed IS 'Optimizes remaining capacity calculations for active locks';
-COMMENT ON INDEX idx_bookings_non_expired IS 'Optimizes queries for non-expired bookings';
+-- COMMENT ON INDEX idx_bookings_non_expired IS 'Optimizes queries for non-expired bookings';
