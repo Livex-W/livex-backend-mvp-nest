@@ -23,7 +23,7 @@ interface CreatePendingBookingInput {
   timeZone?: string;
 }
 
-interface PendingBookingResult {
+export interface PendingBookingResult {
   bookingId: string;
   lockId: string;
   status: 'pending';
@@ -333,8 +333,9 @@ export class BookingsService {
           currency,
           status,
           expires_at,
-          idempotency_key
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'pending',$10,$11)
+          idempotency_key,
+          agent_id
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'pending',$10,$11,$12)
         RETURNING id`,
         [
           params.userId,
@@ -348,6 +349,7 @@ export class BookingsService {
           params.dto.currency,
           params.expiresAt,
           params.idempotencyKey ?? null,
+          params.dto.agentId ?? null,
         ],
       );
 

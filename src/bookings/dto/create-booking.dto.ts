@@ -34,4 +34,8 @@ export class CreateBookingDto {
   @Matches(/^[A-Z]{3}$/)
   currency: string = 'COP';
 
+  @IsOptional()
+  @IsUUID()
+  agentId?: string;
+
 }

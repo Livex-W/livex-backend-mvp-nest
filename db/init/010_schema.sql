@@ -19,7 +19,13 @@ DO $$ BEGIN
         CREATE TYPE booking_status AS ENUM ('pending','confirmed','cancelled','refunded','expired');
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'payment_status') THEN
-        CREATE TYPE payment_status AS ENUM ('authorized','paid','refunded','failed');
+        CREATE TYPE payment_status AS ENUM ('pending','authorized','paid','refunded','failed','expired');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'payment_provider') THEN
+        CREATE TYPE payment_provider AS ENUM ('wompi','epayco','stripe','paypal');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'refund_status') THEN
+        CREATE TYPE refund_status AS ENUM ('pending','processed','failed','cancelled');
     END IF;
 END $$;
 
@@ -114,6 +120,22 @@ CREATE INDEX IF NOT EXISTS idx_slots_start ON availability_slots(start_time);
 CREATE TRIGGER trg_slots_updated_at BEFORE UPDATE ON availability_slots
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
+-- 1. Tabla para definir la relación entre un Agente (Usuario) y un Resort, con su % de comisión
+CREATE TABLE resort_agents (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    resort_id uuid NOT NULL REFERENCES resorts(id),
+    user_id uuid NOT NULL REFERENCES users(id),
+    commission_bps integer NOT NULL CHECK (commission_bps >= 0 AND commission_bps <= 10000), -- Basis Points (1500 = 15%)
+    is_active boolean DEFAULT true,
+    created_at timestamptz DEFAULT now(),
+    updated_at timestamptz DEFAULT now(),
+    
+    -- Un usuario solo puede tener un acuerdo activo por resort
+    CONSTRAINT unique_active_agent_resort UNIQUE (resort_id, user_id)
+);
+
+
+
 CREATE TABLE IF NOT EXISTS bookings (
   id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id        uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -125,6 +147,7 @@ CREATE TABLE IF NOT EXISTS bookings (
   currency       text NOT NULL DEFAULT 'COP',
   idempotency_key text,
   status         booking_status NOT NULL DEFAULT 'pending',
+  agent_id       uuid REFERENCES users(id), -- Nuevo campo para Agentes
   created_at     timestamptz NOT NULL DEFAULT now(),
   updated_at     timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT booking_quantities CHECK (adults + children > 0)
@@ -133,6 +156,26 @@ CREATE INDEX IF NOT EXISTS idx_bookings_user ON bookings(user_id);
 CREATE INDEX IF NOT EXISTS idx_bookings_experience ON bookings(experience_id);
 CREATE INDEX IF NOT EXISTS idx_bookings_slot ON bookings(slot_id);
 CREATE INDEX IF NOT EXISTS idx_bookings_status ON bookings(status);
+CREATE INDEX IF NOT EXISTS idx_bookings_agent ON bookings(agent_id); -- Índice para agentes
+
+-- 3. Tabla para registrar las comisiones generadas por cada venta
+CREATE TABLE IF NOT EXISTS agent_commissions (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    booking_id uuid NOT NULL REFERENCES bookings(id),
+    agent_id uuid NOT NULL REFERENCES users(id),
+    resort_id uuid NOT NULL REFERENCES resorts(id),
+    
+    amount_cents integer NOT NULL, -- Monto exacto de la comisión
+    rate_bps integer NOT NULL,     -- Tasa que se aplicó en ese momento
+    
+    status text NOT NULL DEFAULT 'pending', -- pending, paid, cancelled
+    paid_at timestamptz,
+    
+    created_at timestamptz DEFAULT now(),
+    updated_at timestamptz DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_agent_commissions_agent ON agent_commissions(agent_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_bookings_idempotency
   ON bookings(idempotency_key) WHERE idempotency_key IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_bookings_idempotency
@@ -141,26 +184,76 @@ CREATE TRIGGER trg_bookings_updated_at BEFORE UPDATE ON bookings
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 CREATE TABLE IF NOT EXISTS payments (
-  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  booking_id     uuid NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
-  provider       text NOT NULL,
-  provider_ref   text,
-  amount_cents   integer NOT NULL CHECK (amount_cents >= 0),
-  status         payment_status NOT NULL,
-  paid_at        timestamptz,
-  created_at     timestamptz NOT NULL DEFAULT now()
+  id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  booking_id          uuid NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+  provider            payment_provider NOT NULL,
+  provider_payment_id text,
+  provider_reference  text,
+  amount_cents        integer NOT NULL CHECK (amount_cents >= 0),
+  currency            text NOT NULL DEFAULT 'COP',
+  status              payment_status NOT NULL DEFAULT 'pending',
+  payment_method      text,
+  idempotency_key     text,
+  checkout_url        text,
+  expires_at          timestamptz,
+  authorized_at       timestamptz,
+  paid_at             timestamptz,
+  failed_at           timestamptz,
+  failure_reason      text,
+  provider_metadata   jsonb,
+  created_at          timestamptz NOT NULL DEFAULT now(),
+  updated_at          timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_payments_booking ON payments(booking_id);
 CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status);
+CREATE INDEX IF NOT EXISTS idx_payments_provider_id ON payments(provider, provider_payment_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_idempotency 
+  ON payments(idempotency_key) WHERE idempotency_key IS NOT NULL;
+CREATE TRIGGER trg_payments_updated_at BEFORE UPDATE ON payments
+FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 CREATE TABLE IF NOT EXISTS refunds (
-  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  payment_id     uuid NOT NULL REFERENCES payments(id) ON DELETE CASCADE,
-  amount_cents   integer NOT NULL CHECK (amount_cents >= 0),
-  reason         text,
-  processed_at   timestamptz NOT NULL DEFAULT now()
+  id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  payment_id          uuid NOT NULL REFERENCES payments(id) ON DELETE CASCADE,
+  amount_cents        integer NOT NULL CHECK (amount_cents >= 0),
+  currency            text NOT NULL DEFAULT 'COP',
+  status              refund_status NOT NULL DEFAULT 'pending',
+  reason              text,
+  provider_refund_id  text,
+  provider_reference  text,
+  requested_by        uuid REFERENCES users(id) ON DELETE SET NULL,
+  requested_at        timestamptz NOT NULL DEFAULT now(),
+  processed_at        timestamptz,
+  failed_at           timestamptz,
+  failure_reason      text,
+  provider_metadata   jsonb,
+  created_at          timestamptz NOT NULL DEFAULT now(),
+  updated_at          timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_refunds_payment ON refunds(payment_id);
+CREATE INDEX IF NOT EXISTS idx_refunds_status ON refunds(status);
+CREATE INDEX IF NOT EXISTS idx_refunds_provider_id ON refunds(provider_refund_id);
+CREATE TRIGGER trg_refunds_updated_at BEFORE UPDATE ON refunds
+FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE TABLE IF NOT EXISTS payment_reconciliations (
+  id                    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  reconciliation_date   date NOT NULL,
+  provider              payment_provider NOT NULL,
+  total_payments        integer NOT NULL DEFAULT 0,
+  total_amount_cents    bigint NOT NULL DEFAULT 0,
+  reconciled_payments   integer NOT NULL DEFAULT 0,
+  reconciled_amount_cents bigint NOT NULL DEFAULT 0,
+  discrepancies_count   integer NOT NULL DEFAULT 0,
+  status                text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','completed','failed')),
+  notes                 text,
+  created_at            timestamptz NOT NULL DEFAULT now(),
+  updated_at            timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_payment_reconciliations_date ON payment_reconciliations(reconciliation_date);
+CREATE INDEX IF NOT EXISTS idx_payment_reconciliations_provider ON payment_reconciliations(provider);
+CREATE TRIGGER trg_payment_reconciliations_updated_at BEFORE UPDATE ON payment_reconciliations
+FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 CREATE TABLE IF NOT EXISTS commissions (
   id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),

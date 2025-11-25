@@ -164,6 +164,79 @@ VALUES
 
 UPDATE experience_images SET image_type = 'gallery' WHERE image_type IS NULL;
 
+-- ===========================
+-- 11) DATOS DE PRUEBA SISTEMA DE AGENTES
+-- ===========================
+
+-- 11.1) Crear un usuario Agente
+WITH agent_user AS (
+  INSERT INTO users (email, password_hash, full_name, role) 
+  VALUES ('agente.carlos@gmail.com', '$2b$10$j54QekkMZucJ.hKpcRMmqe4SnETnpr.8OxLyRfAZVLnSVkBgP4eFS', 'Carlos El Vendedor', 'tourist')
+  RETURNING id
+),
+
+-- 11.2) Crear Acuerdo: Carlos vende para "Mar y Sol Cartagena" con 15% (1500 bps)
+agreement AS (
+  INSERT INTO resort_agents (resort_id, user_id, commission_bps, is_active)
+  SELECT 
+    (SELECT id FROM r WHERE name='Mar y Sol Cartagena'),
+    (SELECT id FROM agent_user),
+    1500, -- 15%
+    true
+  RETURNING id, resort_id, user_id, commission_bps
+),
+
+-- 11.3) Crear una Reserva hecha por el Agente (Booking Confirmado)
+agent_booking AS (
+  INSERT INTO bookings (
+    user_id, experience_id, slot_id, agent_id,
+    adults, children, subtotal_cents, tax_cents, total_cents, currency, 
+    status, created_at, updated_at
+  )
+  VALUES (
+    (SELECT id FROM u WHERE email='sofia.turista@gmail.com'), -- El turista final
+    (SELECT id FROM e WHERE title='City Tour Histórico'),
+    (SELECT id FROM availability_slots WHERE experience_id=(SELECT id FROM e WHERE title='City Tour Histórico') LIMIT 1),
+    (SELECT user_id FROM agreement), -- El agente Carlos
+    2, 0, 200000, 38000, 238000, 'COP', -- $238,000 COP Total
+    'confirmed', now(), now()
+  )
+  RETURNING id, total_cents, agent_id, experience_id
+),
+
+-- 11.4) Registrar el Pago Exitoso
+agent_payment AS (
+  INSERT INTO payments (
+    booking_id, provider, provider_reference, amount_cents, currency, 
+    status, payment_method, paid_at
+  )
+  VALUES (
+    (SELECT id FROM agent_booking), 'wompi', 'WOMPI-TEST-AGENT-01', 
+    (SELECT total_cents FROM agent_booking), 'COP',
+    'paid', 'card', now()
+  )
+)
+
+-- 11.5) Generar las Comisiones (Simulando lo que haría el backend)
+-- Comisión Livex (10%)
+INSERT INTO commissions (booking_id, rate_bps, commission_cents, created_at)
+SELECT id, 1000, FLOOR(total_cents * 0.10), now()
+FROM agent_booking;
+
+-- Comisión Agente (15%)
+INSERT INTO agent_commissions (
+  booking_id, agent_id, resort_id, amount_cents, rate_bps, status, created_at
+)
+SELECT 
+  b.id, 
+  b.agent_id, 
+  (SELECT resort_id FROM agreement),
+  FLOOR(b.total_cents * 0.15), -- 15% de 238,000 = 35,700
+  1500,
+  'pending',
+  now()
+FROM agent_booking b;
+
 CREATE INDEX IF NOT EXISTS idx_availability_slots_experience_date 
 ON availability_slots(experience_id, start_time, end_time);
 

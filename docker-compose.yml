@@ -158,6 +158,54 @@ services:
     networks:
       - livex_net
 
+  booking-expiry-worker:
+    build:
+      context: .
+      target: ${BUILD_TARGET:-dev}
+    container_name: livex_booking-expiry-worker
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - ${ENV_FILE:-.env.development}
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      BOOKING_PENDING_TTL_MINUTES: ${BOOKING_PENDING_TTL_MINUTES:-15}
+    command: ["sh", "-c", "${BOOKING_EXPIRY_WORKER_COMMAND:-npm run booking-expiry-worker:dev}"]
+    volumes:
+      - type: bind
+        source: .
+        target: /app
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"process.exit(0)\""]  # placeholder
+    networks:
+      - livex_net
+
+  payment-reconciliation-worker:
+    build:
+      context: .
+      target: ${BUILD_TARGET:-dev}
+    container_name: livex_payment-reconciliation-worker
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - ${ENV_FILE:-.env.development}
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      RECONCILIATION_INTERVAL_MS: ${RECONCILIATION_INTERVAL_MS:-86400000}
+    command: ["sh", "-c", "${PAYMENT_RECONCILIATION_WORKER_COMMAND:-npm run payment-reconciliation-worker:dev}"]
+    volumes:
+      - type: bind
+        source: .
+        target: /app
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"process.exit(0)\""]  # placeholder
+    networks:
+      - livex_net
+
   nginx:
     image: nginx:1.27-alpine
     container_name: livex_nginx

@@ -22,7 +22,11 @@
     "worker:dev": "nodemon --watch src --ext ts,js --exec \"node --enable-source-maps -r ts-node/register src/worker.ts\"",
     "worker": "node dist/worker.js",
     "notification-worker:dev": "nodemon --watch src --ext ts,js --exec \"node --enable-source-maps -r ts-node/register src/notification-worker.ts\"",
-    "notification-worker": "node dist/notification-worker.js"
+    "notification-worker": "node dist/notification-worker.js",
+    "booking-expiry-worker:dev": "nodemon --watch src --ext ts,js --exec \"node --enable-source-maps -r ts-node/register src/booking-expiry-worker.ts\"",
+    "booking-expiry-worker": "node dist/booking-expiry-worker.js",
+    "payment-reconciliation-worker:dev": "nodemon --watch src --ext ts,js --exec \"node --enable-source-maps -r ts-node/register src/payment-reconciliation-worker.ts\"",
+    "payment-reconciliation-worker": "node dist/payment-reconciliation-worker.js"
   },
   "dependencies": {
     "@azure/identity": "^4.12.0",

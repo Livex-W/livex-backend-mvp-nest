@@ -21,6 +21,7 @@ import { ResortsModule } from './resorts/resorts.module';
 import { AdminModule } from './admin/admin.module';
 import { NotificationModule } from './notifications/notification.module';
 import { BookingsModule } from './bookings/bookings.module';
+import { PaymentsModule } from './payments/payments.module';
 import bookingConfig from './common/config/booking.config';
 
 @Module({
@@ -41,6 +42,7 @@ import bookingConfig from './common/config/booking.config';
     AdminModule,
     NotificationModule,
     BookingsModule,
+    PaymentsModule,
   ],
   controllers: [AppController],
   providers: [
