@@ -7,7 +7,7 @@ CREATE EXTENSION IF NOT EXISTS citext;
 
 DO $$ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_role') THEN
-        CREATE TYPE user_role AS ENUM ('tourist','resort','admin');
+        CREATE TYPE user_role AS ENUM ('tourist','resort','admin','agent');
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'resort_status') THEN
         CREATE TYPE resort_status AS ENUM ('draft','under_review','approved','rejected');
@@ -148,6 +148,7 @@ CREATE TABLE IF NOT EXISTS bookings (
   idempotency_key text,
   status         booking_status NOT NULL DEFAULT 'pending',
   agent_id       uuid REFERENCES users(id), -- Nuevo campo para Agentes
+  referral_code_id uuid REFERENCES referral_codes(id), -- Código usado en esta reserva
   created_at     timestamptz NOT NULL DEFAULT now(),
   updated_at     timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT booking_quantities CHECK (adults + children > 0)
@@ -174,6 +175,163 @@ CREATE TABLE IF NOT EXISTS agent_commissions (
     created_at timestamptz DEFAULT now(),
     updated_at timestamptz DEFAULT now()
 );
+
+CREATE TABLE IF NOT EXISTS agent_profiles (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    
+    -- Datos Bancarios
+    bank_name text,
+    account_number text,
+    account_type text, -- savings, checking
+    account_holder_name text,
+    
+    -- Datos Fiscales
+    tax_id text, -- NIT, Cédula, SSN
+    
+    is_verified boolean DEFAULT false,
+    
+    created_at timestamptz DEFAULT now(),
+    updated_at timestamptz DEFAULT now(),
+    
+    CONSTRAINT unique_agent_profile UNIQUE (user_id)
+);
+
+-- Tabla de Códigos de Referido / Cupones
+CREATE TABLE IF NOT EXISTS referral_codes (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    code text UNIQUE NOT NULL, -- El código memorable (ej: VERANO2025, JUANVIP)
+    owner_user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    
+    -- Tipo de código
+    code_type text NOT NULL DEFAULT 'commission' CHECK (code_type IN ('commission', 'discount', 'both')),
+    
+    -- Descuento (si aplica)
+    discount_type text CHECK (discount_type IN ('percentage', 'fixed', 'none')),
+    discount_value integer DEFAULT 0, -- Percentage (bps) o Fixed (cents)
+    
+    -- Comisión override (opcional, si NULL usa el de resort_agents)
+    commission_override_bps integer,
+    
+    -- Control
+    is_active boolean DEFAULT true,
+    usage_limit integer, -- NULL = ilimitado
+    usage_count integer DEFAULT 0,
+    expires_at timestamptz,
+    
+    -- Metadata
+    description text,
+    created_at timestamptz DEFAULT now(),
+    updated_at timestamptz DEFAULT now(),
+    
+    CONSTRAINT valid_discount_config CHECK (
+        (code_type = 'commission' AND discount_type IS NULL) OR
+        (code_type IN ('discount', 'both') AND discount_type IS NOT NULL)
+    )
+);
+
+CREATE INDEX IF NOT EXISTS idx_referral_codes_owner ON referral_codes(owner_user_id);
+CREATE INDEX IF NOT EXISTS idx_referral_codes_active ON referral_codes(code) WHERE is_active = true;
+
+CREATE TRIGGER trg_referral_codes_updated_at BEFORE UPDATE ON referral_codes
+FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- Tabla de Restricciones por Experiencia/Categoría
+CREATE TABLE IF NOT EXISTS referral_code_restrictions (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    referral_code_id uuid NOT NULL REFERENCES referral_codes(id) ON DELETE CASCADE,
+    
+    -- Restricción por tipo (mutuamente exclusivo)
+    restriction_type text NOT NULL CHECK (restriction_type IN ('experience', 'category', 'resort')),
+    
+    -- IDs relacionados (solo uno debe estar lleno según el tipo)
+    experience_id uuid REFERENCES experiences(id) ON DELETE CASCADE,
+    category_slug text,
+    resort_id uuid REFERENCES resorts(id) ON DELETE CASCADE,
+    
+    created_at timestamptz DEFAULT now(),
+    
+    -- Un código no puede tener la misma restricción duplicada
+    UNIQUE (referral_code_id, restriction_type, experience_id, category_slug, resort_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_referral_restrictions_code ON referral_code_restrictions(referral_code_id);
+CREATE INDEX IF NOT EXISTS idx_referral_restrictions_experience ON referral_code_restrictions(experience_id);
+
+-- Tabla de Variantes A/B Testing
+CREATE TABLE IF NOT EXISTS referral_code_variants (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    parent_code_id uuid NOT NULL REFERENCES referral_codes(id) ON DELETE CASCADE,
+    
+    variant_name text NOT NULL, -- 'A', 'B', 'Control', etc.
+    code text UNIQUE NOT NULL,
+    
+    -- Configuración propia (puede diferir del padre)
+    discount_value integer,
+    commission_override_bps integer,
+    
+    -- Métricas
+    usage_count integer DEFAULT 0,
+    conversion_count integer DEFAULT 0, -- Cuántos se confirmaron
+    
+    is_active boolean DEFAULT true,
+    created_at timestamptz DEFAULT now(),
+    
+    UNIQUE (parent_code_id, variant_name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_code_variants_parent ON referral_code_variants(parent_code_id);
+
+-- Ampliar referral_codes con nuevos campos
+ALTER TABLE referral_codes
+    ADD COLUMN IF NOT EXISTS allow_stacking boolean DEFAULT false,
+    ADD COLUMN IF NOT EXISTS min_purchase_cents integer DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS max_discount_cents integer;
+
+-- Tabla de uso múltiple de códigos (stacking)
+CREATE TABLE IF NOT EXISTS booking_referral_codes (
+    booking_id uuid NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+    referral_code_id uuid NOT NULL REFERENCES referral_codes(id),
+    discount_applied_cents integer NOT NULL DEFAULT 0,
+    created_at timestamptz DEFAULT now(),
+    PRIMARY KEY (booking_id, referral_code_id)
+);
+
+-- Vista de Analytics por Código
+CREATE OR REPLACE VIEW v_referral_code_analytics AS
+SELECT 
+    rc.id as code_id,
+    rc.code,
+    rc.owner_user_id,
+    rc.code_type,
+    
+    -- Uso
+    rc.usage_count,
+    COUNT(DISTINCT b.id) as total_bookings,
+    COUNT(DISTINCT CASE WHEN b.status = 'confirmed' THEN b.id END) as confirmed_bookings,
+    
+    -- Revenue
+    COALESCE(SUM(CASE WHEN b.status = 'confirmed' THEN b.total_cents ELSE 0 END), 0) as total_revenue_cents,
+    COALESCE(AVG(CASE WHEN b.status = 'confirmed' THEN b.total_cents END), 0) as avg_order_value_cents,
+    
+    -- Descuentos
+    COALESCE(SUM(brc.discount_applied_cents), 0) as total_discounts_given_cents,
+    
+    -- Tasa de conversión
+    CASE 
+        WHEN COUNT(DISTINCT b.id) > 0 
+        THEN ROUND((COUNT(DISTINCT CASE WHEN b.status = 'confirmed' THEN b.id END)::numeric / COUNT(DISTINCT b.id)::numeric) * 100, 2)
+        ELSE 0 
+    END as conversion_rate_pct,
+    
+    -- Temporal
+    MIN(b.created_at) as first_use,
+    MAX(b.created_at) as last_use
+    
+FROM referral_codes rc
+LEFT JOIN bookings b ON b.referral_code_id = rc.id
+LEFT JOIN booking_referral_codes brc ON brc.referral_code_id = rc.id
+GROUP BY rc.id, rc.code, rc.owner_user_id, rc.code_type, rc.usage_count;
 
 CREATE INDEX IF NOT EXISTS idx_agent_commissions_agent ON agent_commissions(agent_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_bookings_idempotency

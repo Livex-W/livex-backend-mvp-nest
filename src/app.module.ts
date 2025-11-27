@@ -22,6 +22,7 @@ import { AdminModule } from './admin/admin.module';
 import { NotificationModule } from './notifications/notification.module';
 import { BookingsModule } from './bookings/bookings.module';
 import { PaymentsModule } from './payments/payments.module';
+import { AgentsModule } from './agents/agents.module';
 import bookingConfig from './common/config/booking.config';
 
 @Module({
@@ -43,6 +44,7 @@ import bookingConfig from './common/config/booking.config';
     NotificationModule,
     BookingsModule,
     PaymentsModule,
+    AgentsModule,
   ],
   controllers: [AppController],
   providers: [
@@ -77,4 +79,4 @@ import bookingConfig from './common/config/booking.config';
     },
   ],
 })
-export class AppModule {}
+export class AppModule { }

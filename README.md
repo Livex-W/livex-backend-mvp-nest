@@ -1,98 +1,227 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# 🚀 LIVEX Backend MVP
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+> **Versión:** 1.0.0 (Producción-Ready)  
+> **Estado:** Completado ✅  
+> **Fecha:** Noviembre 2025
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+Backend robusto y escalable para la plataforma de turismo LIVEX, construido con **NestJS**, **PostgreSQL** y **TypeScript**.
 
-## Description
+---
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## 📋 Tabla de Contenidos
 
-## Project setup
+1. [Visión General](#-visión-general)
+2. [Características Principales](#-características-principales)
+3. [Arquitectura del Sistema](#-arquitectura-del-sistema)
+4. [Documentación Detallada](#-documentación-detallada)
+5. [Guía de Instalación](#-guía-de-instalación)
+6. [Variables de Entorno](#-variables-de-entorno)
+7. [Testing y Desarrollo](#-testing-y-desarrollo)
+8. [Estructura del Proyecto](#-estructura-del-proyecto)
+
+---
+
+## 🔭 Visión General
+
+LIVEX es una plataforma que conecta turistas con resorts y experiencias exclusivas. Este backend maneja toda la lógica de negocio, desde la autenticación de usuarios hasta el procesamiento seguro de pagos y la gestión de comisiones para agentes.
+
+### Tecnologías Core
+- **Framework:** NestJS 10.x (Node.js)
+- **Base de Datos:** PostgreSQL 15
+- **Lenguaje:** TypeScript 5.x
+- **Pagos:** Wompi (Colombia) & PayPal (Global)
+- **Email:** Nodemailer + SMTP
+- **Validación:** Class-validator & Class-transformer
+
+---
+
+## ✨ Características Principales
+
+### 🔐 Autenticación y Seguridad
+- **JWT:** Access tokens (15min) y Refresh tokens (7 días) con rotación segura.
+- **Roles:** Sistema RBAC con roles `tourist`, `resort`, `agent`, `admin`.
+- **Protección:** Rate limiting, CORS configurado, Headers de seguridad (Helmet).
+- **Webhooks:** Validación criptográfica de firmas (HMAC-SHA256) para pagos seguros.
+
+### 🏨 Gestión de Experiencias
+- **CRUD Completo:** Creación, edición y aprobación de experiencias turísticas.
+- **Disponibilidad:** Gestión de cupos en tiempo real con bloqueos temporales (`inventory_locks`).
+- **Imágenes:** Soporte para múltiples imágenes por experiencia.
+
+### 💰 Pagos y Reembolsos
+- **Multi-Pasarela:** Integración transparente con Wompi y PayPal.
+- **Flujo de Pago:** `Pending` → `Authorized` → `Paid`.
+- **Reembolsos Automáticos:** Al cancelar una reserva confirmada, el dinero se devuelve automáticamente.
+- **Seguridad:** Validación estricta de webhooks para evitar fraudes.
+
+### 🤝 Agentes y Comisiones
+- **Sistema de Referidos v2.0:** Códigos avanzados con reglas personalizadas.
+- **Reglas:** Mínimo de compra, stacking, restricciones por resort/categoría.
+- **A/B Testing:** Variantes de códigos para optimizar conversiones.
+- **Comisiones:** Cálculo automático de split entre plataforma y agente.
+
+### 📧 Notificaciones
+- **Emails Transaccionales:** Bienvenida, Confirmación de Reserva, Reset Password, Pagos.
+- **Templates:** HTML responsivo y multi-idioma.
+- **Arquitectura:** Desacoplada mediante `NotificationService`.
+
+---
+
+## 📚 Documentación Detallada
+
+Hemos generado documentación técnica específica para cada subsistema. Consulta estos archivos para detalles de implementación:
+
+| Módulo | Documento | Descripción |
+|--------|-----------|-------------|
+| **Resumen Final** | [📄 MVP_COMPLETE.md](docs/MVP_COMPLETE.md) | Resumen ejecutivo del estado del proyecto. |
+| **Agentes** | [📄 AGENTS_SYSTEM.md](docs/AGENTS_SYSTEM.md) | Arquitectura del sistema de comisiones. |
+| **Códigos V2** | [📄 REFERRAL_CODES_SYSTEM.md](docs/REFERRAL_CODES_SYSTEM.md) | Implementación de códigos de referido avanzados. |
+| **A/B Testing** | [📄 AB_TESTING_GUIDE.md](docs/AB_TESTING_GUIDE.md) | Guía para crear variantes de códigos. |
+| **Notificaciones** | [📄 NOTIFICATIONS_SYSTEM.md](docs/NOTIFICATIONS_SYSTEM.md) | Configuración y uso del servicio de emails. |
+| **Reembolsos** | [📄 REFUND_IMPLEMENTATION.md](docs/REFUND_IMPLEMENTATION.md) | Flujos de cancelación y devolución de dinero. |
+| **Seguridad** | [📄 WEBHOOK_SECURITY.md](docs/WEBHOOK_SECURITY.md) | Implementación de validación de firmas de pago. |
+| **Testing** | [📄 AGENTS_CURL_TESTS.md](docs/AGENTS_CURL_TESTS.md) | Colección de comandos CURL para probar la API. |
+
+---
+
+## 🛠 Guía de Instalación
+
+### Prerrequisitos
+- Node.js >= 18
+- Docker & Docker Compose
+- PostgreSQL (si no usas Docker)
+
+### Pasos
+
+1. **Clonar el repositorio:**
+   ```bash
+   git clone https://github.com/livex/backend.git
+   cd backend
+   ```
+
+2. **Instalar dependencias:**
+   ```bash
+   npm install
+   ```
+
+3. **Configurar entorno:**
+   ```bash
+   cp .env.example .env
+   # Editar .env con tus credenciales
+   ```
+
+4. **Iniciar base de datos (Docker):**
+   ```bash
+   docker-compose up -d db
+   ```
+
+5. **Ejecutar migraciones y seed:**
+   ```bash
+   npm run migration:run
+   npm run seed:run
+   ```
+
+6. **Iniciar servidor:**
+   ```bash
+   # Desarrollo
+   npm run start:dev
+   
+   # Producción
+   npm run build
+   npm run start:prod
+   ```
+
+---
+
+## 🔑 Variables de Entorno
+
+Las variables críticas que debes configurar en `.env`:
 
 ```bash
-$ yarn install
+# App
+PORT=3000
+NODE_ENV=development
+FRONTEND_URL=http://localhost:4000
+
+# Database
+DATABASE_URL=postgresql://user:pass@localhost:5432/livex
+
+# Auth
+JWT_SECRET=super-secret-key
+JWT_ACCESS_TOKEN_TTL_SECONDS=900
+JWT_REFRESH_TOKEN_TTL_SECONDS=604800
+
+# Payments (Wompi)
+WOMPI_PUBLIC_KEY=pub_test_...
+WOMPI_PRIVATE_KEY=prv_test_...
+WOMPI_WEBHOOK_SECRET=prod_secret_...  # ⭐ Requerido para seguridad
+
+# Payments (PayPal)
+PAYPAL_CLIENT_ID=...
+PAYPAL_CLIENT_SECRET=...
+PAYPAL_WEBHOOK_ID=...
+
+# Email
+SMTP_HOST=smtp.gmail.com
+SMTP_USER=noreply@livex.com
+SMTP_PASS=...
 ```
 
-## Compile and run the project
+---
+
+## 🧪 Testing y Desarrollo
+
+### Tests Manuales (CURL)
+Hemos preparado una suite completa de tests manuales usando CURL. Puedes encontrarlos en `docs/AGENTS_CURL_TESTS.md`.
+
+Ejemplo para crear una reserva:
 
 ```bash
-# development
-$ yarn run start
-
-# watch mode
-$ yarn run start:dev
-
-# production mode
-$ yarn run start:prod
+curl -X POST http://localhost:3000/api/v1/bookings \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "experienceId": "exp_123",
+    "adults": 2,
+    "referralCode": "SUMMER2025"
+  }'
 ```
 
-## Run tests
+### Comandos Útiles
 
 ```bash
-# unit tests
-$ yarn run test
+# Linting
+npm run lint
 
-# e2e tests
-$ yarn run test:e2e
+# Formateo
+npm run format
 
-# test coverage
-$ yarn run test:cov
+# Generar recurso
+nest g resource my-new-feature
 ```
 
-## Deployment
+---
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+## 📂 Estructura del Proyecto
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ yarn install -g @nestjs/mau
-$ mau deploy
+```
+src/
+├── agents/          # Módulo de Agentes y Códigos
+├── auth/            # Autenticación y JWT
+├── bookings/        # Gestión de Reservas
+├── common/          # Decorators, Guards, Filters
+├── database/        # Configuración DB
+├── experiences/     # Módulo de Experiencias
+├── notifications/   # Servicio de Email
+├── payments/        # Pasarelas de Pago
+├── resorts/         # Gestión de Resorts
+└── users/           # Gestión de Usuarios
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+---
 
-## Resources
+## 📞 Soporte
 
-Check out a few resources that may come in handy when working with NestJS:
+Para dudas técnicas sobre la implementación, contactar al equipo de desarrollo backend.
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+> **LIVEX Backend Team** - 2025

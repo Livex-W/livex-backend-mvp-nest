@@ -38,4 +38,8 @@ export class CreateBookingDto {
   @IsUUID()
   agentId?: string;
 
+  @IsOptional()
+  @IsString()
+  referralCode?: string;
+
 }

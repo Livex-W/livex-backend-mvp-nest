@@ -46,10 +46,10 @@ export interface WebhookEvent {
 export interface PaymentProvider {
   readonly name: string;
   readonly supportedCurrencies: string[];
-  
+
   createPayment(intent: PaymentIntent): Promise<PaymentResult>;
   getPaymentStatus(providerPaymentId: string): Promise<PaymentResult>;
   createRefund(request: RefundRequest): Promise<RefundResult>;
   getRefundStatus(providerRefundId: string): Promise<RefundResult>;
-  validateWebhook(payload: any, signature?: string): Promise<WebhookEvent>;
+  validateWebhook(payload: any, signatureOrHeaders?: string | Record<string, string>): Promise<WebhookEvent>;
 }

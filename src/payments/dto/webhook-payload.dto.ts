@@ -10,4 +10,8 @@ export class WebhookPayloadDto {
   @IsOptional()
   @IsString()
   signature?: string;
+
+  @IsOptional()
+  @IsObject()
+  headers?: Record<string, string>;
 }

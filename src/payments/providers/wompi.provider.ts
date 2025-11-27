@@ -1,13 +1,13 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { 
-  PaymentProvider, 
-  PaymentIntent, 
-  PaymentResult, 
-  RefundRequest, 
-  RefundResult, 
-  WebhookEvent 
+import {
+  PaymentProvider,
+  PaymentIntent,
+  PaymentResult,
+  RefundRequest,
+  RefundResult,
+  WebhookEvent
 } from '../interfaces/payment-provider.interface';
 
 interface WompiConfig {
@@ -43,7 +43,7 @@ export class WompiProvider implements PaymentProvider {
   private readonly logger = new Logger(WompiProvider.name);
   readonly name = 'wompi';
   readonly supportedCurrencies = ['COP'];
-  
+
   private readonly config: WompiConfig;
 
   constructor(private configService: ConfigService) {
@@ -78,7 +78,7 @@ export class WompiProvider implements PaymentProvider {
       };
 
       const response = await this.makeRequest<WompiPaymentResponse>('POST', '/v1/transactions', payload);
-      
+
       return {
         id: intent.id,
         status: this.mapWompiStatus(response.data.status),
@@ -100,7 +100,7 @@ export class WompiProvider implements PaymentProvider {
   async getPaymentStatus(providerPaymentId: string): Promise<PaymentResult> {
     try {
       const response = await this.makeRequest<WompiPaymentResponse>('GET', `/v1/transactions/${providerPaymentId}`);
-      
+
       return {
         id: response.data.reference,
         status: this.mapWompiStatus(response.data.status),
@@ -126,7 +126,7 @@ export class WompiProvider implements PaymentProvider {
       };
 
       const response = await this.makeRequest<WompiRefundResponse>('POST', '/v1/transactions/void', payload);
-      
+
       return {
         id: `refund_${response.data.id}`,
         status: this.mapWompiRefundStatus(response.data.status),
@@ -145,7 +145,7 @@ export class WompiProvider implements PaymentProvider {
   async getRefundStatus(providerRefundId: string): Promise<RefundResult> {
     try {
       const response = await this.makeRequest<WompiRefundResponse>('GET', `/v1/transactions/void/${providerRefundId}`);
-      
+
       return {
         id: `refund_${response.data.id}`,
         status: this.mapWompiRefundStatus(response.data.status),
@@ -161,8 +161,11 @@ export class WompiProvider implements PaymentProvider {
     }
   }
 
-  async validateWebhook(payload: any, signature?: string): Promise<WebhookEvent> {
+  async validateWebhook(payload: any, signatureOrHeaders?: string | Record<string, string>): Promise<WebhookEvent> {
     try {
+      // Para Wompi, el segundo parámetro es la firma (string)
+      const signature = typeof signatureOrHeaders === 'string' ? signatureOrHeaders : '';
+
       // Validar firma del webhook si está configurada
       if (this.config.webhookSecret && signature) {
         const isValid = await this.validateWebhookSignature(payload, signature);
@@ -172,7 +175,7 @@ export class WompiProvider implements PaymentProvider {
       }
 
       const event = payload.data || payload;
-      
+
       return {
         provider: this.name,
         eventType: payload.event || 'transaction.updated',
@@ -208,7 +211,7 @@ export class WompiProvider implements PaymentProvider {
     }
 
     const response = await fetch(url, options);
-    
+
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(`HTTP ${response.status}: ${errorText}`);
@@ -249,9 +252,41 @@ export class WompiProvider implements PaymentProvider {
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private async validateWebhookSignature(payload: any, signature: string): Promise<boolean> {
-    // Implementar validación de firma según documentación de Wompi
-    // Por ahora retornamos true, pero en producción debe implementarse correctamente
-    this.logger.warn('Webhook signature validation not implemented');
-    return Promise.resolve(true);
+    if (!this.config.webhookSecret) {
+      this.logger.warn('WOMPI_WEBHOOK_SECRET not configured. Skipping signature validation.');
+      return true; // En desarrollo sin secret, permitir
+    }
+
+    try {
+      // Wompi usa HMAC-SHA256 para firmar los webhooks
+      // La firma se calcula sobre el JSON stringificado del payload
+      const crypto = await import('crypto');
+
+      // Crear el payload string (sin espacios, orden de keys importa)
+      const payloadString = JSON.stringify(payload);
+
+      // Calcular HMAC
+      const hmac = crypto.createHmac('sha256', this.config.webhookSecret);
+      hmac.update(payloadString);
+      const calculatedSignature = hmac.digest('hex');
+
+      // Comparación segura (constant-time para evitar timing attacks)
+      const isValid = crypto.timingSafeEqual(
+        Buffer.from(signature),
+        Buffer.from(calculatedSignature)
+      );
+
+      if (!isValid) {
+        this.logger.error('Wompi webhook signature validation failed', {
+          receivedSignature: signature,
+          calculatedSignature,
+        });
+      }
+
+      return isValid;
+    } catch (error) {
+      this.logger.error('Error validating Wompi webhook signature', error);
+      return false;
+    }
   }
 }

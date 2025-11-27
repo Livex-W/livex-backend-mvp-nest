@@ -1,13 +1,13 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { 
-  PaymentProvider, 
-  PaymentIntent, 
-  PaymentResult, 
-  RefundRequest, 
-  RefundResult, 
-  WebhookEvent 
+import {
+  PaymentProvider,
+  PaymentIntent,
+  PaymentResult,
+  RefundRequest,
+  RefundResult,
+  WebhookEvent
 } from '../interfaces/payment-provider.interface';
 
 interface PayPalConfig {
@@ -50,7 +50,7 @@ interface PayPalOrder {
 export class PayPalProvider implements PaymentProvider {
   readonly name = 'paypal';
   readonly supportedCurrencies = ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY', 'COP'];
-  
+
   private readonly logger = new Logger(PayPalProvider.name);
   private readonly config: PayPalConfig;
   private accessToken: string | null = null;
@@ -165,7 +165,7 @@ export class PayPalProvider implements PaymentProvider {
       }
 
       const order: PayPalOrder = await response.json();
-      
+
       // Mapear estados de PayPal a nuestros estados
       let status: string;
       switch (order.status) {
@@ -213,7 +213,7 @@ export class PayPalProvider implements PaymentProvider {
 
       // Primero necesitamos obtener el capture ID de la orden
       const captureId = await this.getCaptureIdFromOrder(request.paymentId);
-      
+
       if (!captureId) {
         throw new Error('PayPal capture ID not found for refund');
       }
@@ -284,7 +284,7 @@ export class PayPalProvider implements PaymentProvider {
       }
 
       const refund = await response.json();
-      
+
       // Mapear estados de refund de PayPal a nuestros estados
       let status: 'pending' | 'processed' | 'failed';
       switch (refund.status) {
@@ -320,12 +320,15 @@ export class PayPalProvider implements PaymentProvider {
     }
   }
 
-  async validateWebhook(payload: any, signature?: string): Promise<WebhookEvent> {
+  async validateWebhook(payload: any, signatureOrHeaders?: string | Record<string, string>): Promise<WebhookEvent> {
     try {
       this.logger.log('Processing PayPal webhook');
 
+      // Para PayPal, el segundo parámetro son los headers (Record)
+      const headers = typeof signatureOrHeaders === 'object' ? signatureOrHeaders : {};
+
       // Validar firma del webhook
-      const isValid = await this.validateWebhookSignature(payload, signature || '');
+      const isValid = await this.validateWebhookSignature(payload, headers);
       if (!isValid) {
         throw new Error('Invalid PayPal webhook signature');
       }
@@ -368,7 +371,6 @@ export class PayPalProvider implements PaymentProvider {
         eventType,
         paymentId: paymentId || undefined,
         status: status || 'unknown',
-        signature,
         rawPayload: payload,
         metadata: {
           paypal_event_type: eventType,
@@ -407,7 +409,7 @@ export class PayPalProvider implements PaymentProvider {
       }
 
       const tokenData: PayPalAccessToken = await response.json();
-      
+
       this.accessToken = tokenData.access_token;
       // Establecer expiración con un margen de seguridad de 5 minutos
       this.tokenExpiresAt = new Date(Date.now() + (tokenData.expires_in - 300) * 1000);
@@ -437,11 +439,11 @@ export class PayPalProvider implements PaymentProvider {
       }
 
       const order = await response.json();
-      
+
       // Buscar el capture ID en los purchase units
       const purchaseUnit = order.purchase_units?.[0];
       const capture = purchaseUnit?.payments?.captures?.[0];
-      
+
       return capture?.id || null;
 
     } catch (error) {
@@ -451,13 +453,65 @@ export class PayPalProvider implements PaymentProvider {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  private async validateWebhookSignature(payload: any, signature: string): Promise<boolean> {
-    // Implementar validación de firma según documentación de PayPal
-    // PayPal usa un sistema de validación más complejo que requiere verificar
-    // el certificado y la firma usando su API de verificación
-    
-    // Por ahora retornamos true para desarrollo, pero en producción debe implementarse
-    this.logger.warn('PayPal webhook signature validation not implemented - using development mode');
-    return Promise.resolve(true);
+  private async validateWebhookSignature(payload: any, headers: any): Promise<boolean> {
+    if (!this.config.webhookId) {
+      this.logger.warn('PAYPAL_WEBHOOK_ID not configured. Skipping signature validation.');
+      return true; // En desarrollo sin webhook ID, permitir
+    }
+
+    try {
+      // PayPal usa su propia API para verificar webhooks
+      // Necesitamos enviar el payload + headers a la API de verificación
+      await this.ensureAccessToken();
+
+      const verificationData = {
+        auth_algo: headers['paypal-auth-algo'],
+        cert_url: headers['paypal-cert-url'],
+        transmission_id: headers['paypal-transmission-id'],
+        transmission_sig: headers['paypal-transmission-sig'],
+        transmission_time: headers['paypal-transmission-time'],
+        webhook_id: this.config.webhookId,
+        webhook_event: payload,
+      };
+
+      // Validar que todos los headers necesarios estén presentes
+      if (!verificationData.auth_algo || !verificationData.cert_url ||
+        !verificationData.transmission_id || !verificationData.transmission_sig) {
+        this.logger.error('Missing required PayPal webhook headers for verification');
+        return false;
+      }
+
+      const response = await fetch(`${this.config.baseUrl}/v1/notifications/verify-webhook-signature`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.accessToken}`,
+        },
+        body: JSON.stringify(verificationData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        this.logger.error('PayPal webhook verification API error', errorData);
+        return false;
+      }
+
+      const result = await response.json();
+
+      // PayPal devuelve { verification_status: "SUCCESS" } si es válido
+      const isValid = result.verification_status === 'SUCCESS';
+
+      if (!isValid) {
+        this.logger.error('PayPal webhook signature verification failed', {
+          verification_status: result.verification_status,
+        });
+      }
+
+      return isValid;
+
+    } catch (error) {
+      this.logger.error('Error validating PayPal webhook signature', error);
+      return false;
+    }
   }
 }

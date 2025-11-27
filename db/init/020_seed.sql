@@ -171,7 +171,7 @@ UPDATE experience_images SET image_type = 'gallery' WHERE image_type IS NULL;
 -- 11.1) Crear un usuario Agente
 WITH agent_user AS (
   INSERT INTO users (email, password_hash, full_name, role) 
-  VALUES ('agente.carlos@gmail.com', '$2b$10$j54QekkMZucJ.hKpcRMmqe4SnETnpr.8OxLyRfAZVLnSVkBgP4eFS', 'Carlos El Vendedor', 'tourist')
+  VALUES ('agente.carlos@gmail.com', '$2b$10$j54QekkMZucJ.hKpcRMmqe4SnETnpr.8OxLyRfAZVLnSVkBgP4eFS', 'Carlos El Vendedor', 'agent')
   RETURNING id
 ),
 
@@ -236,6 +236,107 @@ SELECT
   'pending',
   now()
 FROM agent_booking b;
+
+-- 11.6) Completar Perfil del Agente (Datos Bancarios)
+INSERT INTO agent_profiles (
+  user_id, bank_name, account_number, account_type, account_holder_name, tax_id, is_verified
+)
+SELECT 
+  (SELECT user_id FROM agreement),
+  'Bancolombia',
+  '9876543210',
+  'savings',
+  'Carlos Vendedor',
+  '1234567890',
+  true;
+
+-- 11.7) Códigos de Referido del Agente Carlos
+-- Código de comisión simple (solo trackea)
+INSERT INTO referral_codes (
+  owner_user_id, code, code_type, description
+)
+VALUES (
+  (SELECT user_id FROM agreement),
+  'CARLOSVIP',
+  'commission',
+  'Código personal de Carlos - Solo tracking'
+);
+
+-- Código con descuento del 10% (10% = 1000 bps)
+INSERT INTO referral_codes (
+  owner_user_id, code, code_type, discount_type, discount_value, description
+)
+VALUES (
+  (SELECT user_id FROM agreement),
+  'VERANO2025',
+  'both', -- Da descuento Y comisión
+  'percentage',
+  1000, -- 10%
+  'Promoción de verano - 10% de descuento'
+);
+
+-- Código con descuento fijo de $20,000 COP
+INSERT INTO referral_codes (
+  owner_user_id, code, code_type, discount_type, discount_value, usage_limit, description
+)
+VALUES (
+  (SELECT user_id FROM agreement),
+  'PRIMERACOMPRA',
+  'both',
+  'fixed',
+  2000000, -- $20,000 COP en centavos (20000 * 100)
+  50, -- Solo 50 usos
+  'Primera compra - $20,000 COP de descuento (limitado a 50 usos)'
+);
+
+-- 11.8) Restricciones: Código solo para Tours Náuticos
+INSERT INTO referral_code_restrictions (
+  referral_code_id, restriction_type, category_slug
+)
+VALUES (
+  (SELECT id FROM referral_codes WHERE code = 'VERANO2025'),
+  'category',
+  'nautical'
+);
+
+-- 11.9) A/B Testing: Variantes del código VERANO2025
+-- Variante A: 15% descuento
+INSERT INTO referral_code_variants (
+  parent_code_id, variant_name, code, discount_value
+)
+VALUES (
+  (SELECT id FROM referral_codes WHERE code = 'VERANO2025'),
+  'Variant A - 15%',
+  'VERANO2025A',
+  1500  -- 15%
+);
+
+-- Variante B: 5% descuento
+INSERT INTO referral_code_variants (
+  parent_code_id, variant_name, code, discount_value
+)
+VALUES (
+  (SELECT id FROM referral_codes WHERE code = 'VERANO2025'),
+  'Variant B - 5%', 
+  'VERANO2025B',
+  500  -- 5%
+);
+
+-- 11.10) Código con Stacking permitido
+INSERT INTO referral_codes (
+  owner_user_id, code, code_type, discount_type, discount_value,
+  allow_stacking, min_purchase_cents, description
+)
+VALUES (
+  (SELECT user_id FROM agreement),
+  'EXTRA10',
+  'discount',
+  'percentage',
+  1000,  -- 10%
+  true,  -- Permite combinarse con otros códigos
+  5000000,  -- Mínimo $50,000 COP (en centavos)
+  'Extra 10% - Combinable con otros códigos (mínimo $50,000 COP)'
+);
 
 CREATE INDEX IF NOT EXISTS idx_availability_slots_experience_date 
 ON availability_slots(experience_id, start_time, end_time);

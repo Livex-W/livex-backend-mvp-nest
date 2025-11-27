@@ -148,6 +148,78 @@ export class BookingsService {
     });
   }
 
+  async cancelConfirmedBooking(options: {
+    bookingId: string;
+    userId: string;
+    reason?: string;
+  }): Promise<{ refundId?: string; message: string }> {
+    return await this.db.transaction(async (client) => {
+      // 1. Verificar que la reserva existe y pertenece al usuario
+      const bookingResult = await client.query(
+        `SELECT b.*, p.id as payment_id, p.status as payment_status, p.amount_cents
+         FROM bookings b
+         LEFT JOIN payments p ON p.booking_id = b.id AND p.status = 'paid'
+         WHERE b.id = $1 AND b.user_id = $2`,
+        [options.bookingId, options.userId]
+      );
+
+      if (bookingResult.rows.length === 0) {
+        throw new NotFoundException('Booking not found or does not belong to you');
+      }
+
+      const booking = bookingResult.rows[0];
+
+      // 2. Verificar que la reserva está confirmada
+      if (booking.status !== 'confirmed') {
+        throw new BadRequestException(`Cannot cancel booking in status: ${booking.status}`);
+      }
+
+      // 3. Verificar que hay un pago exitoso
+      if (!booking.payment_id) {
+        throw new BadRequestException('No payment found for this booking');
+      }
+
+      // 4. Actualizar estado de la reserva a cancelled
+      await client.query(
+        `UPDATE bookings 
+         SET status = 'cancelled', 
+             updated_at = NOW()
+         WHERE id = $1`,
+        [options.bookingId]
+      );
+
+      // 5. Liberar el inventory lock (restaurar disponibilidad)
+      await client.query(
+        `UPDATE availability_slots 
+         SET available_spots = available_spots + (
+           SELECT quantity FROM inventory_locks 
+           WHERE booking_id = $1 LIMIT 1
+         )
+         WHERE id = (SELECT slot_id FROM bookings WHERE id = $1)`,
+        [options.bookingId]
+      );
+
+      // 6. Marcar el lock como released
+      await client.query(
+        `UPDATE inventory_locks 
+         SET consumed_at = NULL, released_at = NOW()
+         WHERE booking_id = $1`,
+        [options.bookingId]
+      );
+
+      this.logger.logBusinessEvent('booking_confirmed_cancelled', {
+        bookingId: options.bookingId,
+        userId: options.userId,
+        reason: options.reason,
+      });
+
+      // 7. Retornar información para que el caller procese el reembolso
+      return {
+        message: 'Booking cancelled successfully. Refund will be processed.',
+      };
+    });
+  }
+
   async cancelPendingBooking(options: CancelBookingOptions): Promise<void> {
     const cancelledAt = options.cancelledAt ?? new Date();
 
@@ -319,6 +391,95 @@ export class BookingsService {
     id: string;
   }> {
     const totalCents = params.dto.subtotalCents + params.dto.taxCents;
+
+    let agentId = params.dto.agentId ?? null;
+    let referralCodeId: string | null = null;
+
+    // Si se proporciona un código de referido, validarlo y extraer el agente
+    if (params.dto.referralCode) {
+      const codeResult = await client.query<{
+        id: string;
+        owner_user_id: string;
+        min_purchase_cents: number;
+      }>(
+        `SELECT id, owner_user_id, min_purchase_cents FROM referral_codes 
+         WHERE UPPER(code) = UPPER($1) 
+         AND is_active = true
+         AND (expires_at IS NULL OR expires_at > NOW())
+         AND (usage_limit IS NULL OR usage_count < usage_limit)`,
+        [params.dto.referralCode],
+      );
+
+      if (codeResult.rows.length > 0) {
+        const code = codeResult.rows[0];
+
+        // Validar monto mínimo de compra
+        if (totalCents < code.min_purchase_cents) {
+          throw new BadRequestException(
+            `Minimum purchase amount not met for this code. Required: ${code.min_purchase_cents} cents`
+          );
+        }
+
+        // Validar restricciones (si las hay)
+        const restrictions = await client.query(
+          `SELECT restriction_type, experience_id, category_slug, resort_id 
+           FROM referral_code_restrictions 
+           WHERE referral_code_id = $1`,
+          [code.id],
+        );
+
+        if (restrictions.rows.length > 0) {
+          // Obtener info de la experiencia
+          const expInfo = await client.query<{
+            category: string;
+            resort_id: string;
+          }>(
+            'SELECT category, resort_id FROM experiences WHERE id = $1',
+            [params.dto.experienceId],
+          );
+
+          if (expInfo.rows.length === 0) {
+            throw new BadRequestException('Experience not found');
+          }
+
+          const experience = expInfo.rows[0];
+          let isValid = false;
+
+          // Verificar si cumple al menos una restricción
+          for (const restriction of restrictions.rows) {
+            if (restriction.restriction_type === 'experience' &&
+              restriction.experience_id === params.dto.experienceId) {
+              isValid = true;
+              break;
+            }
+            if (restriction.restriction_type === 'category' &&
+              restriction.category_slug === experience.category) {
+              isValid = true;
+              break;
+            }
+            if (restriction.restriction_type === 'resort' &&
+              restriction.resort_id === experience.resort_id) {
+              isValid = true;
+              break;
+            }
+          }
+
+          if (!isValid) {
+            throw new BadRequestException('Referral code not valid for this experience');
+          }
+        }
+
+        referralCodeId = code.id;
+        // Si no se especificó agente, usar el dueño del código
+        if (!agentId) {
+          agentId = code.owner_user_id;
+        }
+      } else {
+        // Código no válido o expirado
+        throw new BadRequestException('Invalid or expired referral code');
+      }
+    }
+
     try {
       const bookingInsert = await client.query<{ id: string }>(
         `INSERT INTO bookings (
@@ -334,8 +495,9 @@ export class BookingsService {
           status,
           expires_at,
           idempotency_key,
-          agent_id
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'pending',$10,$11,$12)
+          agent_id,
+          referral_code_id
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'pending',$10,$11,$12,$13)
         RETURNING id`,
         [
           params.userId,
@@ -349,9 +511,18 @@ export class BookingsService {
           params.dto.currency,
           params.expiresAt,
           params.idempotencyKey ?? null,
-          params.dto.agentId ?? null,
+          agentId,
+          referralCodeId,
         ],
       );
+
+      // Si se usó un código de referido, incrementar su contador
+      if (referralCodeId) {
+        await client.query(
+          'UPDATE referral_codes SET usage_count = usage_count + 1 WHERE id = $1',
+          [referralCodeId],
+        );
+      }
 
       return bookingInsert.rows[0];
     } catch (error) {

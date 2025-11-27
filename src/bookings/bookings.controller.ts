@@ -20,6 +20,7 @@ import type { JwtPayload } from '../common/interfaces/jwt-payload.interface';
 import type { Request } from 'express';
 import { ThrottlePayment } from '../common/decorators/throttle.decorator';
 import { CustomLoggerService } from '../common/services/logger.service';
+import { PaymentsService } from '../payments/payments.service';
 
 @Controller('api/v1/bookings')
 @UseGuards(JwtAuthGuard)
@@ -27,7 +28,8 @@ export class BookingsController {
   constructor(
     private readonly bookingsService: BookingsService,
     private readonly logger: CustomLoggerService,
-  ) {}
+    private readonly paymentsService: PaymentsService,
+  ) { }
 
   @Post()
   @Roles(USER_ROLES[0])
@@ -112,5 +114,66 @@ export class BookingsController {
       userId: user.sub,
       reason: dto.reason,
     });
+  }
+
+  @Post(':bookingId/cancel-confirmed')
+  @Roles(USER_ROLES[0])
+  @HttpCode(HttpStatus.OK)
+  async cancelConfirmedBooking(
+    @Param('bookingId') bookingId: string,
+    @Body() dto: CancelBookingDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    this.logger.logBusinessEvent('booking_confirmed_cancel_request', {
+      bookingId,
+      userId: user.sub,
+      reason: dto.reason,
+    });
+
+    // 1. Cancelar la reserva (libera inventario)
+    const cancelResult = await this.bookingsService.cancelConfirmedBooking({
+      bookingId,
+      userId: user.sub,
+      reason: dto.reason,
+    });
+
+    // 2. Procesar reembolso automáticamente
+    try {
+      const refundResult = await this.paymentsService.processBookingCancellationRefund(
+        bookingId,
+        dto.reason || 'Booking cancelled by customer'
+      );
+
+      this.logger.logBusinessEvent('refund_processed', {
+        bookingId,
+        userId: user.sub,
+        refundId: refundResult.refundId,
+        amount: refundResult.amount,
+      });
+
+      return {
+        ...cancelResult,
+        refund: {
+          id: refundResult.refundId,
+          amount: refundResult.amount,
+          status: 'processed',
+        },
+      };
+    } catch (refundError) {
+      this.logger.logError(refundError as Error, {
+        method: 'cancelConfirmedBooking',
+        message: 'Booking cancelled but refund failed',
+        bookingId,
+      });
+
+      // La reserva ya está cancelada, pero el reembolso falló
+      return {
+        ...cancelResult,
+        refund: {
+          status: 'failed',
+          error: 'Refund processing failed. Please contact support.',
+        },
+      };
+    }
   }
 }

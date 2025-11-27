@@ -140,17 +140,17 @@ export class PaymentsController {
   async processWebhook(
     @Param('provider') provider: string,
     @Body() payload: any,
-    @Headers('x-signature') signature?: string,
-    @Headers('wompi-signature') wompiSignature?: string,
+    @Headers() headers: Record<string, string>,
   ) {
     try {
-      // Usar la firma apropiada según el proveedor
-      const webhookSignature = signature || wompiSignature;
+      // Extraer la firma según el proveedor
+      const signature = headers['x-signature'] || headers['wompi-signature'];
 
       const webhookPayload: WebhookPayloadDto = {
         provider,
         payload,
-        signature: webhookSignature,
+        signature,
+        headers, // Pasar todos los headers para validación de PayPal
       };
 
       await this.paymentsService.processWebhook(webhookPayload);
