@@ -5,9 +5,9 @@ services:
     image: postgres:16-alpine
     container_name: livex_db
     env_file:
-      - ${ENV_FILE:-.env.development}   # <- aquí están tus POSTGRES_*
+      - ${ENV_FILE:-.env.development} # <- aquí están tus POSTGRES_*
     environment:
-      PGTZ: America/Bogota              # (opcional) algo que NO pise POSTGRES_*
+      PGTZ: America/Bogota # (opcional) algo que NO pise POSTGRES_*
     ports:
       - "5432:5432"
     volumes:
@@ -15,7 +15,11 @@ services:
       - ./db/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       # Usa las variables del contenedor. Ojo con los $$ para que Compose no las expanda.
-      test: ["CMD-SHELL", "PGUSER=$${POSTGRES_USER:-postgres} PGDATABASE=$${POSTGRES_DB:-postgres} pg_isready -q"]
+      test:
+        [
+          "CMD-SHELL",
+          "PGUSER=$${POSTGRES_USER:-postgres} PGDATABASE=$${POSTGRES_DB:-postgres} pg_isready -q",
+        ]
       interval: 5s
       timeout: 30s
       retries: 10
@@ -29,8 +33,8 @@ services:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-livex}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-livex}
     ports:
-      - "5672:5672"    # AMQP
-      - "15672:15672"  # UI
+      - "5672:5672" # AMQP
+      - "15672:15672" # UI
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 5s
@@ -46,8 +50,8 @@ services:
     profiles: ["dev", "staging"]
     command: ["--webroot", "/mailpit"]
     ports:
-      - "1025:1025"  # SMTP
-      - "8025:8025"  # UI
+      - "1025:1025" # SMTP
+      - "8025:8025" # UI
     healthcheck:
       test: ["CMD", "wget", "-qO", "-", "http://127.0.0.1:8025/healthz"]
       interval: 10s
@@ -68,7 +72,11 @@ services:
     volumes:
       - azurite_data:/data
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:10000/ >/dev/null 2>&1 || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://127.0.0.1:10000/ >/dev/null 2>&1 || exit 1",
+        ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -99,6 +107,7 @@ services:
       - type: bind
         source: .
         target: /app
+      - /app/node_modules
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:3000/healthz || exit 1"]
       interval: 10s
@@ -128,8 +137,9 @@ services:
       - type: bind
         source: .
         target: /app
+      - /app/node_modules
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"process.exit(0)\""]  # placeholder
+      test: ["CMD-SHELL", 'node -e "process.exit(0)"'] # placeholder
     networks:
       - livex_net
 
@@ -144,6 +154,8 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      mailpit:
+        condition: service_healthy
     env_file:
       - ${ENV_FILE:-.env.development}
     environment:
@@ -153,8 +165,9 @@ services:
       - type: bind
         source: .
         target: /app
+      - /app/node_modules
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"process.exit(0)\""]  # placeholder
+      test: ["CMD-SHELL", 'node -e "process.exit(0)"'] # placeholder
     networks:
       - livex_net
 
@@ -172,13 +185,19 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       BOOKING_PENDING_TTL_MINUTES: ${BOOKING_PENDING_TTL_MINUTES:-15}
-    command: ["sh", "-c", "${BOOKING_EXPIRY_WORKER_COMMAND:-npm run booking-expiry-worker:dev}"]
+    command:
+      [
+        "sh",
+        "-c",
+        "${BOOKING_EXPIRY_WORKER_COMMAND:-npm run booking-expiry-worker:dev}",
+      ]
     volumes:
       - type: bind
         source: .
         target: /app
+      - /app/node_modules
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"process.exit(0)\""]  # placeholder
+      test: ["CMD-SHELL", 'node -e "process.exit(0)"'] # placeholder
     networks:
       - livex_net
 
@@ -196,13 +215,19 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       RECONCILIATION_INTERVAL_MS: ${RECONCILIATION_INTERVAL_MS:-86400000}
-    command: ["sh", "-c", "${PAYMENT_RECONCILIATION_WORKER_COMMAND:-npm run payment-reconciliation-worker:dev}"]
+    command:
+      [
+        "sh",
+        "-c",
+        "${PAYMENT_RECONCILIATION_WORKER_COMMAND:-npm run payment-reconciliation-worker:dev}",
+      ]
     volumes:
       - type: bind
         source: .
         target: /app
+      - /app/node_modules
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"process.exit(0)\""]  # placeholder
+      test: ["CMD-SHELL", 'node -e "process.exit(0)"'] # placeholder
     networks:
       - livex_net
 
