@@ -169,59 +169,49 @@ UPDATE experience_images SET image_type = 'gallery' WHERE image_type IS NULL;
 -- ===========================
 
 -- 11.1) Crear un usuario Agente
-WITH agent_user AS (
-  INSERT INTO users (email, password_hash, full_name, role) 
-  VALUES ('agente.carlos@gmail.com', '$2b$10$j54QekkMZucJ.hKpcRMmqe4SnETnpr.8OxLyRfAZVLnSVkBgP4eFS', 'Carlos El Vendedor', 'agent')
-  RETURNING id
-),
+-- 11.1) Crear un usuario Agente
+INSERT INTO users (email, password_hash, full_name, role) 
+VALUES ('agente.carlos@gmail.com', '$2b$10$j54QekkMZucJ.hKpcRMmqe4SnETnpr.8OxLyRfAZVLnSVkBgP4eFS', 'Carlos El Vendedor', 'agent');
 
 -- 11.2) Crear Acuerdo: Carlos vende para "Mar y Sol Cartagena" con 15% (1500 bps)
-agreement AS (
-  INSERT INTO resort_agents (resort_id, user_id, commission_bps, is_active)
-  SELECT 
-    (SELECT id FROM r WHERE name='Mar y Sol Cartagena'),
-    (SELECT id FROM agent_user),
-    1500, -- 15%
-    true
-  RETURNING id, resort_id, user_id, commission_bps
-),
+INSERT INTO resort_agents (resort_id, user_id, commission_bps, is_active)
+SELECT 
+  (SELECT id FROM resorts WHERE name='Mar y Sol Cartagena'),
+  (SELECT id FROM users WHERE email='agente.carlos@gmail.com'),
+  1500, -- 15%
+  true;
 
 -- 11.3) Crear una Reserva hecha por el Agente (Booking Confirmado)
-agent_booking AS (
-  INSERT INTO bookings (
-    user_id, experience_id, slot_id, agent_id,
-    adults, children, subtotal_cents, tax_cents, total_cents, currency, 
-    status, created_at, updated_at
-  )
-  VALUES (
-    (SELECT id FROM u WHERE email='sofia.turista@gmail.com'), -- El turista final
-    (SELECT id FROM e WHERE title='City Tour Histórico'),
-    (SELECT id FROM availability_slots WHERE experience_id=(SELECT id FROM e WHERE title='City Tour Histórico') LIMIT 1),
-    (SELECT user_id FROM agreement), -- El agente Carlos
-    2, 0, 200000, 38000, 238000, 'COP', -- $238,000 COP Total
-    'confirmed', now(), now()
-  )
-  RETURNING id, total_cents, agent_id, experience_id
-),
+INSERT INTO bookings (
+  user_id, experience_id, slot_id, agent_id,
+  adults, children, subtotal_cents, tax_cents, total_cents, currency, 
+  status, created_at, updated_at
+)
+SELECT
+  (SELECT id FROM users WHERE email='sofia.turista@gmail.com'), -- El turista final
+  (SELECT id FROM experiences WHERE title='City Tour Histórico'),
+  (SELECT id FROM availability_slots WHERE experience_id=(SELECT id FROM experiences WHERE title='City Tour Histórico') LIMIT 1),
+  (SELECT id FROM users WHERE email='agente.carlos@gmail.com'), -- El agente Carlos
+  2, 0, 200000, 38000, 238000, 'COP', -- $238,000 COP Total
+  'confirmed', now(), now();
 
 -- 11.4) Registrar el Pago Exitoso
-agent_payment AS (
-  INSERT INTO payments (
-    booking_id, provider, provider_reference, amount_cents, currency, 
-    status, payment_method, paid_at
-  )
-  VALUES (
-    (SELECT id FROM agent_booking), 'wompi', 'WOMPI-TEST-AGENT-01', 
-    (SELECT total_cents FROM agent_booking), 'COP',
-    'paid', 'card', now()
-  )
+INSERT INTO payments (
+  booking_id, provider, provider_reference, amount_cents, currency, 
+  status, payment_method, paid_at
 )
+SELECT
+  (SELECT id FROM bookings WHERE user_id=(SELECT id FROM users WHERE email='sofia.turista@gmail.com') AND agent_id=(SELECT id FROM users WHERE email='agente.carlos@gmail.com') ORDER BY created_at DESC LIMIT 1),
+  'wompi', 'WOMPI-TEST-AGENT-01', 
+  238000, 'COP',
+  'paid', 'card', now();
 
 -- 11.5) Generar las Comisiones (Simulando lo que haría el backend)
 -- Comisión Livex (10%)
 INSERT INTO commissions (booking_id, rate_bps, commission_cents, created_at)
-SELECT id, 1000, FLOOR(total_cents * 0.10), now()
-FROM agent_booking;
+SELECT
+  (SELECT id FROM bookings WHERE user_id=(SELECT id FROM users WHERE email='sofia.turista@gmail.com') AND agent_id=(SELECT id FROM users WHERE email='agente.carlos@gmail.com') ORDER BY created_at DESC LIMIT 1),
+  1000, FLOOR(238000 * 0.10), now();
 
 -- Comisión Agente (15%)
 INSERT INTO agent_commissions (
@@ -230,19 +220,22 @@ INSERT INTO agent_commissions (
 SELECT 
   b.id, 
   b.agent_id, 
-  (SELECT resort_id FROM agreement),
+  (SELECT id FROM resorts WHERE name='Mar y Sol Cartagena'),
   FLOOR(b.total_cents * 0.15), -- 15% de 238,000 = 35,700
   1500,
   'pending',
   now()
-FROM agent_booking b;
+FROM bookings b
+WHERE b.user_id=(SELECT id FROM users WHERE email='sofia.turista@gmail.com') 
+  AND b.agent_id=(SELECT id FROM users WHERE email='agente.carlos@gmail.com')
+ORDER BY b.created_at DESC LIMIT 1;
 
 -- 11.6) Completar Perfil del Agente (Datos Bancarios)
 INSERT INTO agent_profiles (
   user_id, bank_name, account_number, account_type, account_holder_name, tax_id, is_verified
 )
 SELECT 
-  (SELECT user_id FROM agreement),
+  (SELECT id FROM users WHERE email='agente.carlos@gmail.com'),
   'Bancolombia',
   '9876543210',
   'savings',
@@ -256,7 +249,7 @@ INSERT INTO referral_codes (
   owner_user_id, code, code_type, description
 )
 VALUES (
-  (SELECT user_id FROM agreement),
+  (SELECT id FROM users WHERE email='agente.carlos@gmail.com'),
   'CARLOSVIP',
   'commission',
   'Código personal de Carlos - Solo tracking'
@@ -267,7 +260,7 @@ INSERT INTO referral_codes (
   owner_user_id, code, code_type, discount_type, discount_value, description
 )
 VALUES (
-  (SELECT user_id FROM agreement),
+  (SELECT id FROM users WHERE email='agente.carlos@gmail.com'),
   'VERANO2025',
   'both', -- Da descuento Y comisión
   'percentage',
@@ -280,7 +273,7 @@ INSERT INTO referral_codes (
   owner_user_id, code, code_type, discount_type, discount_value, usage_limit, description
 )
 VALUES (
-  (SELECT user_id FROM agreement),
+  (SELECT id FROM users WHERE email='agente.carlos@gmail.com'),
   'PRIMERACOMPRA',
   'both',
   'fixed',
@@ -328,7 +321,7 @@ INSERT INTO referral_codes (
   allow_stacking, min_purchase_cents, description
 )
 VALUES (
-  (SELECT user_id FROM agreement),
+  (SELECT id FROM users WHERE email='agente.carlos@gmail.com'),
   'EXTRA10',
   'discount',
   'percentage',

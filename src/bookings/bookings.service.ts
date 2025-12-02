@@ -284,10 +284,14 @@ export class BookingsService {
   async cleanupOrphanLocks(batchSize = 500): Promise<number> {
     const result = await this.db.query(
       `DELETE FROM inventory_locks
-        WHERE booking_id IS NULL
-          AND consumed_at IS NULL
-          AND expires_at < NOW()
-        LIMIT $1`,
+        WHERE id IN (
+          SELECT id
+          FROM inventory_locks
+          WHERE booking_id IS NULL
+            AND consumed_at IS NULL
+            AND expires_at < NOW()
+          LIMIT $1
+        )`,
       [batchSize],
     );
 

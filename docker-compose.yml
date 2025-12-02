@@ -53,7 +53,7 @@ services:
       - "1025:1025" # SMTP
       - "8025:8025" # UI
     healthcheck:
-      test: ["CMD", "wget", "-qO", "-", "http://127.0.0.1:8025/healthz"]
+      test: ["CMD", "wget", "-qO", "-", "http://127.0.0.1:8025/mailpit/"]
       interval: 10s
       timeout: 10s
       retries: 10
@@ -110,7 +110,7 @@ services:
       - /app/node_modules
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:3000/healthz || exit 1"]
-      interval: 10s
+      interval: 30s
       timeout: 5s
       retries: 10
     networks:

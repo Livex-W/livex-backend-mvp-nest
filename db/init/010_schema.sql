@@ -134,69 +134,6 @@ CREATE TABLE resort_agents (
     CONSTRAINT unique_active_agent_resort UNIQUE (resort_id, user_id)
 );
 
-
-
-CREATE TABLE IF NOT EXISTS bookings (
-  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id        uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  experience_id  uuid NOT NULL REFERENCES experiences(id) ON DELETE CASCADE,
-  slot_id        uuid NOT NULL REFERENCES availability_slots(id) ON DELETE CASCADE,
-  adults         integer NOT NULL CHECK (adults >= 0),
-  children       integer NOT NULL DEFAULT 0 CHECK (children >= 0),
-  total_cents    integer NOT NULL CHECK (total_cents >= 0),
-  currency       text NOT NULL DEFAULT 'COP',
-  idempotency_key text,
-  status         booking_status NOT NULL DEFAULT 'pending',
-  agent_id       uuid REFERENCES users(id), -- Nuevo campo para Agentes
-  referral_code_id uuid REFERENCES referral_codes(id), -- Código usado en esta reserva
-  created_at     timestamptz NOT NULL DEFAULT now(),
-  updated_at     timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT booking_quantities CHECK (adults + children > 0)
-);
-CREATE INDEX IF NOT EXISTS idx_bookings_user ON bookings(user_id);
-CREATE INDEX IF NOT EXISTS idx_bookings_experience ON bookings(experience_id);
-CREATE INDEX IF NOT EXISTS idx_bookings_slot ON bookings(slot_id);
-CREATE INDEX IF NOT EXISTS idx_bookings_status ON bookings(status);
-CREATE INDEX IF NOT EXISTS idx_bookings_agent ON bookings(agent_id); -- Índice para agentes
-
--- 3. Tabla para registrar las comisiones generadas por cada venta
-CREATE TABLE IF NOT EXISTS agent_commissions (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    booking_id uuid NOT NULL REFERENCES bookings(id),
-    agent_id uuid NOT NULL REFERENCES users(id),
-    resort_id uuid NOT NULL REFERENCES resorts(id),
-    
-    amount_cents integer NOT NULL, -- Monto exacto de la comisión
-    rate_bps integer NOT NULL,     -- Tasa que se aplicó en ese momento
-    
-    status text NOT NULL DEFAULT 'pending', -- pending, paid, cancelled
-    paid_at timestamptz,
-    
-    created_at timestamptz DEFAULT now(),
-    updated_at timestamptz DEFAULT now()
-);
-
-CREATE TABLE IF NOT EXISTS agent_profiles (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    
-    -- Datos Bancarios
-    bank_name text,
-    account_number text,
-    account_type text, -- savings, checking
-    account_holder_name text,
-    
-    -- Datos Fiscales
-    tax_id text, -- NIT, Cédula, SSN
-    
-    is_verified boolean DEFAULT false,
-    
-    created_at timestamptz DEFAULT now(),
-    updated_at timestamptz DEFAULT now(),
-    
-    CONSTRAINT unique_agent_profile UNIQUE (user_id)
-);
-
 -- Tabla de Códigos de Referido / Cupones
 CREATE TABLE IF NOT EXISTS referral_codes (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -287,6 +224,69 @@ ALTER TABLE referral_codes
     ADD COLUMN IF NOT EXISTS allow_stacking boolean DEFAULT false,
     ADD COLUMN IF NOT EXISTS min_purchase_cents integer DEFAULT 0,
     ADD COLUMN IF NOT EXISTS max_discount_cents integer;
+
+CREATE TABLE IF NOT EXISTS bookings (
+  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id        uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  experience_id  uuid NOT NULL REFERENCES experiences(id) ON DELETE CASCADE,
+  slot_id        uuid NOT NULL REFERENCES availability_slots(id) ON DELETE CASCADE,
+  adults         integer NOT NULL CHECK (adults >= 0),
+  children       integer NOT NULL DEFAULT 0 CHECK (children >= 0),
+  total_cents    integer NOT NULL CHECK (total_cents >= 0),
+  currency       text NOT NULL DEFAULT 'COP',
+  idempotency_key text,
+  status         booking_status NOT NULL DEFAULT 'pending',
+  agent_id       uuid REFERENCES users(id), -- Nuevo campo para Agentes
+  referral_code_id uuid REFERENCES referral_codes(id), -- Código usado en esta reserva
+  created_at     timestamptz NOT NULL DEFAULT now(),
+  updated_at     timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT booking_quantities CHECK (adults + children > 0)
+);
+CREATE INDEX IF NOT EXISTS idx_bookings_user ON bookings(user_id);
+CREATE INDEX IF NOT EXISTS idx_bookings_experience ON bookings(experience_id);
+CREATE INDEX IF NOT EXISTS idx_bookings_slot ON bookings(slot_id);
+CREATE INDEX IF NOT EXISTS idx_bookings_status ON bookings(status);
+CREATE INDEX IF NOT EXISTS idx_bookings_agent ON bookings(agent_id); -- Índice para agentes
+
+-- 3. Tabla para registrar las comisiones generadas por cada venta
+CREATE TABLE IF NOT EXISTS agent_commissions (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    booking_id uuid NOT NULL REFERENCES bookings(id),
+    agent_id uuid NOT NULL REFERENCES users(id),
+    resort_id uuid NOT NULL REFERENCES resorts(id),
+    
+    amount_cents integer NOT NULL, -- Monto exacto de la comisión
+    rate_bps integer NOT NULL,     -- Tasa que se aplicó en ese momento
+    
+    status text NOT NULL DEFAULT 'pending', -- pending, paid, cancelled
+    paid_at timestamptz,
+    
+    created_at timestamptz DEFAULT now(),
+    updated_at timestamptz DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS agent_profiles (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    
+    -- Datos Bancarios
+    bank_name text,
+    account_number text,
+    account_type text, -- savings, checking
+    account_holder_name text,
+    
+    -- Datos Fiscales
+    tax_id text, -- NIT, Cédula, SSN
+    
+    is_verified boolean DEFAULT false,
+    
+    created_at timestamptz DEFAULT now(),
+    updated_at timestamptz DEFAULT now(),
+    
+    CONSTRAINT unique_agent_profile UNIQUE (user_id)
+);
+
+
 
 -- Tabla de uso múltiple de códigos (stacking)
 CREATE TABLE IF NOT EXISTS booking_referral_codes (
