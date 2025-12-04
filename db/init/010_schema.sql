@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS users (
   email        citext UNIQUE NOT NULL,
   password_hash text NOT NULL,
   full_name    text,
+  phone        text,
   role         user_role NOT NULL DEFAULT 'tourist',
   created_at   timestamptz NOT NULL DEFAULT now(),
   updated_at   timestamptz NOT NULL DEFAULT now()

@@ -4,12 +4,12 @@
 
 -- 1) Usuarios base (admin + operadores)
 WITH u AS (
-  INSERT INTO users (email, password_hash, full_name, role) VALUES
-    ('admin@livex.app', '$2b$10$j54QekkMZucJ.hKpcRMmqe4SnETnpr.8OxLyRfAZVLnSVkBgP4eFS','Admin Livex','admin'),
-    ('operaciones@marysol.co', '$2b$10$5eTgOS5SOy7P1E/xsB4kBuUTTfEstsU4fM2wNhKGiHWp/HXl2cQ2.','Operaciones Mar y Sol','resort'),
-    ('coordinacion@islabrisa.co', '$2b$10$xo422QzD1EzJGyZw4ZX.uOGPhvH1O/AcZqGXiLXekrQxQWIrfmtB6','Coordinación Isla Brisa','resort'),
-    ('reservas@nauticabahia.co', '$2b$10$spwKr.1mndnqnkr1I4Y/keuLEUKmJ/AXvvTKvv9Jo.EwSdZIVe8Le','Reservas Náutica Bahía','resort'),
-    ('sofia.turista@gmail.com', '$2b$10$2ll7SeL6f3FtaB1l3FYWiOoOBLxSousw97M2bDrBxqk9cxQiqOLnC','Sofía Turista','tourist')
+  INSERT INTO users (email, password_hash, full_name, phone, role) VALUES
+    ('admin@livex.app', '$2b$10$j54QekkMZucJ.hKpcRMmqe4SnETnpr.8OxLyRfAZVLnSVkBgP4eFS','Admin Livex', '+573000000000', 'admin'),
+    ('operaciones@marysol.co', '$2b$10$5eTgOS5SOy7P1E/xsB4kBuUTTfEstsU4fM2wNhKGiHWp/HXl2cQ2.','Operaciones Mar y Sol', '+573001111111', 'resort'),
+    ('coordinacion@islabrisa.co', '$2b$10$xo422QzD1EzJGyZw4ZX.uOGPhvH1O/AcZqGXiLXekrQxQWIrfmtB6','Coordinación Isla Brisa', '+573002222222', 'resort'),
+    ('reservas@nauticabahia.co', '$2b$10$spwKr.1mndnqnkr1I4Y/keuLEUKmJ/AXvvTKvv9Jo.EwSdZIVe8Le','Reservas Náutica Bahía', '+573003333333', 'resort'),
+    ('sofia.turista@gmail.com', '$2b$10$2ll7SeL6f3FtaB1l3FYWiOoOBLxSousw97M2bDrBxqk9cxQiqOLnC','Sofía Turista', '+573004444444', 'tourist')
   RETURNING id, email, role
 ),
 
@@ -170,8 +170,8 @@ UPDATE experience_images SET image_type = 'gallery' WHERE image_type IS NULL;
 
 -- 11.1) Crear un usuario Agente
 -- 11.1) Crear un usuario Agente
-INSERT INTO users (email, password_hash, full_name, role) 
-VALUES ('agente.carlos@gmail.com', '$2b$10$j54QekkMZucJ.hKpcRMmqe4SnETnpr.8OxLyRfAZVLnSVkBgP4eFS', 'Carlos El Vendedor', 'agent');
+INSERT INTO users (email, password_hash, full_name, phone, role) 
+VALUES ('agente.carlos@gmail.com', '$2b$10$j54QekkMZucJ.hKpcRMmqe4SnETnpr.8OxLyRfAZVLnSVkBgP4eFS', 'Carlos El Vendedor', '+573005555555', 'agent');
 
 -- 11.2) Crear Acuerdo: Carlos vende para "Mar y Sol Cartagena" con 15% (1500 bps)
 INSERT INTO resort_agents (resort_id, user_id, commission_bps, is_active)
