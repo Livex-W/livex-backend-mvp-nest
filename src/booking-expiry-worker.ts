@@ -20,7 +20,7 @@ async function main() {
   const processExpiredBookings = async () => {
     try {
       const result = await bookingsService.expireStalePendingBookings(100);
-      
+
       if (result.expired > 0) {
         logger.logBusinessEvent('booking_expiry_batch_processed', {
           expiredCount: result.expired,
@@ -30,7 +30,7 @@ async function main() {
 
       // Cleanup orphan locks (locks sin booking asociado)
       const cleanedLocks = await bookingsService.cleanupOrphanLocks(500);
-      
+
       if (cleanedLocks > 0) {
         logger.logBusinessEvent('inventory_locks_cleanup', {
           cleanedCount: cleanedLocks,
