@@ -32,6 +32,7 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-livex}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-livex}
+      RABBITMQ_ERLANG_COOKIE: ${RABBITMQ_ERLANG_COOKIE:-secret_cookie_123}
     ports:
       - "5672:5672" # AMQP
       - "15672:15672" # UI

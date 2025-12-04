@@ -355,8 +355,12 @@ export class BookingsService {
   ): Promise<number | null> {
     const totalRequested = adults + (children ?? 0);
 
+    // 1. Lock the slot row in the base table to ensure serialization
+    await client.query('SELECT id FROM availability_slots WHERE id = $1 FOR UPDATE', [slotId]);
+
+    // 2. Query the view to get the calculated remaining capacity (now safe from concurrent modifications)
     const slotResult = await client.query<{ slot_id: string; remaining: number }>(
-      `SELECT slot_id, remaining FROM v_slot_remaining WHERE slot_id = $1 FOR UPDATE`,
+      `SELECT slot_id, remaining FROM v_slot_remaining WHERE slot_id = $1`,
       [slotId],
     );
 
