@@ -230,7 +230,7 @@ WHERE b.user_id=(SELECT id FROM users WHERE email='sofia.turista@gmail.com')
   AND b.agent_id=(SELECT id FROM users WHERE email='agente.carlos@gmail.com')
 ORDER BY b.created_at DESC LIMIT 1;
 
--- 11.6) Completar Perfil del Agente (Datos Bancarios)
+-- 11.7) Completar Perfil del Agente (Datos Bancarios) - ÚLTIMO INSERT DEL WITH
 INSERT INTO agent_profiles (
   user_id, bank_name, account_number, account_type, account_holder_name, tax_id, is_verified
 )
@@ -243,8 +243,11 @@ SELECT
   '1234567890',
   true;
 
--- 11.7) Códigos de Referido del Agente Carlos
--- Código de comisión simple (solo trackea)
+-- ===========================
+-- FUERA DEL WITH: Códigos de Referido
+-- ===========================
+
+-- 11.8) Código de comisión simple (solo trackea)
 INSERT INTO referral_codes (
   owner_user_id, code, code_type, description
 )
@@ -255,7 +258,7 @@ VALUES (
   'Código personal de Carlos - Solo tracking'
 );
 
--- Código con descuento del 10% (10% = 1000 bps)
+-- 11.9) Código con descuento del 10% (10% = 1000 bps)
 INSERT INTO referral_codes (
   owner_user_id, code, code_type, discount_type, discount_value, description
 )
@@ -268,7 +271,7 @@ VALUES (
   'Promoción de verano - 10% de descuento'
 );
 
--- Código con descuento fijo de $20,000 COP
+-- 11.10) Código con descuento fijo de $20,000 COP
 INSERT INTO referral_codes (
   owner_user_id, code, code_type, discount_type, discount_value, usage_limit, description
 )
@@ -282,7 +285,7 @@ VALUES (
   'Primera compra - $20,000 COP de descuento (limitado a 50 usos)'
 );
 
--- 11.8) Restricciones: Código solo para Tours Náuticos
+-- 11.11) Restricciones: Código solo para Tours Náuticos
 INSERT INTO referral_code_restrictions (
   referral_code_id, restriction_type, category_slug
 )
@@ -292,8 +295,7 @@ VALUES (
   'nautical'
 );
 
--- 11.9) A/B Testing: Variantes del código VERANO2025
--- Variante A: 15% descuento
+-- 11.12) A/B Testing: Variante A - 15% descuento
 INSERT INTO referral_code_variants (
   parent_code_id, variant_name, code, discount_value
 )
@@ -304,7 +306,7 @@ VALUES (
   1500  -- 15%
 );
 
--- Variante B: 5% descuento
+-- 11.13) A/B Testing: Variante B - 5% descuento
 INSERT INTO referral_code_variants (
   parent_code_id, variant_name, code, discount_value
 )
@@ -315,7 +317,7 @@ VALUES (
   500  -- 5%
 );
 
--- 11.10) Código con Stacking permitido
+-- 11.14) Código con Stacking permitido
 INSERT INTO referral_codes (
   owner_user_id, code, code_type, discount_type, discount_value,
   allow_stacking, min_purchase_cents, description

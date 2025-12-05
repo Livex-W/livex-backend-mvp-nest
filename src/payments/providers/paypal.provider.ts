@@ -35,12 +35,47 @@ interface PayPalOrder {
       value: string;
     };
     description: string;
+    payments?: {
+      captures?: Array<{
+        id: string;
+        status: string;
+        amount: {
+          currency_code: string;
+          value: string;
+        };
+      }>;
+    };
   }>;
   links: Array<{
     href: string;
     rel: string;
     method: string;
   }>;
+  create_time: string;
+  update_time: string;
+}
+
+interface PayPalCapture {
+  id: string;
+  status: string;
+  amount: {
+    currency_code: string;
+    value: string;
+  };
+  supplementary_data?: {
+    related_ids?: {
+      order_id: string;
+    };
+  };
+}
+
+interface PayPalRefund {
+  id: string;
+  status: string;
+  amount: {
+    currency_code: string;
+    value: string;
+  };
   create_time: string;
   update_time: string;
 }
@@ -55,6 +90,7 @@ export class PayPalProvider implements PaymentProvider {
   private readonly config: PayPalConfig;
   private accessToken: string | null = null;
   private tokenExpiresAt: Date | null = null;
+
 
   constructor(private configService: ConfigService) {
     this.config = {
@@ -148,6 +184,53 @@ export class PayPalProvider implements PaymentProvider {
     }
   }
 
+  /**
+   * Captures an approved PayPal order to complete the payment
+   * This is required after a user approves an order (CHECKOUT.ORDER.APPROVED webhook)
+   */
+  async capturePayment(providerPaymentId: string): Promise<{ captureId: string; status: string }> {
+    try {
+      this.logger.log(`Capturing PayPal order: ${providerPaymentId}`);
+
+      await this.ensureAccessToken();
+
+      const response = await fetch(`${this.config.baseUrl}/v2/checkout/orders/${providerPaymentId}/capture`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        this.logger.error('PayPal capture failed', errorData);
+        throw new Error(`PayPal capture failed: ${response.status}`);
+      }
+
+      const captureData: any = await response.json();
+
+      // Extract capture ID from the first purchase unit
+      const captureId = captureData.purchase_units?.[0]?.payments?.captures?.[0]?.id;
+
+      if (!captureId) {
+        this.logger.error('No capture ID found in PayPal response', captureData);
+        throw new Error('PayPal capture ID not found');
+      }
+
+      this.logger.log(`PayPal order ${providerPaymentId} captured successfully. Capture ID: ${captureId}`);
+
+      return {
+        captureId,
+        status: captureData.status === 'COMPLETED' ? 'paid' : 'pending',
+      };
+
+    } catch (error) {
+      this.logger.error(`Error capturing PayPal order ${providerPaymentId}`, error);
+      throw error;
+    }
+  }
+
   async getPaymentStatus(providerPaymentId: string): Promise<PaymentResult> {
     try {
       await this.ensureAccessToken();
@@ -188,6 +271,7 @@ export class PayPalProvider implements PaymentProvider {
           status = 'pending';
       }
 
+      const captureId = order.purchase_units?.[0]?.payments?.captures?.[0]?.id;
       return {
         id: order.id,
         status: status as 'pending' | 'authorized' | 'paid' | 'failed' | 'expired',
@@ -195,6 +279,7 @@ export class PayPalProvider implements PaymentProvider {
         metadata: {
           paypal_order_id: order.id,
           paypal_status: order.status,
+          paypal_capture_id: captureId,
           update_time: order.update_time,
         },
       };
@@ -212,7 +297,7 @@ export class PayPalProvider implements PaymentProvider {
       await this.ensureAccessToken();
 
       // Primero necesitamos obtener el capture ID de la orden
-      const captureId = await this.getCaptureIdFromOrder(request.paymentId);
+      const captureId = request.paymentId;
 
       if (!captureId) {
         throw new Error('PayPal capture ID not found for refund');
@@ -221,10 +306,13 @@ export class PayPalProvider implements PaymentProvider {
       // Convertir centavos a formato decimal
       const amount = (request.amount / 100).toFixed(2);
 
+      const captureDetails = await this.getCaptureDetails(captureId);
+      const currency = captureDetails?.amount?.currency_code || 'USD';
+
       const refundData = {
         amount: {
           value: amount,
-          currency_code: 'COP', // Ajustar según la moneda del pago original
+          currency_code: currency,
         },
         note_to_payer: request.reason || 'Refund processed by LIVEX',
       };
@@ -234,7 +322,7 @@ export class PayPalProvider implements PaymentProvider {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${this.accessToken}`,
-          'PayPal-Request-Id': `refund-${request.paymentId}-${Date.now()}`,
+          'PayPal-Request-Id': `refund-${captureId}-${Date.now()}`,
         },
         body: JSON.stringify(refundData),
       });
@@ -245,15 +333,31 @@ export class PayPalProvider implements PaymentProvider {
         throw new Error(`PayPal refund API error: ${response.status}`);
       }
 
-      const refund = await response.json();
+      const refund: PayPalRefund = await response.json();
 
-      this.logger.log(`PayPal refund created: ${refund.id}`);
+      this.logger.log(`PayPal refund created: ${refund.id} for capture ${captureId}`);
+
+      let status: 'pending' | 'processed' | 'failed';
+      switch (refund.status) {
+        case 'COMPLETED':
+          status = 'processed';
+          break;
+        case 'PENDING':
+          status = 'pending';
+          break;
+        case 'CANCELLED':
+        case 'FAILED':
+          status = 'failed';
+          break;
+        default:
+          status = 'pending';
+      }
 
       return {
         id: refund.id,
         providerRefundId: refund.id,
         providerReference: refund.id,
-        status: refund.status === 'COMPLETED' ? 'processed' : 'pending',
+        status: status,
         metadata: {
           paypal_refund_id: refund.id,
           paypal_status: refund.status,
@@ -335,6 +439,7 @@ export class PayPalProvider implements PaymentProvider {
 
       const eventType = payload.event_type;
       let paymentId: string | null = null;
+      let captureId: string | null = null;
       let status: string | null = null;
 
       // Procesar diferentes tipos de eventos de PayPal
@@ -346,19 +451,24 @@ export class PayPalProvider implements PaymentProvider {
 
         case 'PAYMENT.CAPTURE.COMPLETED':
           // El pago fue capturado exitosamente
+          captureId = payload.resource?.id;
           paymentId = payload.resource?.supplementary_data?.related_ids?.order_id;
           status = 'paid';
+          this.logger.log(`Capture completed - Order: ${paymentId}, Capture: ${captureId}`);
           break;
 
         case 'PAYMENT.CAPTURE.DENIED':
         case 'PAYMENT.CAPTURE.DECLINED':
           paymentId = payload.resource?.supplementary_data?.related_ids?.order_id;
           status = 'failed';
+          this.logger.log(`Capture denied - Order: ${paymentId}`);
           break;
 
         case 'PAYMENT.CAPTURE.REFUNDED':
           // Refund completado
+          captureId = payload.resource?.id;
           paymentId = payload.resource?.supplementary_data?.related_ids?.order_id;
+          this.logger.log(`Refund completed - Order: ${paymentId}, Capture: ${captureId}`);
           // Este evento es para refunds, no cambiar el estado del pago original
           break;
 
@@ -375,6 +485,7 @@ export class PayPalProvider implements PaymentProvider {
         metadata: {
           paypal_event_type: eventType,
           paypal_resource_id: payload.resource?.id,
+          paypal_capture_id: captureId,
           webhook_id: payload.id,
           create_time: payload.create_time,
         },
@@ -383,6 +494,31 @@ export class PayPalProvider implements PaymentProvider {
     } catch (error) {
       this.logger.error('Error processing PayPal webhook', error);
       throw error;
+    }
+  }
+
+
+  private async getCaptureDetails(captureId: string): Promise<PayPalCapture | null> {
+    try {
+      await this.ensureAccessToken();
+
+      const response = await fetch(`${this.config.baseUrl}/v2/payments/captures/${captureId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${this.accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        this.logger.warn(`Could not fetch capture details for ${captureId}: ${response.status}`);
+        return null;
+      }
+
+      return await response.json();
+    } catch (error) {
+      this.logger.error(`Error getting capture details for ${captureId}`, error);
+      return null;
     }
   }
 

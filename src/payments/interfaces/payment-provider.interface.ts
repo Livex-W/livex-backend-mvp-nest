@@ -52,4 +52,7 @@ export interface PaymentProvider {
   createRefund(request: RefundRequest): Promise<RefundResult>;
   getRefundStatus(providerRefundId: string): Promise<RefundResult>;
   validateWebhook(payload: any, signatureOrHeaders?: string | Record<string, string>): Promise<WebhookEvent>;
+
+  // Optional method for providers that require explicit capture (e.g., PayPal)
+  capturePayment?(providerPaymentId: string): Promise<{ captureId: string; status: string }>;
 }
