@@ -235,8 +235,8 @@ export class PaymentsService {
         webhookEvent = await provider.validateWebhook(dto.payload, validationData);
 
         await client.query(
-          'UPDATE webhook_events SET status = $1 WHERE id = $2',
-          ['processed', internalWebhookId]
+          'UPDATE webhook_events SET status = $1, signature_valid = $2 WHERE id = $3',
+          ['processed', true, internalWebhookId]
         );
         this.logger.log(`Webhook signature validated: ${webhookEventId}`);
 
