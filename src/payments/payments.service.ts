@@ -19,6 +19,7 @@ interface Payment {
   currency: string;
   status: string;
   payment_method?: string;
+  provider_capture_id?: string;
   idempotency_key?: string;
   checkout_url?: string;
   expires_at?: Date;
@@ -57,9 +58,9 @@ export class PaymentsService {
   ) { }
 
   async createPayment(dto: CreatePaymentDto, userId: string): Promise<Payment> {
-    return await this.db.transaction(async (client) => {
+    const payment = await this.db.transaction(async (client) => {
 
-      // Verificar que el booking existe y pertenece al usuario
+      // Verificar booking
       const bookingResult = await client.query<Booking>(
         'SELECT * FROM bookings WHERE id = $1 AND user_id = $2 AND status = $3',
         [dto.bookingId, userId, 'pending']
@@ -71,7 +72,7 @@ export class PaymentsService {
 
       const booking = bookingResult.rows[0];
 
-      // Verificar idempotencia si se proporciona clave
+      // Verificar idempotencia
       if (dto.idempotencyKey) {
         const existingPayment = await client.query<Payment>(
           'SELECT * FROM payments WHERE idempotency_key = $1',
@@ -79,12 +80,11 @@ export class PaymentsService {
         );
 
         if (existingPayment.rows.length > 0) {
-          await client.query('COMMIT');
           return existingPayment.rows[0];
         }
       }
 
-      // Verificar que no existe ya un pago exitoso para este booking
+      // Verificar pago existente
       const existingSuccessfulPayment = await client.query<Payment>(
         'SELECT * FROM payments WHERE booking_id = $1 AND status IN ($2, $3)',
         [dto.bookingId, 'paid', 'authorized']
@@ -94,17 +94,18 @@ export class PaymentsService {
         throw new ConflictException('Payment already exists for this booking');
       }
 
-      // Crear registro de pago en estado pending
+      // Crear registro de pago
       const paymentId = crypto.randomUUID();
-      const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutos
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
       const insertResult = await client.query<Payment>(
         `INSERT INTO payments (
-          booking_id, provider, amount_cents, currency, status, 
-          payment_method, idempotency_key, expires_at, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
-        RETURNING *`,
+        id, booking_id, provider, amount_cents, currency, status, 
+        payment_method, idempotency_key, expires_at, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+      RETURNING *`,
         [
+          paymentId,
           dto.bookingId,
           dto.provider,
           booking.total_cents,
@@ -116,17 +117,25 @@ export class PaymentsService {
         ]
       );
 
-      const payment = insertResult.rows[0];
+      return insertResult.rows[0];
+    });
 
-      // Crear pago con el proveedor
-      const provider = this.paymentProviderFactory.getProvider(dto.provider);
+    const provider = this.paymentProviderFactory.getProvider(dto.provider);
 
-      const paymentResult = await provider.createPayment({
+    let paymentResult;
+    try {
+      const bookingResult = await this.db.query<Booking>(
+        'SELECT * FROM bookings WHERE id = $1',
+        [dto.bookingId]
+      );
+      const booking = bookingResult.rows[0];
+
+      paymentResult = await provider.createPayment({
         id: payment.id,
         amount: booking.total_cents,
         currency: booking.currency,
         description: `LIVEX Booking ${booking.id}`,
-        expiresAt,
+        expiresAt: payment.expires_at,
         metadata: {
           bookingId: booking.id,
           userId: booking.user_id,
@@ -135,68 +144,125 @@ export class PaymentsService {
         },
       });
 
-      // Actualizar pago con datos del proveedor
-      const updatedPayment = await client.query<Payment>(
+      this.logger.log(`Provider response: ${JSON.stringify(paymentResult)}`);
+
+    } catch (error) {
+      this.logger.error(`Failed to create payment with provider ${dto.provider}`, error);
+
+      // Marcar como fallido en DB
+      await this.db.query(
+        `UPDATE payments SET status = $1, failure_reason = $2, failed_at = NOW() WHERE id = $3`,
+        ['failed', error.message, payment.id]
+      );
+
+      throw error;
+    }
+
+    const updatedPayment = await this.db.transaction(async (client) => {
+      const result = await client.query<Payment>(
         `UPDATE payments SET 
-          provider_payment_id = $1,
-          provider_reference = $2,
-          checkout_url = $3,
-          status = $4,
-          provider_metadata = $5,
-          updated_at = NOW()
-        WHERE id = $6
-        RETURNING *`,
+        provider_payment_id = $1,
+        provider_reference = $2,
+        checkout_url = $3,
+        status = $4,
+        provider_metadata = $5,
+        updated_at = NOW()
+      WHERE id = $6
+      RETURNING *`,
         [
           paymentResult.providerPaymentId,
           paymentResult.providerReference,
           paymentResult.checkoutUrl,
           paymentResult.status,
-          JSON.stringify(paymentResult.metadata),
-          paymentId,
+          paymentResult.metadata,
+          payment.id,
         ]
       );
 
-      this.logger.log(`Payment created: ${paymentId} for booking ${dto.bookingId}`);
-      return updatedPayment.rows[0];
+      return result.rows[0];
     });
+
+    this.logger.log(`Payment created: ${payment.id} for booking ${dto.bookingId}`);
+    return updatedPayment;
   }
 
   async processWebhook(dto: WebhookPayloadDto): Promise<void> {
     return await this.db.transaction(async (client) => {
 
+      // validar timestamp del webhook (no debe ser mayor a 5 minutos - rechazar eventos antiguos)
+      const webhookTime = new Date(dto.payload.create_time);
+      const now = new Date();
+      const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
+
+      if (webhookTime < fiveMinutesAgo) {
+        this.logger.warn(`Webhook rejected: too old (${dto.payload.create_time})`);
+        throw new BadRequestException('Webhook event is too old');
+      }
       // Registrar webhook event
-      const webhookEventId = crypto.randomUUID();
+      const webhookEventId = dto.payload.id;
+      const existingEvent = await client.query(
+        'SELECT id FROM webhook_events WHERE provider = $1 AND provider_event_id = $2',
+        [dto.provider, webhookEventId]
+      );
+
+      if (existingEvent.rows.length > 0) {
+        this.logger.warn(`Webhook rejected: duplicate event ${webhookEventId}`);
+        return;
+      }
+
+      const internalWebhookId = crypto.randomUUID();
       await client.query(
         `INSERT INTO webhook_events (
           id, provider, event_type, payload, status, received_at
         ) VALUES ($1, $2, $3, $4, $5, NOW())`,
         [
-          webhookEventId,
+          internalWebhookId,
           dto.provider,
           'payment.updated',
-          JSON.stringify(dto.payload),
+          dto.payload,
           'pending',
         ]
       );
+      this.logger.log(`Webhook event registered: ${internalWebhookId} (PayPal ID: ${webhookEventId})`);
 
       // Validar webhook con el proveedor
       const provider = this.paymentProviderFactory.getProvider(dto.provider as PaymentProviderType);
+      let webhookEvent;
 
-      // Para PayPal, pasar headers; para Wompi, pasar signature
-      const validationData = dto.provider === 'paypal' ? dto.headers : dto.signature;
-      const webhookEvent = await provider.validateWebhook(dto.payload, validationData);
+      try {
+        // Para PayPal, pasar headers; para Wompi, pasar signature
+        const validationData = dto.provider === 'paypal' ? dto.headers : dto.signature;
+        webhookEvent = await provider.validateWebhook(dto.payload, validationData);
+
+        await client.query(
+          'UPDATE webhook_events SET status = $1 WHERE id = $2',
+          ['processed', internalWebhookId]
+        );
+        this.logger.log(`Webhook signature validated: ${webhookEventId}`);
+
+      } catch (error) {
+        this.logger.error(`Failed to validate webhook with provider ${dto.provider}`, error);
+
+        await client.query(
+          'UPDATE webhook_events SET status = $1, error = $2, signature_valid = $3 WHERE id = $4',
+          ['failed', `Invalid signature: ${error.message}`, false, internalWebhookId]
+        );
+
+        throw new BadRequestException('Invalid webhook signature');
+      }
 
       // Buscar el pago por provider_payment_id o reference
       let payment: Payment | null = null;
 
       if (webhookEvent.paymentId) {
         const paymentResult = await client.query<Payment>(
-          'SELECT * FROM payments WHERE id = $1 OR provider_reference = $2',
-          [webhookEvent.paymentId, webhookEvent.paymentId]
+          'SELECT * FROM payments WHERE provider_payment_id = $1',
+          [webhookEvent.paymentId]
         );
 
         if (paymentResult.rows.length > 0) {
           payment = paymentResult.rows[0];
+          this.logger.log(`Payment found: ${payment.id} for provider_payment_id: ${webhookEvent.paymentId}`);
         }
       }
 
@@ -204,9 +270,8 @@ export class PaymentsService {
         this.logger.warn(`Payment not found for webhook event: ${webhookEvent.paymentId}`);
         await client.query(
           'UPDATE webhook_events SET status = $1, error = $2 WHERE id = $3',
-          ['ignored', 'Payment not found', webhookEventId]
+          ['ignored', 'Payment not found', internalWebhookId]
         );
-        await client.query('COMMIT');
         return;
       }
 
@@ -222,13 +287,33 @@ export class PaymentsService {
         updateValues.push(webhookEvent.status);
 
         updateFields.push(`provider_metadata = $${paramIndex++}`);
-        updateValues.push(JSON.stringify(webhookEvent.metadata));
+        updateValues.push(webhookEvent.metadata);
 
+        if (webhookEvent.metadata?.paypal_capture_id) {
+          updateFields.push(`provider_capture_id = $${paramIndex++}`);
+          updateValues.push(webhookEvent.metadata.paypal_capture_id);
+          this.logger.log(`Saving capture_id: ${webhookEvent.metadata.paypal_capture_id} for payment ${payment.id}`);
+        }
         updateFields.push(`updated_at = NOW()`);
 
         // Actualizar timestamps según el estado
         if (webhookEvent.status === 'authorized') {
           updateFields.push(`authorized_at = NOW()`);
+
+          // Si es PayPal, capturar automáticamente la orden
+          if (dto.provider === 'paypal' && webhookEvent.paymentId && provider.capturePayment) {
+            this.logger.log(`Auto-capturing PayPal order ${webhookEvent.paymentId}`);
+
+            // Capturar de forma asíncrona para no bloquear el webhook
+            // El webhook PAYMENT.CAPTURE.COMPLETED actualizará el payment a 'paid'
+            provider.capturePayment(webhookEvent.paymentId)
+              .then((captureResult) => {
+                this.logger.log(`PayPal order ${webhookEvent.paymentId} captured: ${captureResult.captureId}`);
+              })
+              .catch((error) => {
+                this.logger.error(`Failed to auto-capture PayPal order ${webhookEvent.paymentId}`, error);
+              });
+          }
         } else if (webhookEvent.status === 'paid') {
           updateFields.push(`paid_at = NOW()`);
         } else if (webhookEvent.status === 'failed') {
@@ -246,6 +331,7 @@ export class PaymentsService {
 
         // Si el pago fue exitoso, confirmar el booking y consumir el lock
         if (webhookEvent.status === 'paid') {
+          this.logger.log(`Payment confirmed, updating booking ${payment.booking_id} to confirmed`);
           await this.confirmBookingPayment(client, payment.booking_id);
         }
 
@@ -255,7 +341,7 @@ export class PaymentsService {
       // Marcar webhook como procesado
       await client.query(
         'UPDATE webhook_events SET status = $1, processed_at = NOW() WHERE id = $2',
-        ['processed', webhookEventId]
+        ['processed', internalWebhookId]
       );
 
     });
@@ -283,6 +369,13 @@ export class PaymentsService {
         // Aquí se podría verificar si es admin
         throw new BadRequestException('Not authorized to refund this payment');
       }
+
+      if (payment.provider === 'paypal' && !payment.provider_capture_id) {
+        throw new BadRequestException(
+          'Payment does not have a capture ID. Cannot process refund. Please contact support.'
+        );
+      }
+
 
       // Calcular monto del refund
       const refundAmount = dto.amountCents || payment.amount_cents;
@@ -325,8 +418,15 @@ export class PaymentsService {
       // Procesar refund con el proveedor
       const provider = this.paymentProviderFactory.getProvider(payment.provider as PaymentProviderType);
 
+      const providerPaymentId = payment.provider === 'paypal'
+        ? (payment.provider_capture_id || payment.provider_payment_id || '')
+        : (payment.provider_payment_id || '');
+
+      this.logger.log(`Creating refund with provider. Provider: ${payment.provider}, ID: ${providerPaymentId}`);
+
+
       const refundProviderResult = await provider.createRefund({
-        paymentId: payment.provider_payment_id || '',
+        paymentId: providerPaymentId,
         amount: refundAmount,
         reason: dto.reason,
         metadata: {
@@ -348,7 +448,7 @@ export class PaymentsService {
           refundProviderResult.providerRefundId,
           refundProviderResult.providerReference,
           refundProviderResult.status,
-          JSON.stringify(refundProviderResult.metadata),
+          refundProviderResult.metadata,
           refundId,
         ]
       );
@@ -384,16 +484,22 @@ export class PaymentsService {
 
   private async confirmBookingPayment(client: any, bookingId: string): Promise<void> {
     // Confirmar booking
-    await client.query(
-      'UPDATE bookings SET status = $1, updated_at = NOW() WHERE id = $2',
+    const bookingUpdate = await client.query(
+      'UPDATE bookings SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
       ['confirmed', bookingId]
     );
 
+    this.logger.log(`Booking updated: ${bookingUpdate.rows.length} rows affected`);
+
+
     // Consumir inventory lock
-    await client.query(
-      'UPDATE inventory_locks SET consumed_at = NOW() WHERE booking_id = $1 AND consumed_at IS NULL',
+    const lockUpdate = await client.query(
+      'UPDATE inventory_locks SET consumed_at = NOW() WHERE booking_id = $1 AND consumed_at IS NULL RETURNING *',
       [bookingId]
     );
+
+    this.logger.log(`Inventory locks consumed: ${lockUpdate.rows.length} locks`);
+
 
     // Obtener datos del booking y resort
     const bookingResult = await client.query(
@@ -550,6 +656,11 @@ export class PaymentsService {
         throw new ConflictException('Refund already exists for this payment');
       }
 
+      if (payment.provider === 'paypal' && !payment.provider_capture_id) {
+        this.logger.error(`Cannot refund PayPal payment ${payment.id}: missing capture_id`);
+        throw new BadRequestException('Payment cannot be refunded: missing capture information');
+      }
+
       // 3. Obtener el proveedor de pagos
       const provider = this.paymentProviderFactory.getProvider(payment.provider as PaymentProviderType);
 
@@ -558,9 +669,15 @@ export class PaymentsService {
       let refundStatus: 'pending' | 'processed' | 'failed' = 'pending';
 
       try {
-        if (payment.provider_payment_id) {
+
+        const providerPaymentId = payment.provider === 'paypal'
+          ? (payment.provider_capture_id || payment.provider_payment_id)
+          : payment.provider_payment_id;
+
+        if (providerPaymentId) {
+          this.logger.log(`Processing refund for booking ${bookingId} with provider ID: ${providerPaymentId}`);
           const refundResult = await provider.createRefund({
-            paymentId: payment.provider_payment_id,
+            paymentId: providerPaymentId,
             amount: payment.amount_cents,
             reason,
           });

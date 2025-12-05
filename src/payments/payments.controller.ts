@@ -19,6 +19,8 @@ import { PaymentsService } from './payments.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { CreateRefundDto } from './dto/create-refund.dto';
 import { WebhookPayloadDto } from './dto/webhook-payload.dto';
+import { Public } from '../common/decorators/public.decorator';
+
 
 @Controller('v1/payments')
 export class PaymentsController {
@@ -135,6 +137,7 @@ export class PaymentsController {
     };
   }
 
+  @Public()
   @Post('webhooks/:provider')
   @HttpCode(HttpStatus.OK)
   async processWebhook(
