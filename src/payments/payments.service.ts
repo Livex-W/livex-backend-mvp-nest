@@ -8,6 +8,7 @@ import { CreatePaymentDto } from './dto/create-payment.dto';
 import { CreateRefundDto } from './dto/create-refund.dto';
 import { WebhookPayloadDto } from './dto/webhook-payload.dto';
 import { NotificationService } from '../notifications/services/notification.service';
+import { WebhookEvent } from './interfaces/payment-provider.interface';
 
 interface Payment {
   id: string;
@@ -250,7 +251,7 @@ export class PaymentsService {
 
       // Validar webhook con el proveedor
       const provider = this.paymentProviderFactory.getProvider(dto.provider as PaymentProviderType);
-      let webhookEvent: any;
+      let webhookEvent: WebhookEvent;
 
       try {
         // Para PayPal, pasar headers; para Wompi, pasar signature
