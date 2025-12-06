@@ -10,7 +10,8 @@ import {
   Headers,
   HttpCode,
   HttpStatus,
-  Logger
+  Logger,
+  BadRequestException
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -25,6 +26,7 @@ import { Public } from '../common/decorators/public.decorator';
 @Controller('v1/payments')
 export class PaymentsController {
   private readonly logger = new Logger(PaymentsController.name);
+  private readonly ALLOWED_PROVIDERS = ['paypal', 'wompi', 'epayco', 'stripe'];
 
   constructor(private readonly paymentsService: PaymentsService) { }
 
@@ -146,11 +148,42 @@ export class PaymentsController {
     @Headers() headers: Record<string, string>,
   ) {
     try {
+
+      if (!this.ALLOWED_PROVIDERS.includes(provider.toLowerCase())) {
+        this.logger.warn(`Webhook rejected: invalid provider "${provider}"`);
+        throw new BadRequestException('Invalid payment provider');
+      }
+
+      if (!payload || typeof payload !== 'object') {
+        this.logger.warn('Webhook rejected: invalid payload');
+        throw new BadRequestException('Invalid webhook payload');
+      }
+
+      if (provider === 'paypal') {
+        if (!payload.id || !payload.event_type || !payload.create_time) {
+          this.logger.warn('Webhook rejected: missing required PayPal fields');
+          throw new BadRequestException('Invalid PayPal webhook payload');
+        }
+      }
+
+      const requiredHeaders = provider === 'paypal'
+        ? ['paypal-transmission-id', 'paypal-transmission-sig']
+        : ['x-signature'];
+
+
+      const missingHeaders = requiredHeaders.filter(h => !headers[h.toLowerCase()]);
+      if (missingHeaders.length > 0) {
+        this.logger.warn(`Webhook rejected: missing headers ${missingHeaders.join(', ')}`);
+        throw new BadRequestException('Missing required webhook headers');
+      }
+
+      const sanitizedProvider = provider.toLowerCase().trim();
+
       // Extraer la firma según el proveedor
       const signature = headers['x-signature'] || headers['wompi-signature'];
 
       const webhookPayload: WebhookPayloadDto = {
-        provider,
+        provider: sanitizedProvider,
         payload,
         signature,
         headers, // Pasar todos los headers para validación de PayPal
@@ -163,7 +196,10 @@ export class PaymentsController {
     } catch (error) {
       this.logger.error(`Webhook processing failed for provider ${provider}:`, error);
       // Retornar 200 para evitar reintentos innecesarios del proveedor
-      return { success: false, error: error.message };
+      return {
+        success: false,
+        error: error instanceof BadRequestException ? error.message : 'Webhook processing failed'
+      };
     }
   }
 }

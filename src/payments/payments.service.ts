@@ -194,12 +194,35 @@ export class PaymentsService {
       const now = new Date();
       const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
 
+
+      if (isNaN(webhookTime.getTime())) {
+        this.logger.warn(`Webhook rejected: invalid timestamp`);
+        throw new BadRequestException('Invalid webhook timestamp');
+      }
+
       if (webhookTime < fiveMinutesAgo) {
         this.logger.warn(`Webhook rejected: too old (${dto.payload.create_time})`);
         throw new BadRequestException('Webhook event is too old');
       }
-      // Registrar webhook event
-      const webhookEventId = dto.payload.id;
+      // Registrar webhook event  
+      const webhookEventId = String(dto.payload.id).trim();
+
+      // Validar formato del ID (según proveedor)
+      if (dto.provider === 'paypal') {
+        // PayPal IDs: WH-XXXXX o similar
+        if (!webhookEventId.match(/^WH-[A-Z0-9-]+$/i)) {
+          this.logger.warn(`Webhook rejected: invalid PayPal event ID format: ${webhookEventId}`);
+          throw new BadRequestException('Invalid webhook event ID format');
+        }
+      }
+
+      // Validar longitud máxima 
+      if (webhookEventId.length > 100) {
+        this.logger.warn(`Webhook rejected: event ID too long`);
+        throw new BadRequestException('Webhook event ID too long');
+      }
+
+
       const existingEvent = await client.query(
         'SELECT id FROM webhook_events WHERE provider = $1 AND provider_event_id = $2',
         [dto.provider, webhookEventId]
@@ -227,7 +250,7 @@ export class PaymentsService {
 
       // Validar webhook con el proveedor
       const provider = this.paymentProviderFactory.getProvider(dto.provider as PaymentProviderType);
-      let webhookEvent;
+      let webhookEvent: any;
 
       try {
         // Para PayPal, pasar headers; para Wompi, pasar signature
@@ -251,13 +274,31 @@ export class PaymentsService {
         throw new BadRequestException('Invalid webhook signature');
       }
 
+      // Validar y sanitizar paymentId del webhook
+      if (!webhookEvent.paymentId) {
+        this.logger.warn('Webhook event has no paymentId');
+        await client.query(
+          'UPDATE webhook_events SET status = $1, error = $2 WHERE id = $3',
+          ['ignored', 'No payment ID in webhook', internalWebhookId]
+        );
+        return;
+      }
+
+      const sanitizedPaymentId = String(webhookEvent.paymentId).trim();
+
+      // Validar longitud
+      if (sanitizedPaymentId.length > 100) {
+        this.logger.warn('Webhook rejected: payment ID too long');
+        throw new BadRequestException('Payment ID too long');
+      }
+
       // Buscar el pago por provider_payment_id o reference
       let payment: Payment | null = null;
 
       if (webhookEvent.paymentId) {
         const paymentResult = await client.query<Payment>(
           'SELECT * FROM payments WHERE provider_payment_id = $1',
-          [webhookEvent.paymentId]
+          [sanitizedPaymentId]
         );
 
         if (paymentResult.rows.length > 0) {
