@@ -5,7 +5,7 @@ import {
   HttpException,
   HttpStatus,
 } from '@nestjs/common';
-import { Request, Response } from 'express';
+import { FastifyRequest, FastifyReply } from 'fastify';
 import { ThrottlerException } from '@nestjs/throttler';
 import { CustomLoggerService } from '../services/logger.service';
 
@@ -24,7 +24,7 @@ export interface ValidationErrorDetail {
   constraints: string[];
 }
 
-interface RequestWithUser extends Request {
+interface RequestWithUser extends FastifyRequest {
   user?: {
     id: string;
     role: string;
@@ -42,10 +42,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
-    const response = ctx.getResponse<Response>();
+    const response = ctx.getResponse<FastifyReply>();
     const request = ctx.getRequest<RequestWithUser>();
 
-    const requestId = request.requestId || request.headers['x-request-id'] as string || 'unknown';
+    const requestId = request.id || (request.headers['x-request-id'] as string) || 'unknown';
     const timestamp = new Date().toISOString();
     const path = request.url;
 
@@ -66,12 +66,12 @@ export class HttpExceptionFilter implements ExceptionFilter {
     } else if (exception instanceof HttpException) {
       status = exception.getStatus();
       const exceptionResponse = exception.getResponse();
-      
+
       if (typeof exceptionResponse === 'object' && exceptionResponse !== null) {
         const responseObj = exceptionResponse as Record<string, unknown>;
         code = this.getErrorCode(status, responseObj.error as string);
         message = (responseObj.message as string) || exception.message;
-        
+
         // Handle validation errors specially
         if (status === 400 && Array.isArray(responseObj.message)) {
           code = 'VALIDATION_ERROR';
@@ -89,7 +89,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       status = HttpStatus.INTERNAL_SERVER_ERROR;
       code = 'INTERNAL_ERROR';
       message = 'Internal server error';
-      
+
       // Log the full error for debugging
       const errorMessage = exception instanceof Error ? exception.message : String(exception);
       this.logger.logError(
@@ -140,7 +140,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       });
     }
 
-    response.status(status).json(errorResponse);
+    void response.code(status).send(errorResponse);
   }
 
   private formatValidationErrors(errors: string[]): ValidationErrorDetail[] {
@@ -149,7 +149,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       const parts = error.split(' ');
       const field = parts[0] || 'unknown';
       const constraint = parts.slice(1).join(' ') || error;
-      
+
       return {
         field,
         value: undefined, // We don't have access to the actual value here

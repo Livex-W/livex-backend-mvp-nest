@@ -17,7 +17,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { USER_ROLES } from '../common/constants/roles';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { JwtPayload } from '../common/interfaces/jwt-payload.interface';
-import type { Request } from 'express';
+import type { FastifyRequest } from 'fastify';
 import { ThrottlePayment } from '../common/decorators/throttle.decorator';
 import { CustomLoggerService } from '../common/services/logger.service';
 import { PaymentsService } from '../payments/payments.service';
@@ -38,9 +38,9 @@ export class BookingsController {
   async createPendingBooking(
     @Body() dto: CreateBookingDto,
     @CurrentUser() user: JwtPayload,
-    @Req() request: Request,
+    @Req() request: FastifyRequest,
   ): Promise<PendingBookingResult> {
-    const idempotencyKey = request.header('Idempotency-Key') ?? undefined;
+    const idempotencyKey = (request.headers['idempotency-key'] as string) ?? undefined;
 
     this.logger.logBusinessEvent('booking_create_pending_request', {
       userId: user.sub,
@@ -53,9 +53,9 @@ export class BookingsController {
       dto,
       userId: user.sub,
       idempotencyKey,
-      requestId: request.header('X-Request-Id') ?? undefined,
-      acceptLanguage: request.header('Accept-Language') ?? undefined,
-      timeZone: request.header('Time-Zone') ?? undefined,
+      requestId: (request.headers['x-request-id'] as string) ?? undefined,
+      acceptLanguage: (request.headers['accept-language'] as string) ?? undefined,
+      timeZone: (request.headers['time-zone'] as string) ?? undefined,
     });
 
     this.logger.logBusinessEvent('booking_create_pending_response', {

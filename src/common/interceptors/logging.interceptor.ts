@@ -6,10 +6,10 @@ import {
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { tap, catchError } from 'rxjs/operators';
-import { Request, Response } from 'express';
+import type { FastifyRequest, FastifyReply } from 'fastify';
 import { CustomLoggerService } from '../services/logger.service';
 
-interface RequestWithUser extends Request {
+interface RequestWithUser extends FastifyRequest {
   user?: {
     id: string;
     role: string;
@@ -28,7 +28,7 @@ export class LoggingInterceptor implements NestInterceptor {
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const request = context.switchToHttp().getRequest<RequestWithUser>();
-    const response = context.switchToHttp().getResponse<Response>();
+    const response = context.switchToHttp().getResponse<FastifyReply>();
     const startTime = Date.now();
 
     // Extract request information

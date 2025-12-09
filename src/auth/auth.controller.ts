@@ -7,7 +7,7 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import type { Request } from 'express';
+import type { FastifyRequest } from 'fastify';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -22,25 +22,25 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 
 @Controller('api/v1/auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService) { }
 
   @Public()
   @Post('register')
-  async register(@Body() dto: RegisterDto, @Req() request: Request) {
+  async register(@Body() dto: RegisterDto, @Req() request: FastifyRequest) {
     return this.authService.register(dto, this.buildContextFromRequest(request));
   }
 
   @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  async login(@Body() dto: LoginDto, @Req() request: Request) {
+  async login(@Body() dto: LoginDto, @Req() request: FastifyRequest) {
     return this.authService.login(dto, this.buildContextFromRequest(request));
   }
 
   @Public()
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  async refresh(@Body() dto: RefreshTokenDto, @Req() request: Request) {
+  async refresh(@Body() dto: RefreshTokenDto, @Req() request: FastifyRequest) {
     return this.authService.refresh(dto, this.buildContextFromRequest(request));
   }
 
@@ -63,10 +63,31 @@ export class AuthController {
     return this.authService.resetPassword(dto);
   }
 
-  private buildContextFromRequest(request: Request) {
+  private buildContextFromRequest(request: FastifyRequest) {
+    const xff = request.headers['x-forwarded-for'];
+    const ua = request.headers['user-agent'];
+
+    // Normalizar X-Forwarded-For a string
+    const xffValue = Array.isArray(xff) ? xff[0] : xff;
+    let ipFromHeader: string | undefined;
+
+    if (typeof xffValue === 'string') {
+      ipFromHeader = xffValue.split(',')[0]?.trim();
+    }
+
+    const ip = ipFromHeader ?? request.ip;
+
+    // Normalizar user-agent a string | undefined
+    const userAgent =
+      typeof ua === 'string'
+        ? ua
+        : Array.isArray(ua)
+          ? ua[0]
+          : undefined;
+
     return {
-      ip: (request.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim() ?? request.ip,
-      userAgent: request.headers['user-agent'],
+      ip,
+      userAgent,
     };
   }
 }

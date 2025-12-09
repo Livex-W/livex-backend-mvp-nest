@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import {
   Controller,
@@ -14,12 +12,10 @@ import {
   ParseBoolPipe,
   HttpCode,
   HttpStatus,
-  UseInterceptors,
-  UploadedFile,
   UseGuards,
-  Request,
+  Req,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import type { FastifyRequest } from 'fastify';
 import { Throttle } from '@nestjs/throttler';
 import { ExperiencesService } from './experiences.service';
 import {
@@ -36,6 +32,20 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CustomLoggerService } from '../common/services/logger.service';
+
+interface FastifyMultipartFile {
+  toBuffer: () => Promise<Buffer>;
+  filename: string;
+  mimetype: string;
+  encoding: string;
+  fieldname: string;
+}
+
+interface ExperienceUploadBody {
+  file?: FastifyMultipartFile;
+  sort_order?: string | number;
+  image_type?: string;
+}
 
 @Controller('api/v1/experiences')
 @UseGuards(JwtAuthGuard)
@@ -107,14 +117,28 @@ export class ExperiencesController {
 
   @Post(':id/images/upload')
   @HttpCode(HttpStatus.CREATED)
-  @UseInterceptors(FileInterceptor('file'))
   async uploadExperienceImage(
     @Param('id', ParseUUIDPipe) id: string,
-    @UploadedFile() file: any,
-    @Body('sort_order') sortOrder?: number,
-    @Body('image_type') imageType?: string,
+    @Req() req: FastifyRequest,
+    @Body() body: ExperienceUploadBody,
   ): Promise<{ image_url: string }> {
-    return this.experiencesService.uploadExperienceImage(id, file, sortOrder, imageType);
+    const file = body.file;
+    if (!file) {
+      throw new Error('File not found in request');
+    }
+
+    // Fastify multipart file object adaptation
+    const fileBuffer = await file.toBuffer();
+    const adaptedFile = {
+      buffer: fileBuffer,
+      originalname: file.filename,
+      mimetype: file.mimetype,
+    };
+
+    const sortOrder = body.sort_order ? Number(body.sort_order) : undefined;
+    const imageType = body.image_type;
+
+    return this.experiencesService.uploadExperienceImage(id, adaptedFile, sortOrder, imageType);
   }
 
   @Post(':id/submit')
@@ -125,23 +149,24 @@ export class ExperiencesController {
   async submitForReview(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() submitDto: SubmitForReviewDto,
-    @Request() req: any
+    @Req() req: FastifyRequest
   ) {
+    const user = (req as any).user;
     this.logger.logRequest({
       method: 'POST',
       url: '/api/v1/experiences/:id/submit',
-      userId: req.user.id,
-      role: req.user.role,
+      userId: user.id,
+      role: user.role,
       experienceId: id,
       notes: submitDto.notes
     });
 
-    const experience = await this.experiencesService.submitForReview(id, req.user.id, req.user.role);
+    const experience = await this.experiencesService.submitForReview(id, user.id, user.role);
 
     this.logger.logResponse({
       method: 'POST',
       url: '/api/v1/experiences/:id/submit',
-      userId: req.user.id,
+      userId: user.id,
       experienceId: id,
       newStatus: experience.status,
       statusCode: 200

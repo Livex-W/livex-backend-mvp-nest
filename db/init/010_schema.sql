@@ -636,7 +636,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_experiences_resort_slug
 -- ---------- Reseñas ----------
 CREATE TABLE IF NOT EXISTS reviews (
   id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  booking_id     uuid UNIQUE NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+  booking_id     uuid UNIQUE NULL REFERENCES bookings(id) ON DELETE CASCADE,
   user_id        uuid REFERENCES users(id) ON DELETE SET NULL,
   experience_id  uuid NOT NULL REFERENCES experiences(id) ON DELETE CASCADE,
   rating         smallint NOT NULL CHECK (rating BETWEEN 1 AND 5),

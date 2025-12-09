@@ -1,9 +1,9 @@
 import { Injectable, ExecutionContext, CanActivate } from '@nestjs/common';
 import { ThrottlerException } from '@nestjs/throttler';
-import { Request } from 'express';
+import { FastifyRequest } from 'fastify';
 import { CustomLoggerService } from '../services/logger.service';
 
-interface RequestWithUser extends Request {
+interface RequestWithUser extends FastifyRequest {
   user?: {
     id: string;
     role: string;

@@ -5,9 +5,13 @@ import {
   CallHandler,
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
-import { Request, Response } from 'express';
+import type { FastifyRequest, FastifyReply } from 'fastify';
 import { randomUUID } from 'crypto';
 import { CustomLoggerService } from '../services/logger.service';
+
+interface RequestWithId extends FastifyRequest {
+  requestId?: string;
+}
 
 @Injectable()
 export class RequestIdInterceptor implements NestInterceptor {
@@ -18,20 +22,26 @@ export class RequestIdInterceptor implements NestInterceptor {
   }
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
-    const request = context.switchToHttp().getRequest<Request>();
-    const response = context.switchToHttp().getResponse<Response>();
+    const request = context.switchToHttp().getRequest<RequestWithId>();
+    const response = context.switchToHttp().getResponse<FastifyReply>();
 
-    // Generate or use existing request ID
-    const requestId = (request.headers['x-request-id'] as string) || randomUUID();
-    
-    // Set request ID in headers for response
-    response.setHeader('X-Request-Id', requestId);
-    
+    const xRequestIdHeader = request.headers['x-request-id'];
+    const headerValue = Array.isArray(xRequestIdHeader)
+      ? xRequestIdHeader[0]
+      : xRequestIdHeader;
+
+    const requestId = typeof headerValue === 'string' && headerValue.length > 0
+      ? headerValue
+      : randomUUID();
+
+    // Set request ID in headers for response (FastifyReply)
+    response.header('X-Request-Id', requestId);
+
     // Add request ID to request object for logging
-    (request as Request & { requestId: string }).requestId = requestId;
+    request.requestId = requestId;
 
     // Log request ID generation for debugging
-    if (!request.headers['x-request-id']) {
+    if (!headerValue) {
       this.logger.debug('Generated new request ID', {
         requestId,
         method: request.method,

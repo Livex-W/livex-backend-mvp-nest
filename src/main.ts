@@ -1,4 +1,5 @@
 import { NestFactory } from '@nestjs/core';
+import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { DatabaseClient } from './database/database.client';
@@ -7,8 +8,9 @@ import { CustomLoggerService } from './common/services/logger.service';
 import { CorsConfig } from './common/config/cors.config';
 import { SecurityConfigService } from './common/config/security.config';
 
-import helmet from 'helmet';
-import * as swaggerUi from 'swagger-ui-express';
+import helmet from '@fastify/helmet';
+import fastifySwagger from '@fastify/swagger';
+import fastifySwaggerUi from '@fastify/swagger-ui';
 import openapi from '@livex/contracts/openapi';
 
 async function bootstrap() {
@@ -28,15 +30,17 @@ async function bootstrap() {
     // Create NestJS application
     const nestLogger = new CustomLoggerService();
     nestLogger.setContext('NestApplication');
-    const app = await NestFactory.create(AppModule, {
-      logger: nestLogger,
-    });
+    const app = await NestFactory.create<NestFastifyApplication>(
+      AppModule,
+      new FastifyAdapter(),
+      { logger: nestLogger },
+    );
 
     // Enable shutdown hooks
     app.enableShutdownHooks();
 
     // Security middleware - Helmet
-    app.use(helmet({
+    app.register(helmet, {
       contentSecurityPolicy: {
         directives: {
           defaultSrc: ["'self'"],
@@ -56,11 +60,21 @@ async function bootstrap() {
         includeSubDomains: true,
         preload: true,
       },
-    }));
+    });
 
     // CORS configuration
     const corsOptions = CorsConfig.getCorsOptions();
-    app.enableCors(corsOptions);
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    app.register(require('@fastify/cors'), corsOptions)
+
+    // Multipart support (file uploads)
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    await app.register(require('@fastify/multipart'), {
+      attachFieldsToBody: 'keyValues',
+      limits: {
+        fileSize: 50 * 1024 * 1024, // 50MB limit
+      },
+    });
 
     // Global validation pipe
     app.useGlobalPipes(
@@ -72,16 +86,43 @@ async function bootstrap() {
       }),
     );
 
-    // API documentation
-    app.use('/docs', swaggerUi.serve, swaggerUi.setup(openapi, {
-      customSiteTitle: 'LIVEX API Documentation',
-      customfavIcon: '/favicon.ico',
-      customCss: '.swagger-ui .topbar { display: none }',
-      swaggerOptions: {
-        persistAuthorization: true,
+    // 1. Registrar la definición de la API
+    await app.register(fastifySwagger, {
+      mode: 'static',
+      specification: {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        document: openapi as any, // Tu objeto JSON importado
+      },
+    });
+
+    // 2. Registrar la interfaz gráfica
+    app.register(fastifySwaggerUi, {
+      routePrefix: '/docs',
+      uiConfig: {
+        docExpansion: 'list',
+        deepLinking: true,
         displayRequestDuration: true,
       },
-    }));
+      staticCSP: true, // Importante para que funcione con Helmet
+      theme: {
+        title: 'LIVEX API Documentation',
+        favicon: [
+          {
+            filename: 'favicon.png',
+            rel: 'icon',
+            sizes: '16x16',
+            type: 'image/png',
+            content: '/favicon.ico',
+          }
+        ],
+        css: [
+          {
+            filename: 'livex-theme.css',
+            content: '.swagger-ui .topbar { display: none }'
+          }
+        ],
+      }
+    });
 
     // Graceful shutdown
     const shutdown = async (signal: string) => {
@@ -103,7 +144,7 @@ async function bootstrap() {
 
     // Start server
     const port = process.env.PORT ?? 3000;
-    await app.listen(port);
+    await app.listen(port, '0.0.0.0');
 
     logger.log('Application started successfully', {
       port,

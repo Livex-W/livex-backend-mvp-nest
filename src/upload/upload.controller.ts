@@ -9,16 +9,26 @@ import {
   HttpCode,
   HttpStatus,
   BadRequestException,
-  UploadedFile,
-  UseInterceptors,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
 import { UploadService, PresignedUrlOptions, PresignedUrlResult } from './upload.service';
 import { PresignImageDto, PresignedUrlResponse } from './dto/upload.dto';
 
+interface FastifyMultipartFile {
+  toBuffer: () => Promise<Buffer>;
+  filename: string;
+  mimetype: string;
+  encoding: string;
+  fieldname: string;
+}
+
+interface UploadBody {
+  file?: FastifyMultipartFile;
+  container?: string;
+}
+
 @Controller('api/v1/upload')
 export class UploadController {
-  constructor(private readonly uploadService: UploadService) {}
+  constructor(private readonly uploadService: UploadService) { }
 
   /**
    * Generate presigned URL for file upload
@@ -52,11 +62,12 @@ export class UploadController {
    */
   @Post('direct')
   @HttpCode(HttpStatus.CREATED)
-  @UseInterceptors(FileInterceptor('file'))
   async uploadFile(
-    @UploadedFile() file: any,
-    @Body('container') container?: string,
+    @Body() body: UploadBody,
   ): Promise<{ url: string }> {
+    const file = body.file;
+    const container = body.container;
+
     if (!file) {
       throw new BadRequestException('No file provided');
     }
@@ -67,10 +78,12 @@ export class UploadController {
     }
 
     const containerName = container || 'livex-media';
+    const fileBuffer = await file.toBuffer();
+
     const url = await this.uploadService.uploadFile(
       containerName,
-      file.originalname,
-      file.buffer,
+      file.filename,
+      fileBuffer,
       file.mimetype,
     );
 
