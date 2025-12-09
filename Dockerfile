@@ -1,43 +1,50 @@
-# -------- Base de dependencias (compila deps nativas si hiciera falta) --------
+# -------- Base de dependencias --------
 FROM node:22.10.0-alpine AS deps
 WORKDIR /app
-# Paquetes para compilar dependencias nativas (opcional según tu stack)
-RUN apk add --no-cache python3 make g++ bash curl
+RUN apk add --no-cache python3 make g++ bash curl \
+    && curl -fsSL https://bun.sh/install | bash \
+    && ln -s /root/.bun/bin/bun /usr/local/bin/bun
 COPY package.json package-lock.json* ./
-RUN yarn install
+RUN bun install
 
 # -------- Stage de desarrollo (hot reload) -----------------------------------
 FROM node:22.10.0-alpine AS dev
 WORKDIR /app
+RUN apk add --no-cache bash curl \
+    && curl -fsSL https://bun.sh/install | bash \
+    && ln -s /root/.bun/bin/bun /usr/local/bin/bun
 ENV NODE_ENV=development
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json ./
 COPY tsconfig.json ./
-# COPY openapi ./openapi
 COPY src ./src
 EXPOSE 3000
-CMD ["npm","run","dev"]
+CMD ["bun","run","start:dev:bun"]
 
 # -------- Build de producción -------------------------------------------------
 FROM node:22.10.0-alpine AS build
 WORKDIR /app
+RUN apk add --no-cache bash curl \
+    && curl -fsSL https://bun.sh/install | bash \
+    && ln -s /root/.bun/bin/bun /usr/local/bin/bun
 ENV NODE_ENV=production
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json ./
 COPY tsconfig.json ./
 COPY openapi ./openapi
 COPY src ./src
-RUN npm run build
+RUN bun run build
 
 # -------- Runner de producción -----------------------------------------------
 FROM node:22.10.0-alpine AS prod
 WORKDIR /app
+RUN apk add --no-cache bash curl \
+    && curl -fsSL https://bun.sh/install | bash \
+    && ln -s /root/.bun/bin/bun /usr/local/bin/bun
 ENV NODE_ENV=production
-# Usuario no-root
 RUN addgroup -S nodegrp && adduser -S nodeusr -G nodegrp
-COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY package.json ./
 EXPOSE 3000
 USER nodeusr
-CMD ["node","dist/main.js"]
+CMD ["bun","dist/main.js"]
