@@ -71,6 +71,11 @@ PAYPAL_WEBHOOK_ID=your_webhook_id_from_dashboard
 3. Copiar `Client ID` y `Client Secret`
 4. Configurar webhooks (ver sección de [Webhooks](#5-webhooks-y-captura-automática)) -- debe ser la url de la api de livex o en prueba con ngrok alguna url que tenga certificado ssl
 
+usuario de prueba: 
+
+email: sb-fwzds43999531@personal.example.com
+password: |vKO3l.<
+
 ---
 
 ## 1. Crear una Reserva (Booking)
