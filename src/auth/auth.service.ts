@@ -1,7 +1,7 @@
 import { Inject, Injectable, ConflictException, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, randomInt } from 'node:crypto';
 import { PasswordHashService } from './services/password-hash.service';
 import type { QueryResultRow } from 'pg';
 import { UsersService } from '../users/users.service';
@@ -163,7 +163,8 @@ export class AuthService {
             return { success: true, token: '' };
         }
 
-        const token = randomUUID();
+        // Generate a 6-digit OTP
+        const token = randomInt(100000, 1000000).toString();
         const expiresAt = new Date(Date.now() + this.getPasswordResetTtl() * 1000);
 
         await this.db.query(

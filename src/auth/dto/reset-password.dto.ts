@@ -1,8 +1,9 @@
-import { IsString, Matches, IsUUID } from 'class-validator';
+import { IsString, Matches, Length } from 'class-validator';
 import { PASSWORD_REGEX } from '../constants/auth.constants';
 
 export class ResetPasswordDto {
-  @IsUUID()
+  @IsString()
+  @Length(6, 6)
   token!: string;
 
   @IsString()
