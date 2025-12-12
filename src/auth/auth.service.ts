@@ -45,6 +45,9 @@ interface PasswordResetTokenRow extends QueryResultRow {
     used_at: Date | null;
 }
 
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { PasswordResetRequestedEvent } from '../notifications/events/notification.events';
+
 @Injectable()
 export class AuthService {
     constructor(
@@ -54,6 +57,7 @@ export class AuthService {
         private readonly passwordHashService: PasswordHashService,
         @Inject(DATABASE_CLIENT) private readonly db: DatabaseClient,
         private readonly logger: CustomLoggerService,
+        private readonly eventEmitter: EventEmitter2,
     ) { }
 
     async register(dto: RegisterDto, context: TokenContext): Promise<AuthResult> {
@@ -171,6 +175,16 @@ export class AuthService {
             `INSERT INTO password_reset_tokens (user_id, token, expires_at)
             VALUES ($1, $2, $3)`,
             [user.id, token, expiresAt],
+        );
+
+        this.eventEmitter.emit(
+            'password.reset.requested',
+            new PasswordResetRequestedEvent(
+                user.id,
+                user.email,
+                user.fullName ?? "",
+                token
+            )
         );
 
         return { success: true, token };

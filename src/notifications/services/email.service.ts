@@ -336,11 +336,14 @@ export class EmailService {
           <h2>Restablecer contraseña</h2>
           <p>Hola {{userName}},</p>
           <p>Recibimos una solicitud para restablecer tu contraseña.</p>
-          <p><a href="{{resetLink}}" style="background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Restablecer Contraseña</a></p>
-          <p>Este enlace expira en 1 hora.</p>
+          <p>Tu código de verificación es:</p>
+          <div style="background: #f4f4f4; padding: 15px; text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 5px; border-radius: 5px; margin: 20px 0;">
+            {{token}}
+          </div>
+          <p>Este código expira en 1 hora.</p>
           <p>Si no solicitaste este cambio, ignora este email.</p>
         `,
-        text: 'Restablecer contraseña: {{resetLink}}'
+        text: 'Tu código para restablecer contraseña es: {{token}}'
       },
     };
 

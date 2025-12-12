@@ -241,7 +241,7 @@ export class NotificationService implements OnModuleInit {
     userEmail: string,
     resetData: {
       userName: string;
-      resetLink: string;
+      token: string;
     }
   ): string {
     return this.sendEmailNotification(

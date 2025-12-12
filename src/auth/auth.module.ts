@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
@@ -27,9 +28,10 @@ import { CommonModule } from '../common/common.module';
         },
       }),
     }),
+    EventEmitterModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, PasswordHashService, JwtAccessStrategy],
   exports: [AuthService],
 })
-export class AuthModule {}
+export class AuthModule { }

@@ -137,13 +137,13 @@ export class NotificationListener {
   @OnEvent('password.reset.requested')
   handlePasswordResetRequested(event: PasswordResetRequestedEvent) {
     try {
-      const resetLink = `${process.env.FRONTEND_URL || 'https://livex.com'}/reset-password?token=${event.resetToken}`;
+
 
       this.notificationService.sendPasswordReset(
         event.userEmail,
         {
           userName: event.userName,
-          resetLink,
+          token: event.resetToken,
         }
       );
 
