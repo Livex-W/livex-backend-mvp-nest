@@ -858,7 +858,7 @@ CREATE TABLE IF NOT EXISTS email_verifications (
 CREATE TABLE IF NOT EXISTS password_reset_tokens (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id     uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  token       uuid NOT NULL,
+  token       VARCHAR(6) NOT NULL,
   created_at  timestamptz NOT NULL DEFAULT now(),
   expires_at  timestamptz NOT NULL,
   used_at     timestamptz,
