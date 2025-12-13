@@ -37,14 +37,21 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE TABLE IF NOT EXISTS users (
-  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  email        citext UNIQUE NOT NULL,
-  password_hash text NOT NULL,
-  full_name    text,
-  phone        text,
-  role         user_role NOT NULL DEFAULT 'tourist',
-  created_at   timestamptz NOT NULL DEFAULT now(),
-  updated_at   timestamptz NOT NULL DEFAULT now()
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  email         citext UNIQUE NOT NULL,
+  
+  -- Puede ser NULL para usuarios de Google
+  password_hash text, 
+  
+  -- Nuevo campo para vincular con Firebase
+  firebase_uid  text UNIQUE, 
+  
+  full_name     text,
+  phone         text,
+  avatar        text, -- Recomendado
+  role          user_role NOT NULL DEFAULT 'tourist',
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  updated_at    timestamptz NOT NULL DEFAULT now()
 );
 CREATE TRIGGER trg_users_updated_at BEFORE UPDATE ON users
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();

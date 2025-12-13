@@ -1,4 +1,5 @@
-import { Inject, Injectable, ConflictException, UnauthorizedException, BadRequestException } from '@nestjs/common';
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+import { Inject, Injectable, ConflictException, UnauthorizedException, BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID, randomInt } from 'node:crypto';
@@ -24,6 +25,8 @@ import type { RefreshTokenDto } from './dto/refresh-token.dto';
 import type { RequestPasswordResetDto } from './dto/request-password-reset.dto';
 import { LogoutDto } from './dto/logout.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { GoogleLoginDto } from './dto/google-login.dto';
+import { FirebaseAdminService } from './services/firebase-admin.service';
 
 interface RefreshTokenRow extends QueryResultRow {
     id: string;
@@ -58,6 +61,7 @@ export class AuthService {
         @Inject(DATABASE_CLIENT) private readonly db: DatabaseClient,
         private readonly logger: CustomLoggerService,
         private readonly eventEmitter: EventEmitter2,
+        private readonly firebaseAdminService: FirebaseAdminService,
     ) { }
 
     async register(dto: RegisterDto, context: TokenContext): Promise<AuthResult> {
@@ -66,11 +70,33 @@ export class AuthService {
             throw new ConflictException('Email already registered');
         }
 
-        const passwordHash = this.passwordHashService.hashPassword(dto.password);
+        let firebaseUid = dto.firebaseUid;
+
+        // If registering traditionally (no firebaseUid provided), create in Firebase to maintain consistency
+        if (!firebaseUid && dto.password) {
+            try {
+                const firebaseUser = await this.firebaseAdminService.createUser(dto.email, dto.password, dto.fullName);
+                firebaseUid = firebaseUser.uid;
+            } catch (error) {
+                this.logger.error('Failed to create user in Firebase', (error as Error).stack);
+                // Proceed? Or fail? 
+                // If we fail, we keep consistency.
+                throw new InternalServerErrorException('Failed to create user in identity provider');
+            }
+        }
+
+        let passwordHash: string | undefined;
+        if (dto.password) {
+            passwordHash = this.passwordHashService.hashPassword(dto.password);
+        }
+
         const user = await this.usersService.createUser({
             email: dto.email,
             passwordHash,
+            firebaseUid,
             fullName: dto.fullName,
+            phone: dto.phone,
+            avatar: dto.avatar,
             role: dto.role || 'tourist',
         });
 
@@ -89,6 +115,10 @@ export class AuthService {
     async login(dto: LoginDto, context: TokenContext): Promise<AuthResult> {
         const user = await this.usersService.findByEmail(dto.email);
         if (!user) {
+            throw new UnauthorizedException('Invalid credentials');
+        }
+
+        if (!user.passwordHash) {
             throw new UnauthorizedException('Invalid credentials');
         }
 
@@ -112,6 +142,38 @@ export class AuthService {
             ip: context.ip || undefined,
             userAgent: context.userAgent || undefined
         });
+
+        return this.issueAuthResult(user, context, { rotateFromJti: null });
+    }
+
+    async loginWithGoogle(dto: GoogleLoginDto, context: TokenContext): Promise<AuthResult> {
+        const decodedToken = await this.firebaseAdminService.verifyIdToken(dto.idToken);
+        const firebaseUid = decodedToken.uid;
+        const email = decodedToken.email;
+
+        if (!email) {
+            throw new BadRequestException('Google account must have an email');
+        }
+
+        let user = await this.usersService.findByFirebaseUid(firebaseUid);
+
+        if (!user) {
+            const existingUser = await this.usersService.findByEmail(email);
+
+            if (existingUser) {
+                user = await this.usersService.updateFirebaseInfo(existingUser.id, firebaseUid, decodedToken.picture);
+                this.logger.logSecurityEvent('user_linked_google', { userId: user.id, email });
+            } else {
+                user = await this.usersService.createUser({
+                    email,
+                    firebaseUid,
+                    fullName: decodedToken.name || null,
+                    avatar: decodedToken.picture || null,
+                    role: 'tourist',
+                });
+                this.logger.logSecurityEvent('user_registered_google', { userId: user.id, email });
+            }
+        }
 
         return this.issueAuthResult(user, context, { rotateFromJti: null });
     }
@@ -237,6 +299,10 @@ export class AuthService {
         const userEntity = await this.usersService.findById(user.sub);
         if (!userEntity) {
             throw new UnauthorizedException('User not found');
+        }
+
+        if (!userEntity.passwordHash) {
+            throw new UnauthorizedException('User has no password set');
         }
 
         const isValid = await this.passwordHashService.comparePassword(currentPassword, userEntity.passwordHash);

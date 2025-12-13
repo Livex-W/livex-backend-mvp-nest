@@ -9,16 +9,29 @@ export class RegisterDto {
     @IsEmail()
     email!: string;
 
+    @IsOptional()
+    @IsString()
+    firebaseUid?: string;
+
+    @IsOptional()
     @IsString()
     @Matches(PASSWORD_REGEX, {
         message: 'Password must be at least 8 characters, include uppercase, lowercase, and numbers',
     })
-    password!: string;
+    password?: string;
 
     @IsOptional()
     @IsString()
     @MaxLength(120)
     fullName?: string;
+
+    @IsOptional()
+    @IsString()
+    phone?: string;
+
+    @IsOptional()
+    @IsString()
+    avatar?: string;
 
     @IsOptional()
     @IsEnum(USER_ROLES, {

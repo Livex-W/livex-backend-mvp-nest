@@ -11,4 +11,12 @@ export class UpdateProfileDto {
   @Transform(({ value }: { value: string | undefined }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
   @IsEmail()
   email?: string | undefined;
+
+  @IsOptional()
+  @IsString()
+  phone?: string;
+
+  @IsOptional()
+  @IsString()
+  avatar?: string;
 }

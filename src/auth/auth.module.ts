@@ -11,6 +11,8 @@ import { JwtAccessStrategy } from './strategies/jwt-access.strategy';
 import { DatabaseModule } from '../database/database.module';
 import { CommonModule } from '../common/common.module';
 
+import { FirebaseAdminService } from './services/firebase-admin.service';
+
 @Module({
   imports: [
     ConfigModule,
@@ -31,7 +33,7 @@ import { CommonModule } from '../common/common.module';
     EventEmitterModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, PasswordHashService, JwtAccessStrategy],
+  providers: [AuthService, PasswordHashService, JwtAccessStrategy, FirebaseAdminService], // Added FirebaseAdminService
   exports: [AuthService],
 })
 export class AuthModule { }

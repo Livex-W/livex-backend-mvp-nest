@@ -9,8 +9,11 @@ import { UserEntity, SafeUser } from './entities/user.entity';
 interface UserRow extends QueryResultRow {
     id: string;
     email: string;
-    password_hash: string;
+    password_hash: string | null;
+    firebase_uid: string | null;
     full_name: string | null;
+    phone: string | null;
+    avatar: string | null;
     role: string;
     created_at: Date;
     updated_at: Date;
@@ -25,7 +28,7 @@ export class UsersService {
 
     async findByEmail(email: string): Promise<UserEntity | null> {
         const result = await this.db.query<UserRow>(
-            `SELECT id, email, password_hash, full_name, role, created_at, updated_at
+            `SELECT id, email, password_hash, firebase_uid, full_name, phone, avatar, role, created_at, updated_at
             FROM users WHERE email = $1`,
             [email],
         );
@@ -37,9 +40,23 @@ export class UsersService {
         return this.mapRowToEntity(result.rows[0]);
     }
 
+    async findByFirebaseUid(uid: string): Promise<UserEntity | null> {
+        const result = await this.db.query<UserRow>(
+            `SELECT id, email, password_hash, firebase_uid, full_name, phone, avatar, role, created_at, updated_at
+            FROM users WHERE firebase_uid = $1`,
+            [uid],
+        );
+
+        if (result.rowCount === 0) {
+            return null;
+        }
+
+        return this.mapRowToEntity(result.rows[0]);
+    }
+
     async findById(id: string): Promise<UserEntity | null> {
         const result = await this.db.query<UserRow>(
-            `SELECT id, email, password_hash, full_name, role, created_at, updated_at
+            `SELECT id, email, password_hash, firebase_uid, full_name, phone, avatar, role, created_at, updated_at
             FROM users WHERE id = $1`,
             [id],
         );
@@ -53,15 +70,26 @@ export class UsersService {
 
     async createUser(params: {
         email: string;
-        passwordHash: string;
+        passwordHash?: string;
+        firebaseUid?: string;
         fullName?: string | null;
+        phone?: string | null;
+        avatar?: string | null;
         role: UserRole;
     }): Promise<UserEntity> {
         const result = await this.db.query<UserRow>(
-            `INSERT INTO users (email, password_hash, full_name, role)
-            VALUES ($1, $2, $3, $4)
-            RETURNING id, email, password_hash, full_name, role, created_at, updated_at`,
-            [params.email, params.passwordHash, params.fullName ?? null, params.role],
+            `INSERT INTO users (email, password_hash, firebase_uid, full_name, phone, avatar, role)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING id, email, password_hash, firebase_uid, full_name, phone, avatar, role, created_at, updated_at`,
+            [
+                params.email,
+                params.passwordHash ?? null,
+                params.firebaseUid ?? null,
+                params.fullName ?? null,
+                params.phone ?? null,
+                params.avatar ?? null,
+                params.role
+            ],
         );
 
         const user = this.mapRowToEntity(result.rows[0]);
@@ -82,6 +110,8 @@ export class UsersService {
         params: {
             fullName?: string | null;
             email?: string;
+            phone?: string;
+            avatar?: string;
         },
     ): Promise<UserEntity> {
         const updates: string[] = [];
@@ -99,6 +129,16 @@ export class UsersService {
             values.push(params.email);
         }
 
+        if (params.phone !== undefined) {
+            updates.push(`phone = $${placeholderIndex++}`);
+            values.push(params.phone);
+        }
+
+        if (params.avatar !== undefined) {
+            updates.push(`avatar = $${placeholderIndex++}`);
+            values.push(params.avatar);
+        }
+
         if (updates.length === 0) {
             const existingUser = await this.findById(userId);
             if (!existingUser) {
@@ -114,7 +154,7 @@ export class UsersService {
             `UPDATE users
             SET ${updates.join(', ')}
             WHERE id = $${placeholderIndex}
-            RETURNING id, email, password_hash, full_name, role, created_at, updated_at`,
+            RETURNING id, email, password_hash, firebase_uid, full_name, phone, avatar, role, created_at, updated_at`,
             values,
         );
 
@@ -133,6 +173,33 @@ export class UsersService {
         });
 
         return updatedUser;
+    }
+
+    async updateFirebaseInfo(userId: string, firebaseUid: string, avatarUrl?: string): Promise<UserEntity> {
+        const updates: string[] = ['firebase_uid = $2'];
+        const values: unknown[] = [userId, firebaseUid];
+        const placeholderIndex = 3;
+
+        if (avatarUrl) {
+            updates.push(`avatar = $${placeholderIndex}`);
+            values.push(avatarUrl);
+        }
+
+        updates.push(`updated_at = now()`);
+
+        const result = await this.db.query<UserRow>(
+            `UPDATE users
+             SET ${updates.join(', ')}
+             WHERE id = $1
+             RETURNING id, email, password_hash, firebase_uid, full_name, phone, avatar, role, created_at, updated_at`,
+            values,
+        );
+
+        if (result.rowCount === 0) {
+            throw new NotFoundException('User not found');
+        }
+
+        return this.mapRowToEntity(result.rows[0]);
     }
 
     private async assertEmailAvailable(email: string, ownerId?: string): Promise<void> {
@@ -174,7 +241,10 @@ export class UsersService {
             id: row.id,
             email: row.email,
             passwordHash: row.password_hash,
+            firebaseUid: row.firebase_uid,
             fullName: row.full_name,
+            phone: row.phone,
+            avatar: row.avatar,
             role: row.role as UserEntity['role'],
             createdAt: row.created_at,
             updatedAt: row.updated_at,

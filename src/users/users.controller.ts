@@ -26,6 +26,8 @@ export class UsersController {
     const updatedUser = await this.usersService.updateProfile(user.sub, {
       fullName: dto.fullName ?? null,
       email,
+      phone: dto.phone,
+      avatar: dto.avatar,
     });
 
     return this.usersService.toSafeUser(updatedUser);
