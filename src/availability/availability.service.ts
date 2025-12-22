@@ -2,10 +2,10 @@ import { Injectable, NotFoundException, BadRequestException, Inject } from '@nes
 import { DatabaseClient } from '../database/database.client';
 import { DATABASE_CLIENT } from '../database/database.module';
 import { CustomLoggerService } from '../common/services/logger.service';
-import { 
-  AvailabilitySlot, 
-  AvailabilitySlotWithRemaining, 
-  SlotSummary 
+import {
+  AvailabilitySlot,
+  AvailabilitySlotWithRemaining,
+  SlotSummary
 } from './entities/availability-slot.entity';
 import {
   QueryAvailabilityDto,
@@ -35,7 +35,7 @@ export class AvailabilityService {
   constructor(
     @Inject(DATABASE_CLIENT) private readonly db: DatabaseClient,
     private readonly logger: CustomLoggerService,
-  ) {}
+  ) { }
 
   /**
    * Get availability for an experience within a date range
@@ -384,7 +384,7 @@ export class AvailabilityService {
     const maxDurationHours = 24;
     const durationMs = end.getTime() - start.getTime();
     const durationHours = durationMs / (1000 * 60 * 60);
-    
+
     if (durationHours > maxDurationHours) {
       throw new BadRequestException(`Slot duration cannot exceed ${maxDurationHours} hours`);
     }
@@ -392,7 +392,7 @@ export class AvailabilityService {
     // Validate that times are not in the past (with 1 hour buffer)
     const now = new Date();
     const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000);
-    
+
     if (start < oneHourFromNow) {
       throw new BadRequestException('start_time cannot be in the past or within the next hour');
     }
@@ -427,16 +427,16 @@ export class AvailabilityService {
     for (const slot of slots) {
       // Validate time format
       if (slot.start_hour < 0 || slot.start_hour > 23 ||
-          slot.start_minute < 0 || slot.start_minute > 59 ||
-          slot.end_hour < 0 || slot.end_hour > 23 ||
-          slot.end_minute < 0 || slot.end_minute > 59) {
+        slot.start_minute < 0 || slot.start_minute > 59 ||
+        slot.end_hour < 0 || slot.end_hour > 23 ||
+        slot.end_minute < 0 || slot.end_minute > 59) {
         throw new BadRequestException('Invalid time configuration in slot');
       }
 
       // Validate that start time is before end time
       const startMinutes = slot.start_hour * 60 + slot.start_minute;
       const endMinutes = slot.end_hour * 60 + slot.end_minute;
-      
+
       if (startMinutes >= endMinutes) {
         throw new BadRequestException('start_time must be before end_time in slot configuration');
       }
@@ -482,7 +482,7 @@ export class AvailabilityService {
         date,
         slots: dateSlots.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()),
         total_capacity: dateSlots.reduce((sum, slot) => sum + slot.capacity, 0),
-        total_remaining: dateSlots.reduce((sum, slot) => sum + slot.remaining, 0),
+        total_remaining: dateSlots.reduce((sum, slot) => sum + (Number(slot.remaining) || 0), 0),
       }))
       .sort((a, b) => a.date.localeCompare(b.date));
   }

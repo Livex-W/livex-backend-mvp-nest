@@ -77,15 +77,15 @@ e AS (
   )
   VALUES
     ((SELECT id FROM r WHERE name='Mar y Sol Cartagena'),
-      'City Tour Histórico', 'Recorrido por el Centro Histórico y Getsemaní', 'city_tour', 120000, 'COP',
+      'City Tour Histórico', 'Recorrido por el Centro Histórico y Getsemaní', 'city_tour', 1200, 'USD',
       'Guía certificado, hidratación', 'Almuerzo', 'https://images.example.com/city_tour.jpg', 'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
     ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
-      'Full Day Islas del Rosario', 'Traslado en lancha y día de playa en Isla Brisa', 'islands', 250000, 'COP',
+      'Full Day Islas del Rosario', 'Traslado en lancha y día de playa en Isla Brisa', 'islands', 2500, 'USD',
       'Traslados, coctel de bienvenida, carpa', 'Impuesto de muelle', 'https://images.example.com/islas.jpg', 'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
     ((SELECT id FROM r WHERE name='Náutica Bahía Club'),
-      'Sunset Sailing', 'Navegación a vela por la Bahía al atardecer', 'nautical', 180000, 'COP',
+      'Sunset Sailing', 'Navegación a vela por la Bahía al atardecer', 'nautical', 1800, 'USD',
       'Capitán, seguro, snacks', 'Traslados al muelle', 'https://images.example.com/sunset.jpg', 'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now())
   RETURNING id, title, category, resort_id
@@ -141,6 +141,24 @@ VALUES
   ((SELECT id FROM e WHERE title='Sunset Sailing'),
     '2025-09-22T17:30:00-05', '2025-09-22T19:30:00-05', 10);
 
+-- 10.1) Generación masiva de slots (15 días desde Dec 22, 2025)
+INSERT INTO availability_slots (experience_id, start_time, end_time, capacity)
+SELECT
+  e.id,
+  (to_char(d, 'YYYY-MM-DD') || 'T' || to_char(t.start_time, 'HH24:MI:SS') || '-05')::timestamptz,
+  (to_char(d, 'YYYY-MM-DD') || 'T' || to_char(t.end_time, 'HH24:MI:SS') || '-05')::timestamptz,
+  t.capacity
+FROM
+  experiences e
+  CROSS JOIN generate_series('2025-12-22'::date, '2026-01-05'::date, '1 day'::interval) AS d
+  JOIN (
+    VALUES
+      ('City Tour Histórico', '09:00:00'::time, '12:00:00'::time, 20),
+      ('City Tour Histórico', '15:00:00'::time, '18:00:00'::time, 20),
+      ('Full Day Islas del Rosario', '08:00:00'::time, '16:00:00'::time, 40),
+      ('Sunset Sailing', '17:30:00'::time, '19:30:00'::time, 10)
+  ) AS t(title, start_time, end_time, capacity) ON e.title = t.title;
+
 -- (Opcional de prueba rápida) Una reserva confirmada con impuestos y comisión calculada
 -- Descomenta si quieres datos operativos para probar pagos/payouts.
 
@@ -164,8 +182,24 @@ VALUES
 
 UPDATE experience_images SET image_type = 'gallery' WHERE image_type IS NULL;
 
+-- 11) Reseñas (Reviews) de prueba
+INSERT INTO reviews (user_id, experience_id, rating, comment, created_at)
+VALUES
+  ((SELECT id FROM users WHERE email='sofia.turista@gmail.com'),
+   (SELECT id FROM experiences WHERE title='City Tour Histórico'),
+   5, '¡Increíble experiencia! El guía fue muy amable y aprendí mucho sobre la historia de Cartagena.', now() - INTERVAL '2 days'),
+  ((SELECT id FROM users WHERE email='sofia.turista@gmail.com'),
+   (SELECT id FROM experiences WHERE title='City Tour Histórico'),
+   4, 'Muy bonito todo, pero hizo mucho calor. Recomiendo llevar agua extra.', now() - INTERVAL '5 days'),
+  ((SELECT id FROM users WHERE email='sofia.turista@gmail.com'),
+   (SELECT id FROM experiences WHERE title='Full Day Islas del Rosario'),
+   5, 'El paraíso en la tierra. La comida deliciosa y el mar espectacular.', now() - INTERVAL '1 week'),
+  ((SELECT id FROM users WHERE email='sofia.turista@gmail.com'),
+   (SELECT id FROM experiences WHERE title='Sunset Sailing'),
+   5, 'Un atardecer mágico. Muy romántico y relajante.', now() - INTERVAL '3 days');
+
 -- ===========================
--- 11) DATOS DE PRUEBA SISTEMA DE AGENTES
+-- 12) DATOS DE PRUEBA SISTEMA DE AGENTES
 -- ===========================
 
 -- 11.1) Crear un usuario Agente
@@ -192,7 +226,7 @@ SELECT
   (SELECT id FROM experiences WHERE title='City Tour Histórico'),
   (SELECT id FROM availability_slots WHERE experience_id=(SELECT id FROM experiences WHERE title='City Tour Histórico') LIMIT 1),
   (SELECT id FROM users WHERE email='agente.carlos@gmail.com'), -- El agente Carlos
-  2, 0, 200000, 38000, 238000, 'COP', -- $238,000 COP Total
+  2, 0, 200000, 38000, 238000, 'USD', -- $238,000 COP Total
   'confirmed', now(), now();
 
 -- 11.4) Registrar el Pago Exitoso
@@ -203,7 +237,7 @@ INSERT INTO payments (
 SELECT
   (SELECT id FROM bookings WHERE user_id=(SELECT id FROM users WHERE email='sofia.turista@gmail.com') AND agent_id=(SELECT id FROM users WHERE email='agente.carlos@gmail.com') ORDER BY created_at DESC LIMIT 1),
   'wompi', 'WOMPI-TEST-AGENT-01', 
-  238000, 'COP',
+  238000, 'USD',
   'paid', 'card', now();
 
 -- 11.5) Generar las Comisiones (Simulando lo que haría el backend)

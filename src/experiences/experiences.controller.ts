@@ -23,7 +23,8 @@ import {
   UpdateExperienceDto,
   QueryExperiencesDto,
   PresignImageDto,
-  PresignedUrlResponse
+  PresignedUrlResponse,
+  CreateReviewDto
 } from './dto';
 import { SubmitForReviewDto } from './dto/approve-experience.dto';
 import { ExperienceWithImages } from './entities/experience.entity';
@@ -95,6 +96,23 @@ export class ExperiencesController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async remove(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
     return this.experiencesService.remove(id);
+  }
+
+  @Get(':id/reviews')
+  async getReviews(@Param('id', ParseUUIDPipe) id: string) {
+    return this.experiencesService.getReviews(id);
+  }
+
+  @Post(':id/reviews')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.CREATED)
+  async createReview(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() createReviewDto: CreateReviewDto,
+    @Req() req: FastifyRequest,
+  ) {
+    const user = (req as any).user;
+    return this.experiencesService.createReview(id, user.id, createReviewDto);
   }
 
   @Post(':id/images/presign')

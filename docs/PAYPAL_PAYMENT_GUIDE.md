@@ -1,4 +1,4 @@
-# Guía de Integración de Pagos con PayPal
+ # Guía de Integración de Pagos con PayPal
 
 Esta guía documenta el flujo completo para procesar pagos con PayPal en el backend de LIVEX.
 

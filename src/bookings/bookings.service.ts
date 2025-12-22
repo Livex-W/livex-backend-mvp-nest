@@ -70,10 +70,10 @@ export class BookingsService {
       return await this.db.transaction(async (client) => {
         const remaining = await this.lockSlotCapacity(client, dto.slotId, dto.adults, dto.children, idempotencyKey);
         if (remaining == null) {
-          throw new BadRequestException('Slot not found or unavailable');
+          throw new BadRequestException('El horario no se encuentra o no está disponible');
         }
         if (remaining < 0) {
-          throw new BadRequestException('Insufficient capacity for requested slot');
+          throw new BadRequestException('Capacidad insuficiente para el horario seleccionado');
         }
 
         const expiresAt = this.calculateExpiry();
@@ -342,7 +342,7 @@ export class BookingsService {
   private validateQuantities(dto: CreateBookingDto): void {
     const totalTravelers = dto.adults + (dto.children ?? 0);
     if (totalTravelers <= 0) {
-      throw new BadRequestException('At least one traveler is required');
+      throw new BadRequestException('Se requiere al menos un viajero');
     }
   }
 
@@ -424,7 +424,7 @@ export class BookingsService {
         // Validar monto mínimo de compra
         if (totalCents < code.min_purchase_cents) {
           throw new BadRequestException(
-            `Minimum purchase amount not met for this code. Required: ${code.min_purchase_cents} cents`
+            `El monto mínimo de compra no se cumple para este código. Requerido: ${code.min_purchase_cents} centavos`
           );
         }
 
@@ -447,7 +447,7 @@ export class BookingsService {
           );
 
           if (expInfo.rows.length === 0) {
-            throw new BadRequestException('Experience not found');
+            throw new BadRequestException('Experiencia no encontrada');
           }
 
           const experience = expInfo.rows[0];
@@ -473,7 +473,7 @@ export class BookingsService {
           }
 
           if (!isValid) {
-            throw new BadRequestException('Referral code not valid for this experience');
+            throw new BadRequestException('El código de referido no es válido para esta experiencia');
           }
         }
 
@@ -484,7 +484,7 @@ export class BookingsService {
         }
       } else {
         // Código no válido o expirado
-        throw new BadRequestException('Invalid or expired referral code');
+        throw new BadRequestException('Código de referido inválido o expirado');
       }
     }
 
@@ -536,9 +536,9 @@ export class BookingsService {
     } catch (error) {
       const pgError = error as { code?: string };
       if (pgError.code === '23505') {
-        throw new ConflictException('Booking already created for idempotency key');
+        throw new ConflictException('Ya existe una reserva para esta operación');
       }
-      throw new InternalServerErrorException('Failed to create booking');
+      throw new InternalServerErrorException('Error al crear la reserva');
     }
   }
 

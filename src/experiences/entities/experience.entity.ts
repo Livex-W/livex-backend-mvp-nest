@@ -31,5 +31,18 @@ export interface ExperienceImage {
   experience_id: string;
   url: string;
   sort_order: number;
+  image_type?: 'hero' | 'gallery';
   created_at: Date;
+}
+
+export interface Review {
+  id: string;
+  booking_id?: string;
+  user_id?: string;
+  experience_id: string;
+  rating: number;
+  comment?: string;
+  created_at: Date;
+  user_full_name?: string; // Projected from join
+  user_avatar?: string;    // Projected from join
 }

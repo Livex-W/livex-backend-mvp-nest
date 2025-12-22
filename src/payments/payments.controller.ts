@@ -23,7 +23,7 @@ import { WebhookPayloadDto } from './dto/webhook-payload.dto';
 import { Public } from '../common/decorators/public.decorator';
 
 
-@Controller('v1/payments')
+@Controller('api/v1/payments')
 export class PaymentsController {
   private readonly logger = new Logger(PaymentsController.name);
   private readonly ALLOWED_PROVIDERS = ['paypal', 'wompi', 'epayco', 'stripe'];

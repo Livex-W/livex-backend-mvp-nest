@@ -68,7 +68,7 @@ export class PaymentsService {
       );
 
       if (bookingResult.rows.length === 0) {
-        throw new NotFoundException('Booking not found or not in pending status');
+        throw new NotFoundException('Reserva no encontrada o no está en estado pendiente');
       }
 
       const booking = bookingResult.rows[0];
@@ -92,7 +92,7 @@ export class PaymentsService {
       );
 
       if (existingSuccessfulPayment.rows.length > 0) {
-        throw new ConflictException('Payment already exists for this booking');
+        throw new ConflictException('Ya existe un pago para esta reserva');
       }
 
       // Crear registro de pago

@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
 import { Injectable, NotFoundException, BadRequestException, Inject } from '@nestjs/common';
 import { DatabaseClient } from '../database/database.client';
 import { DATABASE_CLIENT } from '../database/database.module';
@@ -13,8 +11,10 @@ import {
   QueryExperiencesDto,
   PresignImageDto,
   PresignedUrlResponse,
-  ExperienceImageType
+  ExperienceImageType,
+  CreateReviewDto
 } from './dto';
+import { Review } from './entities/experience.entity';
 import { UploadService, PresignedUrlOptions } from '../upload/upload.service';
 // Removed randomUUID import as we now use professional naming structure
 
@@ -429,6 +429,74 @@ export class ExperiencesService {
     );
 
     return result.rows;
+  }
+
+  async getReviews(experienceId: string): Promise<any[]> {
+    // Verify experience exists
+    await this.findOne(experienceId);
+
+    const result = await this.db.query(
+      `SELECT r.*, u.full_name as user_full_name, u.avatar as user_avatar
+       FROM reviews r
+       LEFT JOIN users u ON r.user_id = u.id
+       WHERE r.experience_id = $1
+       ORDER BY r.created_at DESC`,
+      [experienceId],
+    );
+
+    return result.rows;
+  }
+
+  async createReview(
+    experienceId: string,
+    userId: string,
+    reviewDto: CreateReviewDto, // Typed as CreateReviewDto in controller
+  ): Promise<Review> {
+    // Verify experience exists
+    await this.findOne(experienceId);
+
+    // Check if user already reviewed this experience (optional, but good practice)
+    const existing = await this.db.query(
+      `SELECT id FROM reviews WHERE experience_id = $1 AND user_id = $2`,
+      [experienceId, userId],
+    );
+
+    if (existing.rows.length > 0) {
+      throw new BadRequestException('You have already reviewed this experience');
+    }
+
+    const { rating, comment, booking_id } = reviewDto;
+
+    // Use explicit type for insert result
+    const result = await this.db.query<Review>(
+      `INSERT INTO reviews (experience_id, user_id, rating, comment, booking_id)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+      [experienceId, userId, rating, comment, booking_id],
+    );
+
+    const review = result.rows[0];
+
+    // Fetch user info to return complete object matches getReviews
+    const userResult = await this.db.query<{ full_name: string; avatar: string }>(
+      `SELECT full_name, avatar FROM users WHERE id = $1`,
+      [userId],
+    );
+
+    if (userResult.rows.length > 0) {
+      review.user_full_name = userResult.rows[0].full_name;
+      review.user_avatar = userResult.rows[0].avatar;
+    }
+
+    // Log business event
+    this.logger.logBusinessEvent('review_created', {
+      reviewId: review.id,
+      experienceId: experienceId,
+      userId: userId,
+      rating: rating,
+    });
+
+    return review;
   }
 
   /**
