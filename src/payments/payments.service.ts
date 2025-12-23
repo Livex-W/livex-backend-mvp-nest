@@ -178,7 +178,7 @@ export class PaymentsService {
           paymentResult.metadata,
           payment.id,
         ]
-      );
+      )
 
       return result.rows[0];
     });
@@ -237,14 +237,15 @@ export class PaymentsService {
       const internalWebhookId = crypto.randomUUID();
       await client.query(
         `INSERT INTO webhook_events (
-          id, provider, event_type, payload, status, received_at
-        ) VALUES ($1, $2, $3, $4, $5, NOW())`,
+          id, provider, event_type, payload, status, received_at, provider_event_id
+        ) VALUES ($1, $2, $3, $4, $5, NOW(), $6)`,
         [
           internalWebhookId,
           dto.provider,
           'payment.updated',
           dto.payload,
           'pending',
+          webhookEventId
         ]
       );
       this.logger.log(`Webhook event registered: ${internalWebhookId} (PayPal ID: ${webhookEventId})`);
@@ -342,18 +343,17 @@ export class PaymentsService {
         if (webhookEvent.status === 'authorized') {
           updateFields.push(`authorized_at = NOW()`);
 
-          // Si es PayPal, capturar automáticamente la orden
+          // Si es PayPal, capturar la orden de forma asíncrona
+          // El webhook PAYMENT.CAPTURE.COMPLETED actualizará el payment a 'paid'
           if (dto.provider === 'paypal' && webhookEvent.paymentId && provider.capturePayment) {
-            this.logger.log(`Auto-capturing PayPal order ${webhookEvent.paymentId}`);
+            this.logger.log(`Triggering async capture for PayPal order ${webhookEvent.paymentId}`);
 
-            // Capturar de forma asíncrona para no bloquear el webhook
-            // El webhook PAYMENT.CAPTURE.COMPLETED actualizará el payment a 'paid'
             provider.capturePayment(webhookEvent.paymentId)
               .then((captureResult) => {
-                this.logger.log(`PayPal order ${webhookEvent.paymentId} captured: ${captureResult.captureId}`);
+                this.logger.log(`PayPal order ${webhookEvent.paymentId} captured successfully: ${captureResult.captureId}`);
               })
               .catch((error) => {
-                this.logger.error(`Failed to auto-capture PayPal order ${webhookEvent.paymentId}`, error);
+                this.logger.error(`Failed to capture PayPal order ${webhookEvent.paymentId}`, error);
               });
           }
         } else if (webhookEvent.status === 'paid') {
