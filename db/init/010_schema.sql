@@ -934,3 +934,18 @@ COMMENT ON COLUMN email_logs.error_message IS 'Mensaje de error si el envío fal
 -- -- Limpiar password reset tokens usados/expirados
 -- DELETE FROM password_reset_tokens
 -- WHERE used_at IS NOT NULL OR expires_at < NOW();
+
+-- ---------- User Favorites ----------
+CREATE TABLE IF NOT EXISTS user_favorites (
+  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id        uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  experience_id  uuid NOT NULL REFERENCES experiences(id) ON DELETE CASCADE,
+  created_at     timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (user_id, experience_id)
+);
+CREATE INDEX IF NOT EXISTS idx_user_favorites_user ON user_favorites(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_favorites_experience ON user_favorites(experience_id);
+
+COMMENT ON TABLE user_favorites IS 'Stores user favorite experiences';
+COMMENT ON COLUMN user_favorites.user_id IS 'Reference to the user who favorited';
+COMMENT ON COLUMN user_favorites.experience_id IS 'Reference to the favorited experience';

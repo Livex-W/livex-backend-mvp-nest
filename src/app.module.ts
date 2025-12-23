@@ -24,6 +24,7 @@ import { NotificationModule } from './notifications/notification.module';
 import { BookingsModule } from './bookings/bookings.module';
 import { PaymentsModule } from './payments/payments.module';
 import { AgentsModule } from './agents/agents.module';
+import { FavoritesModule } from './favorites/favorites.module';
 import bookingConfig from './common/config/booking.config';
 
 @Module({
@@ -46,6 +47,7 @@ import bookingConfig from './common/config/booking.config';
     BookingsModule,
     PaymentsModule,
     AgentsModule,
+    FavoritesModule,
   ],
   controllers: [AppController],
   providers: [
