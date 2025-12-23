@@ -78,15 +78,15 @@ e AS (
   VALUES
     ((SELECT id FROM r WHERE name='Mar y Sol Cartagena'),
       'City Tour Histórico', 'Recorrido por el Centro Histórico y Getsemaní', 'city_tour', 1200, 'USD',
-      'Guía certificado, hidratación', 'Almuerzo', 'https://images.example.com/city_tour.jpg', 'active'::experience_status,
+      'Guía certificado, hidratación', 'Almuerzo', 'https://images.unsplash.com/photo-1583531172005-893e7e366d3f?w=800', 'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
     ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
       'Full Day Islas del Rosario', 'Traslado en lancha y día de playa en Isla Brisa', 'islands', 2500, 'USD',
-      'Traslados, coctel de bienvenida, carpa', 'Impuesto de muelle', 'https://images.example.com/islas.jpg', 'active'::experience_status,
+      'Traslados, coctel de bienvenida, carpa', 'Impuesto de muelle', 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800', 'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
     ((SELECT id FROM r WHERE name='Náutica Bahía Club'),
       'Sunset Sailing', 'Navegación a vela por la Bahía al atardecer', 'nautical', 1800, 'USD',
-      'Capitán, seguro, snacks', 'Traslados al muelle', 'https://images.example.com/sunset.jpg', 'active'::experience_status,
+      'Capitán, seguro, snacks', 'Traslados al muelle', 'https://images.unsplash.com/photo-1500514966906-fe245eea9344?w=800', 'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now())
   RETURNING id, title, category, resort_id
 ),
@@ -103,11 +103,18 @@ ec AS (
 -- 8) Imágenes de experiencias
 imgs AS (
   INSERT INTO experience_images (experience_id, url, sort_order) VALUES
-    ((SELECT id FROM e WHERE title='City Tour Histórico'), 'https://images.example.com/city_tour_1.jpg', 0),
-    ((SELECT id FROM e WHERE title='City Tour Histórico'), 'https://images.example.com/city_tour_2.jpg', 1),
-    ((SELECT id FROM e WHERE title='Full Day Islas del Rosario'), 'https://images.example.com/islas_1.jpg', 0),
-    ((SELECT id FROM e WHERE title='Full Day Islas del Rosario'), 'https://images.example.com/islas_2.jpg', 1),
-    ((SELECT id FROM e WHERE title='Sunset Sailing'), 'https://images.example.com/sunset_1.jpg', 0)
+    -- City Tour Histórico - imágenes de arquitectura colonial y calles
+    ((SELECT id FROM e WHERE title='City Tour Histórico'), 'https://images.unsplash.com/photo-1583531172005-893e7e366d3f?w=800', 0),
+    ((SELECT id FROM e WHERE title='City Tour Histórico'), 'https://images.unsplash.com/photo-1578632292335-df3abbb0d586?w=800', 1),
+    ((SELECT id FROM e WHERE title='City Tour Histórico'), 'https://images.unsplash.com/photo-1564594736624-def7a10ab047?w=800', 2),
+    -- Full Day Islas del Rosario - imágenes de playa y mar
+    ((SELECT id FROM e WHERE title='Full Day Islas del Rosario'), 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800', 0),
+    ((SELECT id FROM e WHERE title='Full Day Islas del Rosario'), 'https://images.unsplash.com/photo-1519046904884-53103b34b206?w=800', 1),
+    ((SELECT id FROM e WHERE title='Full Day Islas del Rosario'), 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800', 2),
+    -- Sunset Sailing - imágenes de veleros y atardecer
+    ((SELECT id FROM e WHERE title='Sunset Sailing'), 'https://images.unsplash.com/photo-1500514966906-fe245eea9344?w=800', 0),
+    ((SELECT id FROM e WHERE title='Sunset Sailing'), 'https://images.unsplash.com/photo-1540946485063-a40da27545f8?w=800', 1),
+    ((SELECT id FROM e WHERE title='Sunset Sailing'), 'https://images.unsplash.com/photo-1534224039826-c7a0eda0e6b3?w=800', 2)
   RETURNING experience_id
 ),
 

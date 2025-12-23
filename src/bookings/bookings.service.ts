@@ -13,6 +13,11 @@ import { DATABASE_CLIENT } from '../database/database.module';
 import type { CreateBookingDto } from './dto/create-booking.dto';
 import { CustomLoggerService } from '../common/services/logger.service';
 import type { BookingConfig } from '../common/config/booking.config';
+import type { PaginatedResult, PaginationMeta } from '../common/interfaces/pagination.interface';
+import type { PaginationDto } from '../common/dto/pagination.dto';
+import type { BookingWithDetailsDto } from './dto/booking-with-details.dto';
+
+
 
 interface CreatePendingBookingInput {
   dto: CreateBookingDto;
@@ -58,6 +63,79 @@ export class BookingsService {
     private readonly logger: CustomLoggerService,
     private readonly configService: ConfigService,
   ) {
+  }
+
+  async getUserBookings(
+    userId: string,
+    paginationDto: PaginationDto,
+  ): Promise<PaginatedResult<BookingWithDetailsDto>> {
+    const { page = 1, limit = 20 } = paginationDto;
+    const offset = (page - 1) * limit;
+
+    // Count total bookings for user
+    const countResult = await this.db.query<{ count: string }>(
+      'SELECT COUNT(*) as count FROM bookings WHERE user_id = $1',
+      [userId],
+    );
+    const total = parseInt(countResult.rows[0]?.count || '0', 10);
+
+    // Fetch bookings with experience and slot details
+    const query = `
+      SELECT 
+        b.id,
+        b.user_id,
+        b.experience_id,
+        b.slot_id,
+        b.adults,
+        b.children,
+        b.subtotal_cents,
+        b.tax_cents,
+        b.total_cents,
+        b.currency,
+        b.status,
+        b.cancel_reason,
+        b.expires_at,
+        b.created_at,
+        b.updated_at,
+        json_build_object(
+          'id', e.id,
+          'title', e.title,
+          'slug', e.slug,
+          'main_image_url', COALESCE(e.main_image_url, ''),
+          'category', e.category,
+          'price_cents', e.price_cents,
+          'currency', e.currency
+        ) as experience,
+        json_build_object(
+          'id', s.id,
+          'experience_id', s.experience_id,
+          'start_time', s.start_time,
+          'end_time', s.end_time,
+          'capacity', s.capacity
+        ) as slot
+      FROM bookings b
+      LEFT JOIN experiences e ON e.id = b.experience_id
+      LEFT JOIN availability_slots s ON s.id = b.slot_id
+      WHERE b.user_id = $1
+      ORDER BY b.created_at DESC
+      LIMIT $2 OFFSET $3
+    `;
+
+    const result = await this.db.query<BookingWithDetailsDto>(query, [userId, limit, offset]);
+
+    const meta: PaginationMeta = {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+      hasNextPage: page < Math.ceil(total / limit),
+      hasPreviousPage: page > 1,
+    };
+
+    return {
+      data: result.rows,
+      meta,
+    };
   }
 
   async createPendingBooking(input: CreatePendingBookingInput): Promise<PendingBookingResult> {
@@ -167,6 +245,7 @@ export class BookingsService {
         throw new NotFoundException('Booking not found or does not belong to you');
       }
 
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const booking = bookingResult.rows[0];
 
       // 2. Verificar que la reserva está confirmada

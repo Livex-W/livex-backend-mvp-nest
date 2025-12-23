@@ -1,11 +1,13 @@
 import {
   Body,
   Controller,
+  Get,
   HttpCode,
   HttpStatus,
   Param,
   Patch,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -21,6 +23,7 @@ import type { FastifyRequest } from 'fastify';
 import { ThrottlePayment } from '../common/decorators/throttle.decorator';
 import { CustomLoggerService } from '../common/services/logger.service';
 import { PaymentsService } from '../payments/payments.service';
+import { PaginationDto } from '../common/dto/pagination.dto';
 
 @Controller('api/v1/bookings')
 @UseGuards(JwtAuthGuard)
@@ -30,6 +33,21 @@ export class BookingsController {
     private readonly logger: CustomLoggerService,
     private readonly paymentsService: PaymentsService,
   ) { }
+
+  @Get()
+  @Roles(USER_ROLES[0])
+  async getUserBookings(
+    @Query() paginationDto: PaginationDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    this.logger.logBusinessEvent('user_bookings_list_request', {
+      userId: user.sub,
+      page: paginationDto.page,
+      limit: paginationDto.limit,
+    });
+
+    return await this.bookingsService.getUserBookings(user.sub, paginationDto);
+  }
 
   @Post()
   @Roles(USER_ROLES[0])
