@@ -145,13 +145,13 @@ export class BookingsController {
   @HttpCode(HttpStatus.OK)
   async cancelBooking(
     @Param('id') bookingId: string,
-    @Body() cancelDto: { reason?: string },
+    @Body() dto: CancelBookingDto,
     @CurrentUser() user: JwtPayload,
   ) {
     const result = await this.bookingsService.cancelBooking({
       bookingId,
       userId: user.sub,
-      reason: cancelDto.reason,
+      reason: dto.reason,
     });
 
     return {
