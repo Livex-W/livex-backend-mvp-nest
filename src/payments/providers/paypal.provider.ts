@@ -440,6 +440,7 @@ export class PayPalProvider implements PaymentProvider {
       const eventType = payload.event_type;
       let paymentId: string | null = null;
       let captureId: string | null = null;
+      let refundId: string | null = null;
       let status: string | null = null;
 
       // Procesar diferentes tipos de eventos de PayPal
@@ -465,11 +466,12 @@ export class PayPalProvider implements PaymentProvider {
           break;
 
         case 'PAYMENT.CAPTURE.REFUNDED':
-          // Refund completado
+          refundId = payload.resource?.id;
           captureId = payload.resource?.id;
+          captureId = payload.resource?.supplementary_data?.related_ids?.capture_id;
           paymentId = payload.resource?.supplementary_data?.related_ids?.order_id;
+          status = 'refunded';
           this.logger.log(`Refund completed - Order: ${paymentId}, Capture: ${captureId}`);
-          // Este evento es para refunds, no cambiar el estado del pago original
           break;
 
         default:
@@ -486,6 +488,7 @@ export class PayPalProvider implements PaymentProvider {
           paypal_event_type: eventType,
           paypal_resource_id: payload.resource?.id,
           paypal_capture_id: captureId,
+          paypal_refund_id: refundId,
           webhook_id: payload.id,
           create_time: payload.create_time,
         },
@@ -648,6 +651,98 @@ export class PayPalProvider implements PaymentProvider {
     } catch (error) {
       this.logger.error('Error validating PayPal webhook signature', error);
       return false;
+    }
+  }
+
+
+
+  /**
+ * Cancels  order that is in CREATED or APPROVED status
+ * Cannot cancel orders that have already been captured
+ */
+  async cancelPayment(providerPaymentId: string): Promise<{ success: boolean; message?: string }> {
+    try {
+      this.logger.log(`Cancelling PayPal order: ${providerPaymentId}`);
+
+      await this.ensureAccessToken();
+
+      // Primero verificar el estado actual de la orden
+      const orderStatus = await this.getPaymentStatus(providerPaymentId);
+
+      // Solo se pueden cancelar órdenes que NO estén capturadas
+      if (orderStatus.status === 'paid') {
+        return {
+          success: false,
+          message: 'Cannot cancel a payment that has already been captured. Use refund instead.',
+        };
+      }
+
+      if (orderStatus.status === 'cancelled' || orderStatus.status === 'failed') {
+        return {
+          success: true,
+          message: `Order is already ${orderStatus.status}`,
+        };
+      }
+
+      if (orderStatus.status === 'expired') {
+        this.logger.log(`PayPal order ${providerPaymentId} is already expired`);
+        return {
+          success: true,
+          message: 'Order has expired (automatically cancelled by PayPal)',
+        };
+      }
+      // Llamar a la API de PayPal para anular la orden
+      const response = await fetch(`${this.config.baseUrl}/v2/checkout/orders/${providerPaymentId}/void`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        this.logger.error('PayPal order cancellation failed', errorData);
+
+        // PayPal devuelve 422 si la orden ya fue capturada o no puede ser cancelada
+        if (response.status === 422) {
+          const errorName = errorData.name;
+          const errorIssue = errorData.details?.[0]?.issue;
+
+          // ORDER_CANNOT_BE_VOIDED means the order is in CREATED/APPROVED status
+          // These orders will expire automatically, so treat as soft success
+          if (errorIssue === 'ORDER_CANNOT_BE_VOIDED') {
+            this.logger.warn(`PayPal order ${providerPaymentId} cannot be voided (status not SAVED). Order will expire automatically.`);
+            return {
+              success: true,
+              message: 'Order cannot be voided via API (will expire automatically)',
+            };
+          }
+
+          // For other 422 errors (like ORDER_ALREADY_CAPTURED), return failure
+          return {
+            success: false,
+            message: `Order cannot be cancelled: ${errorIssue || errorName || 'Unknown error'}`,
+          };
+        }
+
+        throw new Error(`PayPal cancel API error: ${response.status}`);
+      }
+
+      // PayPal devuelve 204 No Content en caso de éxito
+      this.logger.log(`PayPal order ${providerPaymentId} cancelled successfully`);
+
+      return {
+        success: true,
+        message: 'Order cancelled successfully',
+      };
+
+    } catch (error) {
+      this.logger.error(`Error cancelling PayPal order ${providerPaymentId}`, error);
+      return {
+        success: false,
+        message: error.message || 'Failed to cancel payment',
+      };
     }
   }
 }

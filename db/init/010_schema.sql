@@ -19,7 +19,7 @@ DO $$ BEGIN
         CREATE TYPE booking_status AS ENUM ('pending','confirmed','cancelled','refunded','expired');
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'payment_status') THEN
-        CREATE TYPE payment_status AS ENUM ('pending','authorized','paid','refunded','failed','expired');
+        CREATE TYPE payment_status AS ENUM ('pending','authorized','paid','refunded','failed','expired', 'cancelled');
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'payment_provider') THEN
         CREATE TYPE payment_provider AS ENUM ('wompi','epayco','stripe','paypal');
@@ -428,6 +428,7 @@ CREATE TABLE IF NOT EXISTS payments (
   expires_at          timestamptz,
   authorized_at       timestamptz,
   paid_at             timestamptz,
+  cancelled_at        timestamptz,
   failed_at           timestamptz,
   failure_reason      text,
   provider_metadata   jsonb,
@@ -710,6 +711,7 @@ CREATE TABLE IF NOT EXISTS inventory_locks (
   quantity     integer NOT NULL CHECK (quantity > 0),
   expires_at   timestamptz NOT NULL,
   consumed_at  timestamptz,
+  released_at  timestamptz,
   created_at   timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_inventory_locks_slot ON inventory_locks(slot_id);

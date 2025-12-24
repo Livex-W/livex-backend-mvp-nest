@@ -9,7 +9,7 @@ export interface PaymentIntent {
 
 export interface PaymentResult {
   id: string;
-  status: 'pending' | 'authorized' | 'paid' | 'failed' | 'expired';
+  status: 'pending' | 'authorized' | 'paid' | 'failed' | 'expired' | 'cancelled';
   checkoutUrl?: string;
   providerPaymentId: string;
   providerReference?: string;
@@ -55,4 +55,6 @@ export interface PaymentProvider {
 
   // Optional method for providers that require explicit capture (e.g., PayPal)
   capturePayment?(providerPaymentId: string): Promise<{ captureId: string; status: string }>;
+  cancelPayment?(providerPaymentId: string): Promise<{ success: boolean; message?: string }>;
+
 }

@@ -276,6 +276,17 @@ export class PaymentsService {
         throw new BadRequestException('Invalid webhook signature');
       }
 
+      // Para webhooks de refund
+      // Generalizamos la detección: si trae refundId en metadata o es un evento conocido de refund
+      const isRefundEvent =
+        webhookEvent.metadata?.paypal_refund_id ||
+        webhookEvent.metadata?.refundId ||
+        ['PAYMENT.CAPTURE.REFUNDED', 'REFUND_SUCCESS', 'REFUND_DECLINED'].includes(webhookEvent.eventType);
+
+      if (isRefundEvent) {
+        await this.handleRefundWebhook(client, webhookEvent, internalWebhookId);
+        return;
+      }
       // Validar y sanitizar paymentId del webhook
       if (!webhookEvent.paymentId) {
         this.logger.warn('Webhook event has no paymentId');
@@ -389,7 +400,12 @@ export class PaymentsService {
     });
   }
 
-  async createRefund(dto: CreateRefundDto, userId: string): Promise<any> {
+
+  async createRefund(
+    dto: CreateRefundDto,
+    userId: string,
+    options: { check48hWindow?: boolean } = {}
+  ): Promise<any> {
     return await this.db.transaction(async (client) => {
 
       // Buscar el pago
@@ -406,121 +422,281 @@ export class PaymentsService {
 
       const payment = paymentResult.rows[0];
 
-      // Verificar permisos (usuario propietario o admin)
-      if (payment.user_id && payment.user_id !== userId) {
-        // Aquí se podría verificar si es admin
+      // Verificar permisos (solo si NO es una cancelación automática del sistema)
+      // Si check48hWindow es true, asumimos que es una operación del sistema (cancelación) y el userId se valida arriba
+      if (!options.check48hWindow && payment.user_id && payment.user_id !== userId) {
+        // En un futuro: permitir si es admin
         throw new BadRequestException('Not authorized to refund this payment');
       }
 
-      if (payment.provider === 'paypal' && !payment.provider_capture_id) {
-        throw new BadRequestException(
-          'Payment does not have a capture ID. Cannot process refund. Please contact support.'
-        );
-      }
+      // Validar ventana de 48 horas (Si se solicita)
+      if (options.check48hWindow && payment.paid_at) {
+        const REFUND_WINDOW_HOURS = 48;
+        const hoursSincePaid = (Date.now() - new Date(payment.paid_at).getTime()) / (1000 * 60 * 60);
 
+        if (hoursSincePaid > REFUND_WINDOW_HOURS) {
+          throw new BadRequestException(
+            `Refund window expired. Refunds must be requested within ${REFUND_WINDOW_HOURS} hours of payment.`
+          );
+        }
+
+        this.logger.log(`Refund window check passed (${hoursSincePaid.toFixed(2)} hours since payment)`);
+      }
 
       // Calcular monto del refund
       const refundAmount = dto.amountCents || payment.amount_cents;
 
-      if (refundAmount > payment.amount_cents) {
-        throw new BadRequestException('Refund amount cannot exceed payment amount');
-      }
-
-      // Verificar refunds previos
-      const existingRefundsResult = await client.query(
-        'SELECT COALESCE(SUM(amount_cents), 0) as total_refunded FROM refunds WHERE payment_id = $1 AND status = $2',
-        [dto.paymentId, 'processed']
+      // Delegar ejecución al núcleo centralizado
+      return await this.executeRefund(
+        client,
+        payment,
+        refundAmount,
+        dto.reason ?? '',
+        userId
       );
-
-      const totalRefunded = parseInt(existingRefundsResult.rows[0].total_refunded);
-
-      if (totalRefunded + refundAmount > payment.amount_cents) {
-        throw new BadRequestException('Total refund amount would exceed payment amount');
-      }
-
-      // Crear registro de refund
-      const refundId = crypto.randomUUID();
-      const refundResult = await client.query(
-        `INSERT INTO refunds (
-          id, payment_id, amount_cents, currency, status, reason, 
-          requested_by, requested_at, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW(), NOW())
-        RETURNING *`,
-        [
-          refundId,
-          dto.paymentId,
-          refundAmount,
-          payment.currency,
-          'pending',
-          dto.reason,
-          userId,
-        ]
-      );
-
-      // Procesar refund con el proveedor
-      const provider = this.paymentProviderFactory.getProvider(payment.provider as PaymentProviderType);
-
-      const providerPaymentId = payment.provider === 'paypal'
-        ? (payment.provider_capture_id || payment.provider_payment_id || '')
-        : (payment.provider_payment_id || '');
-
-      this.logger.log(`Creating refund with provider. Provider: ${payment.provider}, ID: ${providerPaymentId}`);
+    });
+  }
 
 
-      const refundProviderResult = await provider.createRefund({
-        paymentId: providerPaymentId,
-        amount: refundAmount,
-        reason: dto.reason,
-        metadata: {
-          refundId,
-          bookingId: payment.booking_id,
-        },
-      });
+  private async handleRefundWebhook(
+    client: any,
+    webhookEvent: WebhookEvent,
+    webhookEventId: string
+  ): Promise<void> {
 
-      // Actualizar refund con datos del proveedor
+    const refundId = webhookEvent.metadata?.paypal_refund_id;
+
+    if (!refundId) {
+      this.logger.warn('Refund webhook has no refund ID');
       await client.query(
-        `UPDATE refunds SET 
-          provider_refund_id = $1,
-          provider_reference = $2,
-          status = $3,
-          provider_metadata = $4,
-          updated_at = NOW()
-        WHERE id = $5`,
-        [
-          refundProviderResult.providerRefundId,
-          refundProviderResult.providerReference,
-          refundProviderResult.status,
-          refundProviderResult.metadata,
-          refundId,
-        ]
+        'UPDATE webhook_events SET status = $1, error = $2 WHERE id = $3',
+        ['ignored', 'No refund ID in webhook', webhookEventId]
+      );
+      return;
+    }
+
+    // Buscar el refund por provider_refund_id
+    const refundResult = await client.query(
+      `SELECT r.*, p.booking_id 
+     FROM refunds r
+     JOIN payments p ON p.id = r.payment_id
+     WHERE r.provider_refund_id = $1`,
+      [refundId]
+    );
+
+    if (refundResult.rows.length === 0) {
+      this.logger.warn(`Refund not found for provider_refund_id: ${refundId}`);
+      await client.query(
+        'UPDATE webhook_events SET status = $1, error = $2 WHERE id = $3',
+        ['ignored', 'Refund not found', webhookEventId]
+      );
+      return;
+    }
+
+    const refund = refundResult.rows[0];
+
+    // Si el refund ya está procesado, no hacer nada
+    if (refund.status === 'processed') {
+      this.logger.log(`Refund ${refund.id} is already processed`);
+      return;
+    }
+
+    // Actualizar el estado del refund según el webhook
+    const paypalStatus = webhookEvent.rawPayload?.resource?.status;
+    let newStatus: 'pending' | 'processed' | 'failed';
+
+    switch (paypalStatus) {
+      case 'COMPLETED':
+        newStatus = 'processed';
+        break;
+      case 'PENDING':
+        newStatus = 'pending';
+        break;
+      case 'CANCELLED':
+      case 'FAILED':
+        newStatus = 'failed';
+        break;
+      default:
+        newStatus = 'pending';
+    }
+
+    // Actualizar el refund
+    const updateFields: string[] = [];
+    const updateValues: any[] = [];
+    let paramIndex = 1;
+
+    updateFields.push(`status = $${paramIndex++}`);
+    updateValues.push(newStatus);
+
+    if (newStatus === 'processed') {
+      updateFields.push(`processed_at = NOW()`);
+    } else if (newStatus === 'failed') {
+      updateFields.push(`failed_at = NOW()`);
+      updateFields.push(`failure_reason = $${paramIndex++}`);
+      updateValues.push('Refund failed in PayPal');
+    }
+
+    updateFields.push(`updated_at = NOW()`);
+    updateValues.push(refund.id);
+
+    await client.query(
+      `UPDATE refunds SET ${updateFields.join(', ')} WHERE id = $${paramIndex}`,
+      updateValues
+    );
+
+    this.logger.log(`Refund ${refund.id} updated to status: ${newStatus} via webhook`);
+
+    //  Enviar notificación de reembolso procesado
+    if (newStatus === 'processed') {
+      await this.sendRefundNotification(client, refund.id);
+    }
+  }
+
+  /**
+   * Helper to send refund notification
+   * Used by both createRefund (sync) and handleRefundWebhook (async)
+   */
+  private async sendRefundNotification(client: any, refundId: string): Promise<void> {
+    try {
+      const userDetails = await client.query(
+        `SELECT u.email, u.full_name, b.id as booking_id, r.amount_cents
+         FROM refunds r
+         JOIN payments p ON p.id = r.payment_id
+         JOIN bookings b ON b.id = p.booking_id
+         JOIN users u ON u.id = b.user_id
+         WHERE r.id = $1`,
+        [refundId]
       );
 
-      this.logger.log(`Refund created: ${refundId} for payment ${dto.paymentId}`);
+      if (userDetails.rows.length > 0) {
+        const user = userDetails.rows[0];
+        await this.notificationService.sendRefundProcessed(user.email, {
+          customerName: user.full_name,
+          refundAmount: Number((user.amount_cents / 100).toFixed(2)),
+          bookingCode: user.booking_id.substring(0, 8).toUpperCase(),
+        });
+        this.logger.log(`Refund notification sent for refund ${refundId}`);
+      }
+    } catch (error) {
+      this.logger.error(`Failed to send refund notification for refund ${refundId}`, error);
+    }
+  }
 
-      // Enviar notificación de reembolso
-      try {
-        const userDetails = await client.query(
-          `SELECT u.email, u.full_name, b.id as booking_id
-           FROM payments p
-           JOIN bookings b ON b.id = p.booking_id
-           JOIN users u ON u.id = b.user_id
-           WHERE p.id = $1`,
-          [dto.paymentId]
-        );
 
-        if (userDetails.rows.length > 0) {
-          const user = userDetails.rows[0];
-          this.notificationService.sendRefundProcessed(user.email, {
-            customerName: user.full_name,
-            refundAmount: Number((refundAmount / 100).toFixed(2)),
-            bookingCode: user.booking_id.substring(0, 8).toUpperCase(),
-          });
-        }
-      } catch (error) {
-        this.logger.error(`Failed to send refund notification for payment ${dto.paymentId}`, error);
+  /**
+   * Cancela un pago pendiente/autorizado
+   * Solo actualiza el payment, NO modifica el booking
+   */
+  async cancelPayment(paymentId: string, userId: string): Promise<{
+    success: boolean;
+    message: string;
+    bookingId: string;
+  }> {
+    this.logger.log(`Attempting to cancel payment ${paymentId} by user ${userId}`);
+
+    return await this.db.transaction(async (client) => {
+
+      // 1. Buscar el pago y verificar permisos
+      const paymentResult = await client.query<Payment>(
+        `SELECT p.*, b.user_id, b.id as booking_id 
+          FROM payments p 
+          JOIN bookings b ON b.id = p.booking_id 
+          WHERE p.id = $1`,
+        [paymentId]
+      );
+
+      if (paymentResult.rows.length === 0) {
+        this.logger.warn(`Payment ${paymentId} not found`);
+        throw new NotFoundException('Payment not found');
       }
 
-      return refundResult.rows[0];
+      const payment = paymentResult.rows[0];
+      this.logger.log(`Found payment ${paymentId}: status=${payment.status}, provider_payment_id=${payment.provider_payment_id}`);
+
+      // Verificar permisos
+      if (payment.user_id !== userId) {
+        this.logger.warn(`User ${userId} not authorized to cancel payment ${paymentId}`);
+        throw new BadRequestException('Not authorized to cancel this payment');
+      }
+
+      // 2. Validar que el pago pueda ser cancelado
+      if (payment.status === 'paid') {
+        this.logger.warn(`Cannot cancel paid payment ${paymentId}`);
+        throw new BadRequestException(
+          'Cannot cancel a completed payment. Use refund instead.'
+        );
+      }
+
+      if (payment.status === 'cancelled') {
+        this.logger.log(`Payment ${paymentId} is already cancelled`);
+        return {
+          success: true,
+          message: 'Payment is already cancelled',
+          bookingId: payment.booking_id,
+        };
+      }
+
+      if (payment.status === 'failed' || payment.status === 'expired') {
+        this.logger.log(`Payment ${paymentId} is already ${payment.status}`);
+        return {
+          success: true,
+          message: `Payment is already ${payment.status}`,
+          bookingId: payment.booking_id,
+        };
+      }
+
+      // 3. Intentar cancelar con el proveedor (si existe provider_payment_id)
+      if (payment.provider_payment_id) {
+        const provider = this.paymentProviderFactory.getProvider(payment.provider as PaymentProviderType);
+
+        if (provider.cancelPayment) {
+          try {
+            this.logger.log(`Calling provider to cancel order ${payment.provider_payment_id}`);
+
+            const cancellationResult = await provider.cancelPayment(payment.provider_payment_id);
+
+            if (!cancellationResult.success) {
+              this.logger.error(`Provider cancelled payment ${paymentId} failed: ${cancellationResult.message}`);
+              throw new BadRequestException(cancellationResult.message || 'Failed to cancel payment with provider');
+            }
+
+            this.logger.log(`Provider cancelled payment ${paymentId} successfully: ${cancellationResult.message}`);
+          } catch (error) {
+            this.logger.error(`Error calling provider to cancel payment ${paymentId}:`, error);
+            throw new BadRequestException(`Failed to cancel payment with provider: ${error.message}`);
+          }
+        } else {
+          this.logger.warn(`Provider ${payment.provider} does not support cancelPayment()`);
+        }
+      } else {
+        this.logger.warn(`Payment ${paymentId} has no provider_payment_id, skipping provider cancellation`);
+      }
+
+      // 4. Actualizar el pago como cancelado en la base de datos
+      this.logger.log(`Updating payment ${paymentId} status to cancelled`);
+
+      const updateResult = await client.query(
+        `UPDATE payments 
+          SET status = $1,
+              cancelled_at = NOW(), 
+              updated_at = NOW() 
+          WHERE id = $2
+          RETURNING *`,
+        ['cancelled', paymentId]
+      );
+
+      if (updateResult.rows.length === 0) {
+        this.logger.error(`Failed to update payment ${paymentId} to cancelled`);
+        throw new Error('Failed to update payment status');
+      }
+
+      this.logger.log(`Payment ${paymentId} successfully updated to cancelled`);
+
+      return {
+        success: true,
+        message: 'Payment cancelled successfully',
+        bookingId: payment.booking_id,
+      };
     });
   }
 
@@ -663,101 +839,117 @@ export class PaymentsService {
   }
 
   /**
-   * Procesa automáticamente el reembolso completo para una reserva cancelada
+   * Core execution logic for refunds
+   * Handles DB checks, provider calls, and notifications
+   * Used by createRefund
    */
-  async processBookingCancellationRefund(
-    bookingId: string,
-    reason: string = 'Booking cancelled by customer'
-  ): Promise<{ refundId: string; amount: number }> {
-    return await this.db.transaction(async (client) => {
-      // 1. Buscar el pago de la reserva
-      const paymentResult = await client.query<Payment>(
-        `SELECT p.* FROM payments p
-         WHERE p.booking_id = $1 
-         AND p.status = 'paid'
-         ORDER BY p.created_at DESC
-         LIMIT 1`,
-        [bookingId]
+  private async executeRefund(
+    client: any,
+    payment: Payment,
+    amountCents: number,
+    reason: string,
+    userId: string
+  ): Promise<any> {
+
+    // 1. Validaciones comunes
+    if (payment.provider === 'paypal' && !payment.provider_capture_id) {
+      throw new BadRequestException(
+        'Payment does not have a capture ID. Cannot process refund. Please contact support.'
       );
+    }
 
-      if (paymentResult.rows.length === 0) {
-        throw new NotFoundException('No paid payment found for this booking');
-      }
+    if (amountCents > payment.amount_cents) {
+      throw new BadRequestException('Refund amount cannot exceed payment amount');
+    }
 
-      const payment = paymentResult.rows[0];
+    // 2. Verificar límite de reembolsos (Partial refunds logic)
+    const existingRefundsResult = await client.query(
+      'SELECT COALESCE(SUM(amount_cents), 0) as total_refunded FROM refunds WHERE payment_id = $1 AND status = $2',
+      [payment.id, 'processed']
+    );
 
-      // 2. Verificar si ya existe un refund procesado
-      const existingRefund = await client.query(
-        `SELECT * FROM refunds 
-         WHERE payment_id = $1 
-         AND status IN ('pending', 'processed')`,
-        [payment.id]
-      );
+    const totalRefunded = parseInt(existingRefundsResult.rows[0].total_refunded);
 
-      if (existingRefund.rows.length > 0) {
-        throw new ConflictException('Refund already exists for this payment');
-      }
+    if (totalRefunded + amountCents > payment.amount_cents) {
+      throw new BadRequestException('Total refund amount would exceed payment amount');
+    }
 
-      if (payment.provider === 'paypal' && !payment.provider_capture_id) {
-        this.logger.error(`Cannot refund PayPal payment ${payment.id}: missing capture_id`);
-        throw new BadRequestException('Payment cannot be refunded: missing capture information');
-      }
-
-      // 3. Obtener el proveedor de pagos
-      const provider = this.paymentProviderFactory.getProvider(payment.provider as PaymentProviderType);
-
-      // 4. Crear el refund con el proveedor
-      let providerRefundId: string | undefined;
-      let refundStatus: 'pending' | 'processed' | 'failed' = 'pending';
-
-      try {
-
-        const providerPaymentId = payment.provider === 'paypal'
-          ? (payment.provider_capture_id || payment.provider_payment_id)
-          : payment.provider_payment_id;
-
-        if (providerPaymentId) {
-          this.logger.log(`Processing refund for booking ${bookingId} with provider ID: ${providerPaymentId}`);
-          const refundResult = await provider.createRefund({
-            paymentId: providerPaymentId,
-            amount: payment.amount_cents,
-            reason,
-          });
-
-          providerRefundId = refundResult.providerRefundId;
-          refundStatus = refundResult.status;
-        } else {
-          // Si no hay provider_payment_id, marcarlo como procesado directamente
-          refundStatus = 'processed';
-        }
-      } catch (error) {
-        this.logger.error(`Failed to create refund with provider ${payment.provider}`, error);
-        refundStatus = 'failed';
-      }
-
-      // 5. Registrar el refund en la base de datos
-      const refundId = crypto.randomUUID();
-
-      await client.query(
-        `INSERT INTO refunds (
-          id, payment_id, amount_cents, currency, status, reason,
-          provider_refund_id, created_at, 
-          ${refundStatus === 'processed' ? 'processed_at,' : ''}
-          ${refundStatus === 'failed' ? 'failed_at, failure_reason,' : ''}
-          updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), ${refundStatus === 'processed' ? 'NOW(),' : ''} ${refundStatus === 'failed' ? 'NOW(), $8,' : ''} NOW())
-        ${refundStatus === 'failed' ? 'RETURNING id' : ''}`,
-        refundStatus === 'failed'
-          ? [refundId, payment.id, payment.amount_cents, payment.currency, refundStatus, reason, providerRefundId, 'Provider refund failed']
-          : [refundId, payment.id, payment.amount_cents, payment.currency, refundStatus, reason, providerRefundId]
-      );
-
-      this.logger.log(`Refund ${refundId} created for booking ${bookingId} with status ${refundStatus}`);
-
-      return {
+    // 3. Crear registro de refund (Pending)
+    const refundId = crypto.randomUUID();
+    const refundResult = await client.query(
+      `INSERT INTO refunds (
+        id, payment_id, amount_cents, currency, status, reason, 
+        requested_by, requested_at, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW(), NOW())
+      RETURNING *`,
+      [
         refundId,
-        amount: payment.amount_cents,
-      };
-    });
+        payment.id,
+        amountCents,
+        payment.currency,
+        'pending',
+        reason,
+        userId,
+      ]
+    );
+
+    // 4. Procesar con el proveedor
+    const provider = this.paymentProviderFactory.getProvider(payment.provider as PaymentProviderType);
+
+    const providerPaymentId = payment.provider === 'paypal'
+      ? (payment.provider_capture_id || payment.provider_payment_id || '')
+      : (payment.provider_payment_id || '');
+
+    this.logger.log(`Executing refund with provider ${payment.provider} (ID: ${providerPaymentId})`);
+
+    let refundProviderResult;
+    try {
+      refundProviderResult = await provider.createRefund({
+        paymentId: providerPaymentId,
+        amount: amountCents,
+        reason: reason,
+        metadata: {
+          refundId,
+          bookingId: payment.booking_id,
+        },
+      });
+    } catch (error) {
+      this.logger.error(`Provider refund failed for payment ${payment.id}`, error);
+      // Marcar como fallido en DB
+      await client.query(
+        'UPDATE refunds SET status = $1, failed_at = NOW(), failure_reason = $2, updated_at = NOW() WHERE id = $3',
+        ['failed', error.message || 'Provider error', refundId]
+      );
+      throw error;
+    }
+
+    // 5. Actualizar registro con respuesta del proveedor
+    await client.query(
+      `UPDATE refunds SET 
+        provider_refund_id = $1,
+        provider_reference = $2,
+        status = $3,
+        provider_metadata = $4,
+        updated_at = NOW()
+      WHERE id = $5`,
+      [
+        refundProviderResult.providerRefundId,
+        refundProviderResult.providerReference,
+        refundProviderResult.status,
+        refundProviderResult.metadata,
+        refundId,
+      ]
+    );
+
+    this.logger.log(`Refund ${refundId} executed. Status: ${refundProviderResult.status}`);
+
+    // 6. Notificación (Centralizada)
+    if (refundProviderResult.status === 'processed') {
+      await this.sendRefundNotification(client, refundId);
+    } else {
+      this.logger.log(`Refund ${refundId} is pending. Notification delegated to webhook.`);
+    }
+
+    return refundResult.rows[0];
   }
 }
