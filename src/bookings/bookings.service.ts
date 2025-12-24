@@ -16,6 +16,7 @@ import type { BookingConfig } from '../common/config/booking.config';
 import type { PaginatedResult, PaginationMeta } from '../common/interfaces/pagination.interface';
 import type { PaginationDto } from '../common/dto/pagination.dto';
 import type { BookingWithDetailsDto } from './dto/booking-with-details.dto';
+import { PaymentsService } from '../payments/payments.service';
 
 
 
@@ -51,6 +52,26 @@ interface CancelBookingOptions {
   reason?: string;
   cancelledAt?: Date;
 }
+interface Booking {
+  id: string;
+  user_id: string;
+  experience_id: string;
+  slot_id: string;
+  adults: number;
+  children: number;
+  subtotal_cents: number;
+  tax_cents: number;
+  total_cents: number;
+  currency: string;
+  status: string;
+  expires_at?: Date;
+  cancel_reason?: string;
+  idempotency_key?: string;
+  agent_id?: string;
+  referral_code_id?: string;
+  created_at: Date;
+  updated_at: Date;
+}
 
 interface ExpireBookingsResult {
   expired: number;
@@ -60,6 +81,7 @@ interface ExpireBookingsResult {
 export class BookingsService {
   constructor(
     @Inject(DATABASE_CLIENT) private readonly db: DatabaseClient,
+    private readonly paymentsService: PaymentsService,
     private readonly logger: CustomLoggerService,
     private readonly configService: ConfigService,
   ) {
@@ -278,7 +300,7 @@ export class BookingsService {
         [options.bookingId]
       );
 
-      // 6. Marcar el lock como released
+      // 6. Marcar el lock como released (restaurar registro histórico)
       await client.query(
         `UPDATE inventory_locks 
          SET consumed_at = NULL, released_at = NOW()
@@ -658,4 +680,162 @@ export class BookingsService {
       throw new InternalServerErrorException('Failed to lock inventory');
     }
   }
+
+
+  /**
+     * Punto de entrada único para cancelar cualquier reserva
+     * Decide automáticamente si cancelar pago o procesar reembolso
+     */
+  async cancelBooking(options: {
+    bookingId: string;
+    userId: string;
+    reason?: string;
+  }): Promise<{
+    booking: Booking;
+    refundId?: string;
+    refundAmount?: number;
+    message: string;
+  }> {
+
+    // 1. Buscar la reserva con su información de pago
+    const bookingResult = await this.db.query(
+      `SELECT 
+        b.*,
+        p.id as payment_id,
+        p.status as payment_status,
+        p.amount_cents as payment_amount,
+        p.paid_at as payment_paid_at
+       FROM bookings b
+       LEFT JOIN payments p ON p.booking_id = b.id
+       WHERE b.id = $1 AND b.user_id = $2
+       ORDER BY p.created_at DESC
+       LIMIT 1`,
+      [options.bookingId, options.userId]
+    );
+
+    if (bookingResult.rows.length === 0) {
+      throw new NotFoundException('Booking not found or does not belong to you');
+    }
+
+    const booking = bookingResult.rows[0];
+
+    // 2. Validar estado del booking
+    if (booking.status === 'cancelled') {
+      throw new ConflictException('Booking is already cancelled');
+    }
+
+    if (booking.status === 'completed') {
+      throw new ConflictException('Cannot cancel a completed booking');
+    }
+
+    // 3. Decidir según el estado del pago
+    let refundInfo: { refundId: string; amount: number } | undefined;
+
+    if (booking.payment_id) {
+      if (booking.payment_status === 'paid') {
+        // Caso 1: Pago completado → REEMBOLSO
+        this.logger.log(`Booking ${options.bookingId} has completed payment. Processing refund...`);
+
+        try {
+          // Delegar al PaymentsService (Reembolso centralizado con flag de 48h)
+          const refundResult = await this.paymentsService.createRefund(
+            {
+              paymentId: booking.payment_id,
+              reason: options.reason || 'Booking cancelled by customer',
+            },
+            options.userId,
+            { check48hWindow: true }
+          );
+
+          refundInfo = { refundId: refundResult.id, amount: refundResult.amount_cents };
+
+          this.logger.log(`Refund processed: ${refundInfo.refundId} for ${refundInfo.amount} cents`);
+        } catch (error) {
+          this.logger.error(`Failed to process refund for booking ${options.bookingId}`, error);
+          throw error; // Propagar error (incluye validación de 48h)
+        }
+
+      } else if (booking.payment_status === 'pending' || booking.payment_status === 'authorized') {
+        // Caso 2: Pago pendiente/autorizado → CANCELAR
+        this.logger.log(`Booking ${options.bookingId} has ${booking.payment_status} payment. Cancelling payment...`);
+
+        try {
+          // Delegar al PaymentsService
+          await this.paymentsService.cancelPayment(booking.payment_id, options.userId);
+          this.logger.log(`Payment ${booking.payment_id} cancelled successfully`);
+        } catch (error) {
+          this.logger.error(`Failed to cancel payment for booking ${options.bookingId}`, error);
+          // Continuar con la cancelación del booking aunque falle la del pago
+        }
+      }
+    }
+
+    // 4. Cancelar el booking y liberar inventario (BookingsService se encarga de esto)
+    return await this.db.transaction(async (client) => {
+
+      // Cancelar el booking
+      const cancelledBooking = await client.query<Booking>(
+        `UPDATE bookings 
+         SET status = 'cancelled', 
+             cancel_reason = COALESCE($2, cancel_reason),
+             updated_at = NOW()
+         WHERE id = $1
+         RETURNING *`,
+        [options.bookingId, options.reason ?? null]
+      );
+
+      // Restaurar disponibilidad del slot (si el booking estaba confirmed)
+      if (booking.status === 'confirmed') {
+        const lockResult = await client.query(
+          `SELECT slot_id, quantity FROM inventory_locks 
+           WHERE booking_id = $1 
+           LIMIT 1`,
+          [options.bookingId]
+        );
+
+        if (lockResult.rows.length > 0) {
+          const { slot_id, quantity } = lockResult.rows[0];
+
+          await client.query(
+            `UPDATE inventory_locks 
+               SET ${booking.status === 'confirmed' ? 'consumed_at = NULL,' : ''} 
+               released_at = NOW()
+               WHERE booking_id = $1
+               AND released_at IS NULL`,
+            [options.bookingId]
+          );
+
+          this.logger.log(`Restored ${quantity} spots to slot ${slot_id}`);
+        }
+      }
+
+      // Liberar el inventory lock (BookingsService se encarga de esto)
+      await client.query(
+        `UPDATE inventory_locks 
+         SET ${booking.status === 'confirmed' ? 'consumed_at = NULL,' : ''} 
+             released_at = NOW()
+         WHERE booking_id = $1
+         ${booking.status === 'pending' ? 'AND consumed_at IS NULL' : ''}`,
+        [options.bookingId]
+      );
+
+      this.logger.logBusinessEvent('booking_cancelled', {
+        bookingId: options.bookingId,
+        userId: options.userId,
+        previousStatus: booking.status,
+        hadRefund: !!refundInfo,
+        refundAmount: refundInfo?.amount,
+      });
+
+      return {
+        booking: cancelledBooking.rows[0],
+        refundId: refundInfo?.refundId,
+        refundAmount: refundInfo?.amount,
+        message: refundInfo
+          ? `Booking cancelled and refund of ${(refundInfo.amount / 100).toFixed(2)} USD processed successfully`
+          : 'Booking cancelled successfully',
+      };
+    });
+  }
+
 }

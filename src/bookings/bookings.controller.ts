@@ -134,64 +134,40 @@ export class BookingsController {
     });
   }
 
-  @Post(':bookingId/cancel-confirmed')
+
+  /**
+   * Cancelar cualquier reserva (pending o confirmed)
+   * - Si está pending: cancela el pago pendiente
+   * - Si está confirmed: procesa reembolso (validando 48h)
+   */
+  @Post(':id/cancel')
   @Roles(USER_ROLES[0])
   @HttpCode(HttpStatus.OK)
-  async cancelConfirmedBooking(
-    @Param('bookingId') bookingId: string,
-    @Body() dto: CancelBookingDto,
+  async cancelBooking(
+    @Param('id') bookingId: string,
+    @Body() cancelDto: { reason?: string },
     @CurrentUser() user: JwtPayload,
   ) {
-    this.logger.logBusinessEvent('booking_confirmed_cancel_request', {
+    const result = await this.bookingsService.cancelBooking({
       bookingId,
       userId: user.sub,
-      reason: dto.reason,
+      reason: cancelDto.reason,
     });
 
-    // 1. Cancelar la reserva (libera inventario)
-    const cancelResult = await this.bookingsService.cancelConfirmedBooking({
-      bookingId,
-      userId: user.sub,
-      reason: dto.reason,
-    });
-
-    // 2. Procesar reembolso automáticamente
-    try {
-      const refundResult = await this.paymentsService.processBookingCancellationRefund(
-        bookingId,
-        dto.reason || 'Booking cancelled by customer'
-      );
-
-      this.logger.logBusinessEvent('refund_processed', {
-        bookingId,
-        userId: user.sub,
-        refundId: refundResult.refundId,
-        amount: refundResult.amount,
-      });
-
-      return {
-        ...cancelResult,
-        refund: {
-          id: refundResult.refundId,
-          amount: refundResult.amount,
-          status: 'processed',
-        },
-      };
-    } catch (refundError) {
-      this.logger.logError(refundError as Error, {
-        method: 'cancelConfirmedBooking',
-        message: 'Booking cancelled but refund failed',
-        bookingId,
-      });
-
-      // La reserva ya está cancelada, pero el reembolso falló
-      return {
-        ...cancelResult,
-        refund: {
-          status: 'failed',
-          error: 'Refund processing failed. Please contact support.',
-        },
-      };
-    }
+    return {
+      success: true,
+      booking: {
+        id: result.booking.id,
+        status: result.booking.status,
+        cancelReason: result.booking.cancel_reason,
+      },
+      refund: result.refundId ? {
+        refundId: result.refundId,
+        amount: (result.refundAmount! / 100).toFixed(2),
+        currency: 'USD',
+      } : null,
+      message: result.message,
+    };
   }
+
 }
