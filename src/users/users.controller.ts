@@ -28,6 +28,8 @@ export class UsersController {
       email,
       phone: dto.phone,
       avatar: dto.avatar,
+      documentType: dto.documentType,
+      documentNumber: dto.documentNumber,
     });
 
     return this.usersService.toSafeUser(updatedUser);

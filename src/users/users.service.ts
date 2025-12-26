@@ -15,6 +15,8 @@ interface UserRow extends QueryResultRow {
     phone: string | null;
     avatar: string | null;
     role: string;
+    document_type: string | null;
+    document_number: string | null;
     created_at: Date;
     updated_at: Date;
 }
@@ -28,7 +30,7 @@ export class UsersService {
 
     async findByEmail(email: string): Promise<UserEntity | null> {
         const result = await this.db.query<UserRow>(
-            `SELECT id, email, password_hash, firebase_uid, full_name, phone, avatar, role, created_at, updated_at
+            `SELECT id, email, password_hash, firebase_uid, full_name, phone, avatar, role, document_type, document_number, created_at, updated_at
             FROM users WHERE email = $1`,
             [email],
         );
@@ -42,7 +44,7 @@ export class UsersService {
 
     async findByFirebaseUid(uid: string): Promise<UserEntity | null> {
         const result = await this.db.query<UserRow>(
-            `SELECT id, email, password_hash, firebase_uid, full_name, phone, avatar, role, created_at, updated_at
+            `SELECT id, email, password_hash, firebase_uid, full_name, phone, avatar, role, document_type, document_number, created_at, updated_at
             FROM users WHERE firebase_uid = $1`,
             [uid],
         );
@@ -56,7 +58,7 @@ export class UsersService {
 
     async findById(id: string): Promise<UserEntity | null> {
         const result = await this.db.query<UserRow>(
-            `SELECT id, email, password_hash, firebase_uid, full_name, phone, avatar, role, created_at, updated_at
+            `SELECT id, email, password_hash, firebase_uid, full_name, phone, avatar, role, document_type, document_number, created_at, updated_at
             FROM users WHERE id = $1`,
             [id],
         );
@@ -75,12 +77,14 @@ export class UsersService {
         fullName?: string | null;
         phone?: string | null;
         avatar?: string | null;
+        documentType?: string | null;
+        documentNumber?: string | null;
         role: UserRole;
     }): Promise<UserEntity> {
         const result = await this.db.query<UserRow>(
-            `INSERT INTO users (email, password_hash, firebase_uid, full_name, phone, avatar, role)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
-            RETURNING id, email, password_hash, firebase_uid, full_name, phone, avatar, role, created_at, updated_at`,
+            `INSERT INTO users (email, password_hash, firebase_uid, full_name, phone, avatar, document_type, document_number, role)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            RETURNING id, email, password_hash, firebase_uid, full_name, phone, avatar, role, document_type, document_number, created_at, updated_at`,
             [
                 params.email,
                 params.passwordHash ?? null,
@@ -88,6 +92,8 @@ export class UsersService {
                 params.fullName ?? null,
                 params.phone ?? null,
                 params.avatar ?? null,
+                params.documentType ?? null,
+                params.documentNumber ?? null,
                 params.role
             ],
         );
@@ -112,6 +118,8 @@ export class UsersService {
             email?: string;
             phone?: string;
             avatar?: string;
+            documentType?: string;
+            documentNumber?: string;
         },
     ): Promise<UserEntity> {
         const updates: string[] = [];
@@ -139,6 +147,16 @@ export class UsersService {
             values.push(params.avatar);
         }
 
+        if (params.documentType !== undefined) {
+            updates.push(`document_type = $${placeholderIndex++}`);
+            values.push(params.documentType);
+        }
+
+        if (params.documentNumber !== undefined) {
+            updates.push(`document_number = $${placeholderIndex++}`);
+            values.push(params.documentNumber);
+        }
+
         if (updates.length === 0) {
             const existingUser = await this.findById(userId);
             if (!existingUser) {
@@ -154,7 +172,7 @@ export class UsersService {
             `UPDATE users
             SET ${updates.join(', ')}
             WHERE id = $${placeholderIndex}
-            RETURNING id, email, password_hash, firebase_uid, full_name, phone, avatar, role, created_at, updated_at`,
+            RETURNING id, email, password_hash, firebase_uid, full_name, phone, avatar, role, document_type, document_number, created_at, updated_at`,
             values,
         );
 
@@ -178,10 +196,10 @@ export class UsersService {
     async updateFirebaseInfo(userId: string, firebaseUid: string, avatarUrl?: string): Promise<UserEntity> {
         const updates: string[] = ['firebase_uid = $2'];
         const values: unknown[] = [userId, firebaseUid];
-        const placeholderIndex = 3;
+        let placeholderIndex = 3;
 
         if (avatarUrl) {
-            updates.push(`avatar = $${placeholderIndex}`);
+            updates.push(`avatar = $${placeholderIndex++}`);
             values.push(avatarUrl);
         }
 
@@ -191,13 +209,62 @@ export class UsersService {
             `UPDATE users
              SET ${updates.join(', ')}
              WHERE id = $1
-             RETURNING id, email, password_hash, firebase_uid, full_name, phone, avatar, role, created_at, updated_at`,
+             RETURNING id, email, password_hash, firebase_uid, full_name, phone, avatar, role, document_type, document_number, created_at, updated_at`,
             values,
         );
 
         if (result.rowCount === 0) {
             throw new NotFoundException('User not found');
         }
+
+        return this.mapRowToEntity(result.rows[0]);
+    }
+
+    async updateGoogleInfo(userId: string, params: {
+        firebaseUid: string;
+        avatar?: string | null;
+        fullName?: string | null;
+        phone?: string | null;
+    }): Promise<UserEntity> {
+        const updates: string[] = ['firebase_uid = $2'];
+        const values: unknown[] = [userId, params.firebaseUid];
+        let placeholderIndex = 3;
+
+        if (params.avatar) {
+            updates.push(`avatar = $${placeholderIndex++}`);
+            values.push(params.avatar);
+        }
+
+        if (params.fullName) {
+            updates.push(`full_name = $${placeholderIndex++}`);
+            values.push(params.fullName);
+        }
+
+        if (params.phone) {
+            updates.push(`phone = $${placeholderIndex++}`);
+            values.push(params.phone);
+        }
+
+        updates.push(`updated_at = now()`);
+
+        const result = await this.db.query<UserRow>(
+            `UPDATE users
+             SET ${updates.join(', ')}
+             WHERE id = $1
+             RETURNING id, email, password_hash, firebase_uid, full_name, phone, avatar, role, document_type, document_number, created_at, updated_at`,
+            values,
+        );
+
+        if (result.rowCount === 0) {
+            throw new NotFoundException('User not found');
+        }
+
+        this.logger.logBusinessEvent('user_google_info_updated', {
+            userId,
+            hasAvatar: !!params.avatar,
+            hasFullName: !!params.fullName,
+            hasPhone: !!params.phone,
+        });
 
         return this.mapRowToEntity(result.rows[0]);
     }
@@ -246,6 +313,8 @@ export class UsersService {
             phone: row.phone,
             avatar: row.avatar,
             role: row.role as UserEntity['role'],
+            documentType: row.document_type,
+            documentNumber: row.document_number,
             createdAt: row.created_at,
             updatedAt: row.updated_at,
         };

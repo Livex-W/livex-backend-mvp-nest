@@ -1,5 +1,8 @@
 import { Transform } from 'class-transformer';
-import { IsEmail, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsEmail, IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
+
+const DOCUMENT_TYPES = ['CC', 'CE', 'TI', 'PPT', 'NIT', 'PASSPORT', 'FOREIGN_ID'] as const;
+type DocumentType = typeof DOCUMENT_TYPES[number];
 
 export class UpdateProfileDto {
   @IsOptional()
@@ -19,4 +22,16 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsString()
   avatar?: string;
+
+  @IsOptional()
+  @IsEnum(DOCUMENT_TYPES, {
+    message: `Document type must be one of: ${DOCUMENT_TYPES.join(', ')}`,
+  })
+  documentType?: DocumentType;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  documentNumber?: string;
 }
+

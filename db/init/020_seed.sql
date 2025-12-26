@@ -1,19 +1,100 @@
+-- ====================================================================================
+-- LIVEX SEED DATA - COMPLETE & ORGANIZED
+-- FECHA: Diciembre 2025
+-- ====================================================================================
+
 -- ===========================
--- LIVEX MVP seed data (full, FIX enum casts)
+-- BLOQUE 1: DATOS ESTRUCTURALES (Core)
+-- Usuarios, Resorts, Documentos, Categorías, Experiencias, Imágenes y Ubicaciones
 -- ===========================
 
--- 1) Usuarios base (admin + operadores)
+-- 1. Usuarios Base (Admin, Operadores, Turista)
 WITH u AS (
-  INSERT INTO users (email, password_hash, full_name, phone, role) VALUES
-    ('admin@livex.app', '$2b$10$j54QekkMZucJ.hKpcRMmqe4SnETnpr.8OxLyRfAZVLnSVkBgP4eFS','Admin Livex', '+573000000000', 'admin'),
-    ('operaciones@marysol.co', '$2b$10$5eTgOS5SOy7P1E/xsB4kBuUTTfEstsU4fM2wNhKGiHWp/HXl2cQ2.','Operaciones Mar y Sol', '+573001111111', 'resort'),
-    ('coordinacion@islabrisa.co', '$2b$10$xo422QzD1EzJGyZw4ZX.uOGPhvH1O/AcZqGXiLXekrQxQWIrfmtB6','Coordinación Isla Brisa', '+573002222222', 'resort'),
-    ('reservas@nauticabahia.co', '$2b$10$spwKr.1mndnqnkr1I4Y/keuLEUKmJ/AXvvTKvv9Jo.EwSdZIVe8Le','Reservas Náutica Bahía', '+573003333333', 'resort'),
-    ('sofia.turista@gmail.com', '$2b$10$2ll7SeL6f3FtaB1l3FYWiOoOBLxSousw97M2bDrBxqk9cxQiqOLnC','Sofía Turista', '+573004444444', 'tourist')
+  INSERT INTO users (email, password_hash, full_name, phone, role, document_type, document_number) VALUES
+    -- 1. ADMIN DEL SISTEMA
+    ('admin@livex.app', 
+     '$2b$10$j54QekkMZucJ.hKpcRMmqe4SnETnpr.8OxLyRfAZVLnSVkBgP4eFS', 
+     'Admin Livex', 
+     '+573000000000', 
+     'admin', 
+     'CC', '1000000001'),
+
+    -- 2. RESORTS / OPERADORES
+    ('operaciones@marysol.co', 
+     '$2b$10$5eTgOS5SOy7P1E/xsB4kBuUTTfEstsU4fM2wNhKGiHWp/HXl2cQ2.', 
+     'Operaciones Mar y Sol', 
+     '+573011111111', 
+     'resort', 
+     'NIT', '900111222'),
+     
+    ('coordinacion@islabrisa.co', 
+     '$2b$10$xo422QzD1EzJGyZw4ZX.uOGPhvH1O/AcZqGXiLXekrQxQWIrfmtB6', 
+     'Coordinación Isla Brisa', 
+     '+573022222222', 
+     'resort', 
+     'NIT', '900333444'),
+     
+    ('reservas@nauticabahia.co', 
+     '$2b$10$spwKr.1mndnqnkr1I4Y/keuLEUKmJ/AXvvTKvv9Jo.EwSdZIVe8Le', 
+     'Reservas Náutica Bahía', 
+     '+573033333333', 
+     'resort', 
+     'NIT', '900555666'),
+
+    -- 3. AGENTE DE VENTAS (Nuevo)
+    ('carlos.ventas@livex.app', 
+     '$2b$10$2ll7SeL6f3FtaB1l3FYWiOoOBLxSousw97M2bDrBxqk9cxQiqOLnC', -- Hash genérico
+     'Carlos El Vendedor', 
+     '+573109998877', 
+     'agent', 
+     'CC', '72345678'),
+
+    -- 4. TURISTAS (Variedad de Documentos)
+    
+    -- Turista Local (CC)
+    ('sofia.turista@gmail.com', 
+     '$2b$10$2ll7SeL6f3FtaB1l3FYWiOoOBLxSousw97M2bDrBxqk9cxQiqOLnC', 
+     'Sofía Turista', 
+     '+573154444444', 
+     'tourist', 
+     'CC', '1045678901'),
+
+    -- Turista Extranjero USA (PASSPORT)
+    ('john.doe@usmail.com', 
+     '$2b$10$2ll7SeL6f3FtaB1l3FYWiOoOBLxSousw97M2bDrBxqk9cxQiqOLnC', 
+     'John Doe', 
+     '+13055551234', 
+     'tourist', 
+     'PASSPORT', 'A12345678'),
+
+    -- Turista Brasilero (FOREIGN_ID / DNI)
+    ('lucia.silva@uol.com.br', 
+     '$2b$10$2ll7SeL6f3FtaB1l3FYWiOoOBLxSousw97M2bDrBxqk9cxQiqOLnC', 
+     'Lucia Silva', 
+     '+551199998888', 
+     'tourist', 
+     'FOREIGN_ID', 'MG1234567'),
+
+    -- Residente Extranjero en Colombia (CE)
+    ('pierre.frances@gmail.com', 
+     '$2b$10$2ll7SeL6f3FtaB1l3FYWiOoOBLxSousw97M2bDrBxqk9cxQiqOLnC', 
+     'Pierre Dubois', 
+     '+573205556677', 
+     'tourist', 
+     'CE', '887766'),
+
+    -- Migrante con Permiso (PPT)
+    ('jose.perez@email.com', 
+     '$2b$10$2ll7SeL6f3FtaB1l3FYWiOoOBLxSousw97M2bDrBxqk9cxQiqOLnC', 
+     'José Pérez', 
+     '+573041234567', 
+     'tourist', 
+     'PPT', '99887766')
+
   RETURNING id, email, role
 ),
 
--- 2) Prestadores (resorts) aprobados por el admin
+-- 2. Prestadores (Resorts)
 r AS (
   INSERT INTO resorts (
     name, description, contact_email, contact_phone,
@@ -40,7 +121,7 @@ r AS (
   RETURNING id, name
 ),
 
--- 3) KYC básico: cuenta bancaria principal por prestador
+-- 3. KYC Financiero (Cuentas Bancarias)
 bank AS (
   INSERT INTO resort_bank_info (resort_id, bank_name, account_holder, account_number, account_type, tax_id, is_primary)
   VALUES
@@ -50,7 +131,7 @@ bank AS (
   RETURNING resort_id
 ),
 
--- 4) KYC: documentos (marcados aprobados)
+-- 4. Documentos Legales
 docs AS (
   INSERT INTO resort_documents (resort_id, doc_type, file_url, status, reviewed_by, reviewed_at)
   VALUES
@@ -60,7 +141,7 @@ docs AS (
   RETURNING resort_id
 ),
 
--- 5) Catálogo: categorías normalizadas
+-- 5. Categorías
 c AS (
   INSERT INTO categories (slug, name) VALUES
     ('city_tour','City Tour'),
@@ -69,29 +150,53 @@ c AS (
   RETURNING id, slug
 ),
 
--- 6) Experiencias (con category = slug; status activo y aprobadas)
+-- 6. Experiencias
 e AS (
   INSERT INTO experiences (
     resort_id, title, description, category, price_cents, currency,
     includes, excludes, main_image_url, status, approved_by, approved_at
   )
   VALUES
+    -- 1. City Tour (Imagen: Calle colonial clásica con balcones y flores - Cartagena Vibe)
     ((SELECT id FROM r WHERE name='Mar y Sol Cartagena'),
       'City Tour Histórico', 'Recorrido por el Centro Histórico y Getsemaní', 'city_tour', 1200, 'USD',
-      'Guía certificado, hidratación', 'Almuerzo', 'https://images.unsplash.com/photo-1583531172005-893e7e366d3f?w=800', 'active'::experience_status,
+      'Guía certificado, hidratación', 'Almuerzo', 'https://images.unsplash.com/photo-1536308037887-165852797016?w=800', 'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
+      
+    -- 2. Islas del Rosario (Existente)
     ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
       'Full Day Islas del Rosario', 'Traslado en lancha y día de playa en Isla Brisa', 'islands', 2500, 'USD',
       'Traslados, coctel de bienvenida, carpa', 'Impuesto de muelle', 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800', 'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
+      
+    -- 3. Sunset Sailing (Existente)
     ((SELECT id FROM r WHERE name='Náutica Bahía Club'),
       'Sunset Sailing', 'Navegación a vela por la Bahía al atardecer', 'nautical', 1800, 'USD',
       'Capitán, seguro, snacks', 'Traslados al muelle', 'https://images.unsplash.com/photo-1500514966906-fe245eea9344?w=800', 'active'::experience_status,
+      (SELECT id FROM u WHERE email='admin@livex.app'), now()),
+
+    -- 4. NUEVA: Cholón Party (Imagen: Grupo de amigos en bote, agua turquesa - Party Vibe)
+    ((SELECT id FROM r WHERE name='Náutica Bahía Club'),
+      'Fiesta en Bote Deportivo Cholón', 'Experiencia de fiesta en el agua con música y amigos', 'nautical', 4500, 'USD',
+      'Bote deportivo, capitán, nevera con hielo', 'Bebidas alcohólicas, comida', 'https://images.unsplash.com/photo-1520116468816-95b69f847357?w=800', 'active'::experience_status,
+      (SELECT id FROM u WHERE email='admin@livex.app'), now()),
+
+    -- 5. NUEVA: Tour Gastronómico (Existente)
+    ((SELECT id FROM r WHERE name='Mar y Sol Cartagena'),
+      'Street Food Tour Getsemaní', 'Prueba las mejores arepas, fritos y frutas locales', 'city_tour', 3500, 'USD',
+      'Degustaciones en 5 paradas, guía local', 'Transporte al punto de encuentro', 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800', 'active'::experience_status,
+      (SELECT id FROM u WHERE email='admin@livex.app'), now()),
+
+    -- 6. NUEVA: Beach Club Tierra Bomba (Imagen: Piscina frente al mar estilo club de playa)
+    ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
+      'Relax Day Tierra Bomba', 'Día de piscina y playa frente a la ciudad', 'islands', 5500, 'USD',
+      'Transporte en lancha, bono consumible', 'Toallas', 'https://images.unsplash.com/photo-1540206351-d6465b3ac5c1?w=800', 'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now())
+
   RETURNING id, title, category, resort_id
 ),
 
--- 7) Relación experiencia↔categorías (M:N)
+-- 7) Relación M:N (Categorías - Automático)
 ec AS (
   INSERT INTO experience_categories (experience_id, category_id)
   SELECT e.id, c.id
@@ -100,55 +205,64 @@ ec AS (
   RETURNING experience_id
 ),
 
--- 8) Imágenes de experiencias
+-- 8) Imágenes de Experiencias (Ampliado)
 imgs AS (
   INSERT INTO experience_images (experience_id, url, sort_order) VALUES
-    -- City Tour Histórico - imágenes de arquitectura colonial y calles
+    -- City Tour Histórico
     ((SELECT id FROM e WHERE title='City Tour Histórico'), 'https://images.unsplash.com/photo-1583531172005-893e7e366d3f?w=800', 0),
     ((SELECT id FROM e WHERE title='City Tour Histórico'), 'https://images.unsplash.com/photo-1578632292335-df3abbb0d586?w=800', 1),
-    ((SELECT id FROM e WHERE title='City Tour Histórico'), 'https://images.unsplash.com/photo-1564594736624-def7a10ab047?w=800', 2),
-    -- Full Day Islas del Rosario - imágenes de playa y mar
+    
+    -- Full Day Islas
     ((SELECT id FROM e WHERE title='Full Day Islas del Rosario'), 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800', 0),
     ((SELECT id FROM e WHERE title='Full Day Islas del Rosario'), 'https://images.unsplash.com/photo-1519046904884-53103b34b206?w=800', 1),
-    ((SELECT id FROM e WHERE title='Full Day Islas del Rosario'), 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800', 2),
-    -- Sunset Sailing - imágenes de veleros y atardecer
+    
+    -- Sunset Sailing
     ((SELECT id FROM e WHERE title='Sunset Sailing'), 'https://images.unsplash.com/photo-1500514966906-fe245eea9344?w=800', 0),
     ((SELECT id FROM e WHERE title='Sunset Sailing'), 'https://images.unsplash.com/photo-1540946485063-a40da27545f8?w=800', 1),
-    ((SELECT id FROM e WHERE title='Sunset Sailing'), 'https://images.unsplash.com/photo-1534224039826-c7a0eda0e6b3?w=800', 2)
+
+    -- NUEVO: Cholón Party
+    ((SELECT id FROM e WHERE title='Fiesta en Bote Deportivo Cholón'), 'https://images.unsplash.com/photo-1566412435010-b747372c0506?w=800', 0),
+    ((SELECT id FROM e WHERE title='Fiesta en Bote Deportivo Cholón'), 'https://images.unsplash.com/photo-1544551763-46a42a4571da?w=800', 1),
+    
+    -- NUEVO: Street Food Tour
+    ((SELECT id FROM e WHERE title='Street Food Tour Getsemaní'), 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800', 0),
+    ((SELECT id FROM e WHERE title='Street Food Tour Getsemaní'), 'https://images.unsplash.com/photo-1626202162624-9b578c7c9800?w=800', 1),
+    
+    -- NUEVO: Tierra Bomba
+    ((SELECT id FROM e WHERE title='Relax Day Tierra Bomba'), 'https://images.unsplash.com/photo-1573046738959-1e35593f0b24?w=800', 0),
+    ((SELECT id FROM e WHERE title='Relax Day Tierra Bomba'), 'https://images.unsplash.com/photo-1596436889106-be35e843f974?w=800', 1)
+
   RETURNING experience_id
 ),
 
--- 9) Ubicaciones/puntos de encuentro
+-- 9) Ubicaciones (Ampliado)
 loc AS (
   INSERT INTO experience_locations (experience_id, name, address_line, latitude, longitude, meeting_instructions)
   VALUES
-    ((SELECT id FROM e WHERE title='City Tour Histórico'),
-      'Monumento Camellón de los Mártires', 'Camellón de los Mártires, Centro', 10.422300, -75.545500,
-      'Llegar 10 min antes. Busca al guía con sombrero vueltiao.'),
-    ((SELECT id FROM e WHERE title='Full Day Islas del Rosario'),
-      'Muelle La Bodeguita', 'Av. Blas de Lezo, Centro', 10.421900, -75.548300,
-      'Impuesto de muelle no incluido. Presentar documento.'),
-    ((SELECT id FROM e WHERE title='Sunset Sailing'),
-      'Marina Santa Cruz', 'Manga, Cartagena', 10.409800, -75.535100,
-      'Ingresar por portería principal, muelle 3.')
+    -- Existentes
+    ((SELECT id FROM e WHERE title='City Tour Histórico'), 'Monumento Camellón de los Mártires', 'Camellón de los Mártires, Centro', 10.422300, -75.545500, 'Llegar 10 min antes. Busca al guía con sombrero vueltiao.'),
+    ((SELECT id FROM e WHERE title='Full Day Islas del Rosario'), 'Muelle La Bodeguita', 'Av. Blas de Lezo, Centro', 10.421900, -75.548300, 'Impuesto de muelle no incluido. Presentar documento.'),
+    ((SELECT id FROM e WHERE title='Sunset Sailing'), 'Marina Santa Cruz', 'Manga, Cartagena', 10.409800, -75.535100, 'Ingresar por portería principal, muelle 3.'),
+    
+    -- Nuevas
+    ((SELECT id FROM e WHERE title='Fiesta en Bote Deportivo Cholón'), 'Muelle de los Pegasos', 'Centro Histórico, muelle lateral', 10.420500, -75.546000, 'Preguntar por el bote "La Fantástica".'),
+    ((SELECT id FROM e WHERE title='Street Food Tour Getsemaní'), 'Plaza de la Trinidad', 'Getsemaní, frente a la iglesia', 10.419500, -75.542000, 'El guía lleva camiseta naranja de Livex.'),
+    ((SELECT id FROM e WHERE title='Relax Day Tierra Bomba'), 'Muelle Hospital Bocagrande', 'Cra 1, Bocagrande', 10.398000, -75.556000, 'Lancha sale cada 30 minutos.')
+
   RETURNING experience_id
 )
+SELECT count(*) as core_data_inserted FROM u;
 
--- 10) Disponibilidad (slots)
-INSERT INTO availability_slots (experience_id, start_time, end_time, capacity)
-VALUES
-  ((SELECT id FROM e WHERE title='City Tour Histórico'),
-    '2025-09-20T09:00:00-05', '2025-09-20T12:00:00-05', 20),
-  ((SELECT id FROM e WHERE title='City Tour Histórico'),
-    '2025-09-20T15:00:00-05', '2025-09-20T18:00:00-05', 20),
-  ((SELECT id FROM e WHERE title='Full Day Islas del Rosario'),
-    '2025-09-20T08:00:00-05', '2025-09-20T16:00:00-05', 40),
-  ((SELECT id FROM e WHERE title='Sunset Sailing'),
-    '2025-09-21T17:30:00-05', '2025-09-21T19:30:00-05', 10),
-  ((SELECT id FROM e WHERE title='Sunset Sailing'),
-    '2025-09-22T17:30:00-05', '2025-09-22T19:30:00-05', 10);
+-- Update para asegurar tipo de imagen
+UPDATE experience_images SET image_type = 'gallery' WHERE image_type IS NULL;
 
--- 10.1) Generación masiva de slots (15 días desde Dec 22, 2025)
+
+-- ===========================
+-- BLOQUE 2: DISPONIBILIDAD (Slots) - GENERACIÓN MASIVA
+-- ===========================
+
+-- Generación masiva (15 días desde Diciembre 22, 2025)
+-- Se han añadido los 3 nuevos títulos al generador
 INSERT INTO availability_slots (experience_id, start_time, end_time, capacity)
 SELECT
   e.id,
@@ -163,58 +277,45 @@ FROM
       ('City Tour Histórico', '09:00:00'::time, '12:00:00'::time, 20),
       ('City Tour Histórico', '15:00:00'::time, '18:00:00'::time, 20),
       ('Full Day Islas del Rosario', '08:00:00'::time, '16:00:00'::time, 40),
-      ('Sunset Sailing', '17:30:00'::time, '19:30:00'::time, 10)
+      ('Sunset Sailing', '17:30:00'::time, '19:30:00'::time, 10),
+      
+      -- Datos de disponibilidad para las NUEVAS experiencias
+      ('Fiesta en Bote Deportivo Cholón', '10:00:00'::time, '16:00:00'::time, 12),
+      ('Street Food Tour Getsemaní', '17:00:00'::time, '19:30:00'::time, 15),
+      ('Relax Day Tierra Bomba', '09:00:00'::time, '17:00:00'::time, 30)
   ) AS t(title, start_time, end_time, capacity) ON e.title = t.title;
 
--- (Opcional de prueba rápida) Una reserva confirmada con impuestos y comisión calculada
--- Descomenta si quieres datos operativos para probar pagos/payouts.
 
--- WITH b AS (
---   INSERT INTO bookings (user_id, experience_id, slot_id, adults, children, subtotal_cents, tax_cents, total_cents, currency, status)
---   VALUES (
---     (SELECT id FROM users WHERE email='sofia.turista@gmail.com'),
---     (SELECT id FROM e WHERE title='City Tour Histórico'),
---     (SELECT id FROM availability_slots WHERE experience_id=(SELECT id FROM e WHERE title='City Tour Histórico') LIMIT 1),
---     2, 0, 100000, 20000, 120000, 'COP', 'confirmed'::booking_status
---   )
---   RETURNING id
--- ),
--- pay AS (
---   INSERT INTO payments (booking_id, provider, provider_ref, amount_cents, status, paid_at, idempotency_key, signature_valid, payment_method)
---   VALUES ((SELECT id FROM b), 'fakepay', 'FP-0001', 120000, 'paid'::payment_status, now(), 'seed-ct-0001', true, 'card')
---   RETURNING booking_id
--- )
--- INSERT INTO commissions (booking_id, rate_bps, commission_cents, status)
--- VALUES ((SELECT id FROM b), 1000, 12000, 'accrued'::commission_status);
+-- ===========================
+-- BLOQUE 3: SOCIAL PROOF (Reseñas)
+-- ===========================
 
-UPDATE experience_images SET image_type = 'gallery' WHERE image_type IS NULL;
-
--- 11) Reseñas (Reviews) de prueba
 INSERT INTO reviews (user_id, experience_id, rating, comment, created_at)
 VALUES
+  -- Existentes
   ((SELECT id FROM users WHERE email='sofia.turista@gmail.com'),
-   (SELECT id FROM experiences WHERE title='City Tour Histórico'),
-   5, '¡Increíble experiencia! El guía fue muy amable y aprendí mucho sobre la historia de Cartagena.', now() - INTERVAL '2 days'),
+   (SELECT id FROM experiences WHERE title='City Tour Histórico'), 5, '¡Increíble experiencia! El guía fue muy amable.', now() - INTERVAL '2 days'),
   ((SELECT id FROM users WHERE email='sofia.turista@gmail.com'),
-   (SELECT id FROM experiences WHERE title='City Tour Histórico'),
-   4, 'Muy bonito todo, pero hizo mucho calor. Recomiendo llevar agua extra.', now() - INTERVAL '5 days'),
+   (SELECT id FROM experiences WHERE title='Full Day Islas del Rosario'), 5, 'El paraíso en la tierra.', now() - INTERVAL '1 week'),
+  
+  -- Nuevas Reseñas
   ((SELECT id FROM users WHERE email='sofia.turista@gmail.com'),
-   (SELECT id FROM experiences WHERE title='Full Day Islas del Rosario'),
-   5, 'El paraíso en la tierra. La comida deliciosa y el mar espectacular.', now() - INTERVAL '1 week'),
+   (SELECT id FROM experiences WHERE title='Fiesta en Bote Deportivo Cholón'), 5, '¡La mejor fiesta de mi vida! Muy recomendado ir con amigos.', now() - INTERVAL '1 day'),
   ((SELECT id FROM users WHERE email='sofia.turista@gmail.com'),
-   (SELECT id FROM experiences WHERE title='Sunset Sailing'),
-   5, 'Un atardecer mágico. Muy romántico y relajante.', now() - INTERVAL '3 days');
+   (SELECT id FROM experiences WHERE title='Street Food Tour Getsemaní'), 4, 'La comida deliciosa, pero hay que caminar bastante.', now() - INTERVAL '4 days'),
+  ((SELECT id FROM users WHERE email='sofia.turista@gmail.com'),
+   (SELECT id FROM experiences WHERE title='Relax Day Tierra Bomba'), 5, 'Un lugar muy exclusivo y tranquilo. El almuerzo estuvo 10/10.', now() - INTERVAL '6 days');
 
 -- ===========================
--- 12) DATOS DE PRUEBA SISTEMA DE AGENTES
+-- BLOQUE 4: SISTEMA DE AGENTES
+-- Creación de usuario agente, acuerdo comercial y simulación de venta
 -- ===========================
 
--- 11.1) Crear un usuario Agente
--- 11.1) Crear un usuario Agente
+-- 4.1 Crear Usuario Agente
 INSERT INTO users (email, password_hash, full_name, phone, role) 
 VALUES ('agente.carlos@gmail.com', '$2b$10$j54QekkMZucJ.hKpcRMmqe4SnETnpr.8OxLyRfAZVLnSVkBgP4eFS', 'Carlos El Vendedor', '+573005555555', 'agent');
 
--- 11.2) Crear Acuerdo: Carlos vende para "Mar y Sol Cartagena" con 15% (1500 bps)
+-- 4.2 Acuerdo Comercial (15% Comisión para Carlos con Mar y Sol)
 INSERT INTO resort_agents (resort_id, user_id, commission_bps, is_active)
 SELECT 
   (SELECT id FROM resorts WHERE name='Mar y Sol Cartagena'),
@@ -222,21 +323,29 @@ SELECT
   1500, -- 15%
   true;
 
--- 11.3) Crear una Reserva hecha por el Agente (Booking Confirmado)
+-- 4.3 Perfil Financiero del Agente
+INSERT INTO agent_profiles (
+  user_id, bank_name, account_number, account_type, account_holder_name, tax_id, is_verified
+)
+SELECT 
+  (SELECT id FROM users WHERE email='agente.carlos@gmail.com'),
+  'Bancolombia', '9876543210', 'savings', 'Carlos Vendedor', '1234567890', true;
+
+-- 4.4 Crear Reserva por Agente (Confirmada)
 INSERT INTO bookings (
   user_id, experience_id, slot_id, agent_id,
   adults, children, subtotal_cents, tax_cents, total_cents, currency, 
   status, created_at, updated_at
 )
 SELECT
-  (SELECT id FROM users WHERE email='sofia.turista@gmail.com'), -- El turista final
+  (SELECT id FROM users WHERE email='sofia.turista@gmail.com'), -- Turista
   (SELECT id FROM experiences WHERE title='City Tour Histórico'),
   (SELECT id FROM availability_slots WHERE experience_id=(SELECT id FROM experiences WHERE title='City Tour Histórico') LIMIT 1),
-  (SELECT id FROM users WHERE email='agente.carlos@gmail.com'), -- El agente Carlos
-  2, 0, 200000, 38000, 238000, 'USD', -- $238,000 COP Total
+  (SELECT id FROM users WHERE email='agente.carlos@gmail.com'), -- Agente
+  2, 0, 200000, 38000, 238000, 'USD', 
   'confirmed', now(), now();
 
--- 11.4) Registrar el Pago Exitoso
+-- 4.5 Registrar Pago
 INSERT INTO payments (
   booking_id, provider, provider_reference, amount_cents, currency, 
   status, payment_method, paid_at
@@ -247,14 +356,14 @@ SELECT
   238000, 'USD',
   'paid', 'card', now();
 
--- 11.5) Generar las Comisiones (Simulando lo que haría el backend)
--- Comisión Livex (10%)
+-- 4.6 Generar Comisiones
+-- A) Comisión de Plataforma (10%)
 INSERT INTO commissions (booking_id, rate_bps, commission_cents, created_at)
 SELECT
   (SELECT id FROM bookings WHERE user_id=(SELECT id FROM users WHERE email='sofia.turista@gmail.com') AND agent_id=(SELECT id FROM users WHERE email='agente.carlos@gmail.com') ORDER BY created_at DESC LIMIT 1),
   1000, FLOOR(238000 * 0.10), now();
 
--- Comisión Agente (15%)
+-- B) Comisión del Agente (15%)
 INSERT INTO agent_commissions (
   booking_id, agent_id, resort_id, amount_cents, rate_bps, status, created_at
 )
@@ -262,7 +371,7 @@ SELECT
   b.id, 
   b.agent_id, 
   (SELECT id FROM resorts WHERE name='Mar y Sol Cartagena'),
-  FLOOR(b.total_cents * 0.15), -- 15% de 238,000 = 35,700
+  FLOOR(b.total_cents * 0.15), -- 15% de 238,000
   1500,
   'pending',
   now()
@@ -271,140 +380,48 @@ WHERE b.user_id=(SELECT id FROM users WHERE email='sofia.turista@gmail.com')
   AND b.agent_id=(SELECT id FROM users WHERE email='agente.carlos@gmail.com')
 ORDER BY b.created_at DESC LIMIT 1;
 
--- 11.7) Completar Perfil del Agente (Datos Bancarios) - ÚLTIMO INSERT DEL WITH
-INSERT INTO agent_profiles (
-  user_id, bank_name, account_number, account_type, account_holder_name, tax_id, is_verified
-)
-SELECT 
-  (SELECT id FROM users WHERE email='agente.carlos@gmail.com'),
-  'Bancolombia',
-  '9876543210',
-  'savings',
-  'Carlos Vendedor',
-  '1234567890',
-  true;
-
 -- ===========================
--- FUERA DEL WITH: Códigos de Referido
+-- BLOQUE 5: MARKETING & REFERIDOS
+-- Códigos de descuento, tracking y reglas
 -- ===========================
 
--- 11.8) Código de comisión simple (solo trackea)
-INSERT INTO referral_codes (
-  owner_user_id, code, code_type, description
-)
-VALUES (
-  (SELECT id FROM users WHERE email='agente.carlos@gmail.com'),
-  'CARLOSVIP',
-  'commission',
-  'Código personal de Carlos - Solo tracking'
-);
+-- 5.1 Código Básico (Tracking)
+INSERT INTO referral_codes (owner_user_id, code, code_type, description)
+VALUES ((SELECT id FROM users WHERE email='agente.carlos@gmail.com'), 'CARLOSVIP', 'commission', 'Código personal de Carlos - Solo tracking');
 
--- 11.9) Código con descuento del 10% (10% = 1000 bps)
-INSERT INTO referral_codes (
-  owner_user_id, code, code_type, discount_type, discount_value, description
-)
-VALUES (
-  (SELECT id FROM users WHERE email='agente.carlos@gmail.com'),
-  'VERANO2025',
-  'both', -- Da descuento Y comisión
-  'percentage',
-  1000, -- 10%
-  'Promoción de verano - 10% de descuento'
-);
+-- 5.2 Código Mixto (Descuento 10% + Comisión)
+INSERT INTO referral_codes (owner_user_id, code, code_type, discount_type, discount_value, description)
+VALUES ((SELECT id FROM users WHERE email='agente.carlos@gmail.com'), 'VERANO2025', 'both', 'percentage', 1000, 'Promoción de verano - 10% de descuento');
 
--- 11.10) Código con descuento fijo de $20,000 COP
-INSERT INTO referral_codes (
-  owner_user_id, code, code_type, discount_type, discount_value, usage_limit, description
-)
-VALUES (
-  (SELECT id FROM users WHERE email='agente.carlos@gmail.com'),
-  'PRIMERACOMPRA',
-  'both',
-  'fixed',
-  2000000, -- $20,000 COP en centavos (20000 * 100)
-  50, -- Solo 50 usos
-  'Primera compra - $20,000 COP de descuento (limitado a 50 usos)'
-);
+-- 5.3 Código Monto Fijo
+INSERT INTO referral_codes (owner_user_id, code, code_type, discount_type, discount_value, usage_limit, description)
+VALUES ((SELECT id FROM users WHERE email='agente.carlos@gmail.com'), 'PRIMERACOMPRA', 'both', 'fixed', 2000000, 50, 'Primera compra - $20,000 COP de descuento');
 
--- 11.11) Restricciones: Código solo para Tours Náuticos
-INSERT INTO referral_code_restrictions (
-  referral_code_id, restriction_type, category_slug
-)
-VALUES (
-  (SELECT id FROM referral_codes WHERE code = 'VERANO2025'),
-  'category',
-  'nautical'
-);
+-- 5.4 Código con Stacking
+INSERT INTO referral_codes (owner_user_id, code, code_type, discount_type, discount_value, allow_stacking, min_purchase_cents, description)
+VALUES ((SELECT id FROM users WHERE email='agente.carlos@gmail.com'), 'EXTRA10', 'discount', 'percentage', 1000, true, 5000000, 'Extra 10% - Combinable');
 
--- 11.12) A/B Testing: Variante A - 15% descuento
-INSERT INTO referral_code_variants (
-  parent_code_id, variant_name, code, discount_value
-)
-VALUES (
-  (SELECT id FROM referral_codes WHERE code = 'VERANO2025'),
-  'Variant A - 15%',
-  'VERANO2025A',
-  1500  -- 15%
-);
+-- 5.5 Restricciones (Solo Náutica)
+INSERT INTO referral_code_restrictions (referral_code_id, restriction_type, category_slug)
+VALUES ((SELECT id FROM referral_codes WHERE code = 'VERANO2025'), 'category', 'nautical');
 
--- 11.13) A/B Testing: Variante B - 5% descuento
-INSERT INTO referral_code_variants (
-  parent_code_id, variant_name, code, discount_value
-)
-VALUES (
-  (SELECT id FROM referral_codes WHERE code = 'VERANO2025'),
-  'Variant B - 5%', 
-  'VERANO2025B',
-  500  -- 5%
-);
+-- 5.6 A/B Testing
+INSERT INTO referral_code_variants (parent_code_id, variant_name, code, discount_value)
+VALUES 
+  ((SELECT id FROM referral_codes WHERE code = 'VERANO2025'), 'Variant A - 15%', 'VERANO2025A', 1500),
+  ((SELECT id FROM referral_codes WHERE code = 'VERANO2025'), 'Variant B - 5%', 'VERANO2025B', 500);
 
--- 11.14) Código con Stacking permitido
-INSERT INTO referral_codes (
-  owner_user_id, code, code_type, discount_type, discount_value,
-  allow_stacking, min_purchase_cents, description
-)
-VALUES (
-  (SELECT id FROM users WHERE email='agente.carlos@gmail.com'),
-  'EXTRA10',
-  'discount',
-  'percentage',
-  1000,  -- 10%
-  true,  -- Permite combinarse con otros códigos
-  5000000,  -- Mínimo $50,000 COP (en centavos)
-  'Extra 10% - Combinable con otros códigos (mínimo $50,000 COP)'
-);
+-- ===========================
+-- BLOQUE 6: ÍNDICES Y OPTIMIZACIÓN
+-- ===========================
 
-CREATE INDEX IF NOT EXISTS idx_availability_slots_experience_date 
-ON availability_slots(experience_id, start_time, end_time);
+CREATE INDEX IF NOT EXISTS idx_availability_slots_experience_date ON availability_slots(experience_id, start_time, end_time);
+CREATE INDEX IF NOT EXISTS idx_availability_slots_date ON availability_slots(DATE(start_time AT TIME ZONE 'UTC'));
+CREATE INDEX IF NOT EXISTS idx_availability_slots_capacity ON availability_slots(capacity) WHERE capacity > 0;
+CREATE INDEX IF NOT EXISTS idx_bookings_active_slot ON bookings(slot_id, status) WHERE status IN ('pending', 'confirmed');
+CREATE INDEX IF NOT EXISTS idx_inventory_locks_active_detailed ON inventory_locks(slot_id, expires_at, consumed_at) WHERE consumed_at IS NULL;
 
--- Add index for date-based queries (for calendar views)
-CREATE INDEX IF NOT EXISTS idx_availability_slots_date 
-ON availability_slots(DATE(start_time AT TIME ZONE 'UTC'));
-
--- Add index for capacity filtering
-CREATE INDEX IF NOT EXISTS idx_availability_slots_capacity 
-ON availability_slots(capacity) WHERE capacity > 0;
-
--- Optimize the v_slot_remaining view with better indexing
--- Add index for active bookings
-CREATE INDEX IF NOT EXISTS idx_bookings_active_slot 
-ON bookings(slot_id, status) 
-WHERE status IN ('pending', 'confirmed');
-
--- Add index for inventory locks
-CREATE INDEX IF NOT EXISTS idx_inventory_locks_active_detailed 
-ON inventory_locks(slot_id, expires_at, consumed_at) 
-WHERE consumed_at IS NULL;
-
--- Add partial index for non-expired bookings
--- CREATE INDEX IF NOT EXISTS idx_bookings_non_expired 
--- ON bookings(slot_id, expires_at, status) 
--- WHERE expires_at IS NULL OR expires_at > now();
-
--- Add comment for documentation
+-- Comentarios de documentación
 COMMENT ON INDEX idx_availability_slots_experience_date IS 'Optimizes availability queries by experience and date range';
 COMMENT ON INDEX idx_availability_slots_date IS 'Optimizes calendar view queries by date';
-COMMENT ON INDEX idx_availability_slots_capacity IS 'Optimizes queries filtering by available capacity';
 COMMENT ON INDEX idx_bookings_active_slot IS 'Optimizes remaining capacity calculations for active bookings';
-COMMENT ON INDEX idx_inventory_locks_active_detailed IS 'Optimizes remaining capacity calculations for active locks';
--- COMMENT ON INDEX idx_bookings_non_expired IS 'Optimizes queries for non-expired bookings';

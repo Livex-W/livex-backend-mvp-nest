@@ -97,6 +97,8 @@ export class AuthService {
             fullName: dto.fullName,
             phone: dto.phone,
             avatar: dto.avatar,
+            documentType: dto.documentType,
+            documentNumber: dto.documentNumber,
             role: dto.role || 'tourist',
         });
 
@@ -151,6 +153,10 @@ export class AuthService {
         const firebaseUid = decodedToken.uid;
         const email = decodedToken.email;
 
+        // Prioritize DTO values (from client), fallback to token values
+        const name = dto.displayName || decodedToken.name || null;
+        const picture = dto.photoUrl || decodedToken.picture || null;
+
         if (!email) {
             throw new BadRequestException('Google account must have an email');
         }
@@ -161,18 +167,35 @@ export class AuthService {
             const existingUser = await this.usersService.findByEmail(email);
 
             if (existingUser) {
-                user = await this.usersService.updateFirebaseInfo(existingUser.id, firebaseUid, decodedToken.picture);
+                // Link existing account with Google data
+                user = await this.usersService.updateGoogleInfo(existingUser.id, {
+                    firebaseUid,
+                    avatar: existingUser.avatar || picture,
+                    fullName: existingUser.fullName || name,
+                    phone: existingUser.phone || dto.phone,
+                });
                 this.logger.logSecurityEvent('user_linked_google', { userId: user.id, email });
             } else {
+                // Create new user with all available Google data
                 user = await this.usersService.createUser({
                     email,
                     firebaseUid,
-                    fullName: decodedToken.name || null,
-                    avatar: decodedToken.picture || null,
+                    fullName: name,
+                    phone: dto.phone,
+                    avatar: picture,
                     role: 'tourist',
                 });
                 this.logger.logSecurityEvent('user_registered_google', { userId: user.id, email });
             }
+        } else if (!user.avatar || !user.fullName) {
+            // User exists but is missing some Google data, update it
+            user = await this.usersService.updateGoogleInfo(user.id, {
+                firebaseUid,
+                avatar: user.avatar || picture,
+                fullName: user.fullName || name,
+                phone: user.phone || dto.phone,
+            });
+            this.logger.logSecurityEvent('user_google_data_enriched', { userId: user.id, email });
         }
 
         return this.issueAuthResult(user, context, { rotateFromJti: null });
