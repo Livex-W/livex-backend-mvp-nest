@@ -50,6 +50,7 @@ export class ExperiencesService {
       description,
       category,
       price_cents,
+      commission_cents,
       currency,
       includes,
       excludes,
@@ -60,9 +61,9 @@ export class ExperiencesService {
     try {
       const result = await this.db.query<Experience>(
         `INSERT INTO experiences (
-          resort_id, title, description, category, price_cents, currency,
+          resort_id, title, description, category, price_cents, commission_cents, currency,
           includes, excludes, main_image_url, status
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) 
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) 
         RETURNING *`,
         [
           resort_id,
@@ -70,6 +71,7 @@ export class ExperiencesService {
           description,
           category,
           price_cents,
+          commission_cents ?? 0,
           currency,
           includes,
           excludes,

@@ -17,8 +17,16 @@ import type { PaginatedResult, PaginationMeta } from '../common/interfaces/pagin
 import type { PaginationDto } from '../common/dto/pagination.dto';
 import type { BookingWithDetailsDto } from './dto/booking-with-details.dto';
 import { PaymentsService } from '../payments/payments.service';
+import type {
+  Booking,
+  ConfirmBookingOptions,
+  CancelBookingOptions,
+  ExpireBookingsResult
+} from './entities/booking.entity';
+import type { PendingBookingResultDto } from './dto/pending-booking.dto';
 
-
+// Re-export for backwards compatibility
+export type PendingBookingResult = PendingBookingResultDto;
 
 interface CreatePendingBookingInput {
   dto: CreateBookingDto;
@@ -27,54 +35,6 @@ interface CreatePendingBookingInput {
   requestId?: string;
   acceptLanguage?: string;
   timeZone?: string;
-}
-
-export interface PendingBookingResult {
-  bookingId: string;
-  lockId: string;
-  status: 'pending';
-  expiresAt: string;
-  slotId: string;
-  experienceId: string;
-  totalCents: number;
-  subtotalCents: number;
-  taxCents: number;
-  currency: string;
-}
-
-interface ConfirmBookingOptions {
-  bookingId: string;
-  confirmedAt?: Date;
-}
-
-interface CancelBookingOptions {
-  bookingId: string;
-  reason?: string;
-  cancelledAt?: Date;
-}
-interface Booking {
-  id: string;
-  user_id: string;
-  experience_id: string;
-  slot_id: string;
-  adults: number;
-  children: number;
-  subtotal_cents: number;
-  tax_cents: number;
-  total_cents: number;
-  currency: string;
-  status: string;
-  expires_at?: Date;
-  cancel_reason?: string;
-  idempotency_key?: string;
-  agent_id?: string;
-  referral_code_id?: string;
-  created_at: Date;
-  updated_at: Date;
-}
-
-interface ExpireBookingsResult {
-  expired: number;
 }
 
 @Injectable()
@@ -202,7 +162,9 @@ export class BookingsService {
           experienceId: dto.experienceId,
           subtotalCents: dto.subtotalCents,
           taxCents: dto.taxCents,
-          totalCents: dto.subtotalCents + dto.taxCents,
+          commissionCents: dto.commissionCents,
+          resortNetCents: dto.resortNetCents,
+          totalCents: dto.commissionCents + dto.resortNetCents,
           currency: dto.currency,
         } satisfies PendingBookingResult;
       });
@@ -590,6 +552,9 @@ export class BookingsService {
     }
 
     try {
+      // Total = commission (online) + resort net (presencial)
+      const actualTotalCents = params.dto.commissionCents + params.dto.resortNetCents;
+
       const bookingInsert = await client.query<{ id: string }>(
         `INSERT INTO bookings (
           user_id,
@@ -599,6 +564,8 @@ export class BookingsService {
           children,
           subtotal_cents,
           tax_cents,
+          commission_cents,
+          resort_net_cents,
           total_cents,
           currency,
           status,
@@ -606,7 +573,7 @@ export class BookingsService {
           idempotency_key,
           agent_id,
           referral_code_id
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'pending',$10,$11,$12,$13)
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'pending',$12,$13,$14,$15)
         RETURNING id`,
         [
           params.userId,
@@ -616,7 +583,9 @@ export class BookingsService {
           params.dto.children ?? 0,
           params.dto.subtotalCents,
           params.dto.taxCents,
-          totalCents,
+          params.dto.commissionCents,
+          params.dto.resortNetCents,
+          actualTotalCents,
           params.dto.currency,
           params.expiresAt,
           params.idempotencyKey ?? null,

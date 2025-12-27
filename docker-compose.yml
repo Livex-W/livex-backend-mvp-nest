@@ -66,18 +66,16 @@ services:
     image: mcr.microsoft.com/azure-storage/azurite
     container_name: livex_azurite
     profiles: ["dev"]
-    command: "azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0"
+    environment:
+      - AZURITE_DISABLE_TELEMETRY=true
+    command: "azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --disableProductStyleUrl"
     ports:
       - "10000:10000" # Blob
       - "10001:10001" # Queue
     volumes:
       - azurite_data:/data
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "wget -qO- http://127.0.0.1:10000/ >/dev/null 2>&1 || exit 1",
-        ]
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 10000 || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -256,3 +254,6 @@ networks:
   livex_net:
     name: livex_network
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.25.0.0/16

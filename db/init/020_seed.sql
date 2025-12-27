@@ -153,43 +153,49 @@ c AS (
 -- 6. Experiencias
 e AS (
   INSERT INTO experiences (
-    resort_id, title, description, category, price_cents, currency,
+    resort_id, title, description, category, price_cents, commission_cents, currency,
     includes, excludes, main_image_url, status, approved_by, approved_at
   )
   VALUES
     -- 1. City Tour (Imagen: Calle colonial clásica con balcones y flores - Cartagena Vibe)
+    -- price_cents = $120 neto resort (pago presencial), commission_cents = $30 (pago online)
     ((SELECT id FROM r WHERE name='Mar y Sol Cartagena'),
-      'City Tour Histórico', 'Recorrido por el Centro Histórico y Getsemaní', 'city_tour', 1200, 'USD',
+      'City Tour Histórico', 'Recorrido por el Centro Histórico y Getsemaní', 'city_tour', 12000, 3000, 'USD',
       'Guía certificado, hidratación', 'Almuerzo', 'https://images.unsplash.com/photo-1536308037887-165852797016?w=800', 'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
       
     -- 2. Islas del Rosario (Existente)
+    -- price_cents = $250 neto resort, commission_cents = $50 (pago online)
     ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
-      'Full Day Islas del Rosario', 'Traslado en lancha y día de playa en Isla Brisa', 'islands', 2500, 'USD',
+      'Full Day Islas del Rosario', 'Traslado en lancha y día de playa en Isla Brisa', 'islands', 25000, 5000, 'USD',
       'Traslados, coctel de bienvenida, carpa', 'Impuesto de muelle', 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800', 'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
       
     -- 3. Sunset Sailing (Existente)
+    -- price_cents = $180 neto resort, commission_cents = $40 (pago online)
     ((SELECT id FROM r WHERE name='Náutica Bahía Club'),
-      'Sunset Sailing', 'Navegación a vela por la Bahía al atardecer', 'nautical', 1800, 'USD',
+      'Sunset Sailing', 'Navegación a vela por la Bahía al atardecer', 'nautical', 18000, 4000, 'USD',
       'Capitán, seguro, snacks', 'Traslados al muelle', 'https://images.unsplash.com/photo-1500514966906-fe245eea9344?w=800', 'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
     -- 4. NUEVA: Cholón Party (Imagen: Grupo de amigos en bote, agua turquesa - Party Vibe)
+    -- price_cents = $450 neto resort, commission_cents = $80 (pago online)
     ((SELECT id FROM r WHERE name='Náutica Bahía Club'),
-      'Fiesta en Bote Deportivo Cholón', 'Experiencia de fiesta en el agua con música y amigos', 'nautical', 4500, 'USD',
+      'Fiesta en Bote Deportivo Cholón', 'Experiencia de fiesta en el agua con música y amigos', 'nautical', 45000, 8000, 'USD',
       'Bote deportivo, capitán, nevera con hielo', 'Bebidas alcohólicas, comida', 'https://images.unsplash.com/photo-1520116468816-95b69f847357?w=800', 'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
     -- 5. NUEVA: Tour Gastronómico (Existente)
+    -- price_cents = $350 neto resort, commission_cents = $60 (pago online)
     ((SELECT id FROM r WHERE name='Mar y Sol Cartagena'),
-      'Street Food Tour Getsemaní', 'Prueba las mejores arepas, fritos y frutas locales', 'city_tour', 3500, 'USD',
+      'Street Food Tour Getsemaní', 'Prueba las mejores arepas, fritos y frutas locales', 'city_tour', 35000, 6000, 'USD',
       'Degustaciones en 5 paradas, guía local', 'Transporte al punto de encuentro', 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800', 'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
     -- 6. NUEVA: Beach Club Tierra Bomba (Imagen: Piscina frente al mar estilo club de playa)
+    -- price_cents = $550 neto resort, commission_cents = $100 (pago online)
     ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
-      'Relax Day Tierra Bomba', 'Día de piscina y playa frente a la ciudad', 'islands', 5500, 'USD',
+      'Relax Day Tierra Bomba', 'Día de piscina y playa frente a la ciudad', 'islands', 55000, 10000, 'USD',
       'Transporte en lancha, bono consumible', 'Toallas', 'https://images.unsplash.com/photo-1540206351-d6465b3ac5c1?w=800', 'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now())
 
@@ -332,9 +338,10 @@ SELECT
   'Bancolombia', '9876543210', 'savings', 'Carlos Vendedor', '1234567890', true;
 
 -- 4.4 Crear Reserva por Agente (Confirmada)
+-- Usando el nuevo modelo: commission_cents = pago online, resort_net_cents = pago presencial
 INSERT INTO bookings (
   user_id, experience_id, slot_id, agent_id,
-  adults, children, subtotal_cents, tax_cents, total_cents, currency, 
+  adults, children, subtotal_cents, tax_cents, commission_cents, resort_net_cents, total_cents, currency, 
   status, created_at, updated_at
 )
 SELECT
@@ -342,7 +349,7 @@ SELECT
   (SELECT id FROM experiences WHERE title='City Tour Histórico'),
   (SELECT id FROM availability_slots WHERE experience_id=(SELECT id FROM experiences WHERE title='City Tour Histórico') LIMIT 1),
   (SELECT id FROM users WHERE email='agente.carlos@gmail.com'), -- Agente
-  2, 0, 200000, 38000, 238000, 'USD', 
+  2, 0, 24000, 0, 6000, 24000, 30000, 'USD',  -- 2 personas × ($120 neto + $30 comisión) = $300 total, $60 comisión
   'confirmed', now(), now();
 
 -- 4.5 Registrar Pago

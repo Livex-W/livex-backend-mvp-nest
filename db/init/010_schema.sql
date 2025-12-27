@@ -1,6 +1,6 @@
 -- ====================================================================================
 -- LIVEX MVP - MASTER SCHEMA (DDL)
--- Organized & Deduplicated
+-- Version: Final Integrated (No ALTER statements)
 -- ====================================================================================
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
@@ -228,9 +228,11 @@ CREATE TABLE IF NOT EXISTS experiences (
   description     text,
   category        text NOT NULL CHECK (category IN ('islands','nautical','city_tour')),
   
-  -- Precios
-  price_cents     integer NOT NULL CHECK (price_cents >= 0),
-  currency        text NOT NULL DEFAULT 'USD',
+  -- Precios e Ingresos
+  price_cents      integer NOT NULL CHECK (price_cents >= 0),
+  commission_cents integer NOT NULL DEFAULT 0 CHECK (commission_cents >= 0), -- INTEGRADO AQUÍ
+  currency         text NOT NULL DEFAULT 'USD',
+  
   includes        text,
   excludes        text,
   main_image_url  text,
@@ -248,6 +250,10 @@ CREATE TABLE IF NOT EXISTS experiences (
   created_at      timestamptz NOT NULL DEFAULT now(),
   updated_at      timestamptz NOT NULL DEFAULT now()
 );
+
+-- Comentarios sobre columnas integradas
+COMMENT ON COLUMN experiences.commission_cents IS 'Fixed commission amount in cents that LIVEX charges online. Resort net (price_cents) is paid on-site.';
+
 CREATE UNIQUE INDEX IF NOT EXISTS uq_experiences_resort_slug ON experiences(resort_id, slug);
 CREATE INDEX IF NOT EXISTS idx_experiences_category ON experiences(category);
 CREATE INDEX IF NOT EXISTS idx_experiences_status ON experiences(status);
@@ -370,10 +376,15 @@ CREATE TABLE IF NOT EXISTS bookings (
   children       integer NOT NULL DEFAULT 0 CHECK (children >= 0),
   
   -- Financiero
-  currency       text NOT NULL DEFAULT 'USD',
-  subtotal_cents integer NOT NULL DEFAULT 0,
-  tax_cents      integer NOT NULL DEFAULT 0,
-  total_cents    integer NOT NULL CHECK (total_cents >= 0),
+  currency          text NOT NULL DEFAULT 'USD',
+  subtotal_cents    integer NOT NULL DEFAULT 0,
+  tax_cents         integer NOT NULL DEFAULT 0,
+  
+  -- Nuevas Columnas Integradas
+  commission_cents  integer NOT NULL DEFAULT 0 CHECK (commission_cents >= 0),
+  resort_net_cents  integer NOT NULL DEFAULT 0 CHECK (resort_net_cents >= 0),
+  
+  total_cents       integer NOT NULL CHECK (total_cents >= 0),
   
   -- Agentes y Referidos
   agent_id       uuid REFERENCES users(id),
@@ -391,6 +402,11 @@ CREATE TABLE IF NOT EXISTS bookings (
   
   CONSTRAINT booking_quantities CHECK (adults + children > 0)
 );
+
+-- Comentarios sobre columnas integradas
+COMMENT ON COLUMN bookings.commission_cents IS 'LIVEX commission amount charged online at booking time';
+COMMENT ON COLUMN bookings.resort_net_cents IS 'Resort net amount to be paid on-site by the customer';
+
 CREATE INDEX IF NOT EXISTS idx_bookings_user ON bookings(user_id);
 CREATE INDEX IF NOT EXISTS idx_bookings_experience ON bookings(experience_id);
 CREATE INDEX IF NOT EXISTS idx_bookings_slot ON bookings(slot_id);

@@ -1,12 +1,12 @@
-import { 
-  IsNotEmpty, 
-  IsOptional, 
-  IsString, 
-  IsUUID, 
-  IsEnum, 
-  IsPositive, 
-  IsUrl, 
-  MaxLength, 
+import {
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  IsEnum,
+  IsPositive,
+  IsUrl,
+  MaxLength,
   MinLength,
   IsInt,
   Min
@@ -53,6 +53,11 @@ export class CreateExperienceDto {
   @IsPositive()
   @Min(1)
   price_cents: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  commission_cents?: number = 0;
 
   @IsOptional()
   @IsString()

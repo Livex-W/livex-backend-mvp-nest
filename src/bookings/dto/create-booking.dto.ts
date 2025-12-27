@@ -29,6 +29,16 @@ export class CreateBookingDto {
   @Min(0)
   taxCents!: number;
 
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  commissionCents!: number;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  resortNetCents!: number;
+
   @IsOptional()
   @IsString()
   @Matches(/^[A-Z]{3}$/)

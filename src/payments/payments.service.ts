@@ -41,6 +41,8 @@ interface Booking {
   slot_id: string;
   adults: number;
   children: number;
+  commission_cents: number;
+  resort_net_cents: number;
   total_cents: number;
   currency: string;
   status: string;
@@ -109,7 +111,7 @@ export class PaymentsService {
           paymentId,
           dto.bookingId,
           dto.provider,
-          booking.total_cents,
+          booking.commission_cents, // Only charge commission online
           booking.currency,
           'pending',
           dto.paymentMethod,
@@ -133,15 +135,17 @@ export class PaymentsService {
 
       paymentResult = await provider.createPayment({
         id: payment.id,
-        amount: booking.total_cents,
+        amount: booking.commission_cents, // Only charge commission online
         currency: booking.currency,
-        description: `LIVEX Booking ${booking.id}`,
+        description: `LIVEX Commission - Booking ${booking.id}`,
         expiresAt: payment.expires_at,
         metadata: {
           bookingId: booking.id,
           userId: booking.user_id,
           customerEmail: dto.customerEmail,
           redirectUrl: dto.redirectUrl,
+          commissionCents: booking.commission_cents,
+          resortNetCents: booking.resort_net_cents,
         },
       });
 
@@ -570,7 +574,7 @@ export class PaymentsService {
 
       if (userDetails.rows.length > 0) {
         const user = userDetails.rows[0];
-        await this.notificationService.sendRefundProcessed(user.email, {
+        this.notificationService.sendRefundProcessed(user.email, {
           customerName: user.full_name,
           refundAmount: Number((user.amount_cents / 100).toFixed(2)),
           bookingCode: user.booking_id.substring(0, 8).toUpperCase(),

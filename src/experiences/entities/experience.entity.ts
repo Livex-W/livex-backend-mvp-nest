@@ -8,6 +8,7 @@ export interface Experience {
   description?: string;
   category: 'islands' | 'nautical' | 'city_tour';
   price_cents: number;
+  commission_cents: number;
   currency: string;
   includes?: string;
   excludes?: string;
