@@ -679,10 +679,21 @@ export class CouponsService {
                         [bookingId, couponRes.rows[0].id, applied.discountApplied],
                     );
                 }
-            } else {
-                // Para referral o VIP, podríamos tener manejo espacial en booking_coupons
-                // si la tabla lo soporta. Por ahora lo omitimos o asumimos tabla simple.
-                // Si la tabla requiere user_coupon_id, solo podemos guardar cupones reales.
+            } else if (applied.type === 'referral_standard') {
+                const refRes = await this.db.query<{ id: string }>(
+                    `SELECT id FROM referral_codes WHERE code = $1`,
+                    [applied.code],
+                );
+
+                if (refRes.rows.length > 0) {
+                    await this.db.query(
+                        `INSERT INTO booking_referral_codes (booking_id, referral_code_id, discount_applied_cents)
+                         VALUES ($1, $2, $3)
+                         ON CONFLICT (booking_id, referral_code_id) DO UPDATE 
+                         SET discount_applied_cents = EXCLUDED.discount_applied_cents`,
+                        [bookingId, refRes.rows[0].id, applied.discountApplied],
+                    );
+                }
             }
         }
     }

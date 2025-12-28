@@ -99,14 +99,25 @@ export class BookingsService {
           'capacity', s.capacity
         ) as slot,
         COALESCE((
-          SELECT json_agg(json_build_object(
-            'code', uc.code,
-            'amount_cents', bc.discount_applied_cents,
-            'description', uc.description
-          ))
-          FROM booking_coupons bc
-          JOIN user_coupons uc ON uc.id = bc.user_coupon_id
-          WHERE bc.booking_id = b.id
+          SELECT json_agg(c) FROM (
+            SELECT 
+              uc.code, 
+              bc.discount_applied_cents as amount_cents, 
+              uc.description
+            FROM booking_coupons bc
+            JOIN user_coupons uc ON uc.id = bc.user_coupon_id
+            WHERE bc.booking_id = b.id
+            
+            UNION ALL
+            
+            SELECT 
+              rc.code, 
+              brc.discount_applied_cents as amount_cents, 
+              rc.description
+            FROM booking_referral_codes brc
+            JOIN referral_codes rc ON rc.id = brc.referral_code_id
+            WHERE brc.booking_id = b.id
+          ) c
         ), '[]'::json) as coupons
       FROM bookings b
       LEFT JOIN experiences e ON e.id = b.experience_id
