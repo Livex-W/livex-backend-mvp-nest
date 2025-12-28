@@ -25,6 +25,7 @@ import { BookingsModule } from './bookings/bookings.module';
 import { PaymentsModule } from './payments/payments.module';
 import { AgentsModule } from './agents/agents.module';
 import { FavoritesModule } from './favorites/favorites.module';
+import { CouponsModule } from './coupons/coupons.module';
 import bookingConfig from './common/config/booking.config';
 
 @Module({
@@ -48,6 +49,7 @@ import bookingConfig from './common/config/booking.config';
     PaymentsModule,
     AgentsModule,
     FavoritesModule,
+    CouponsModule,
   ],
   controllers: [AppController],
   providers: [

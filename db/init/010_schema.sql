@@ -312,11 +312,13 @@ CREATE TABLE IF NOT EXISTS referral_codes (
     owner_user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     
     code_type text NOT NULL DEFAULT 'commission' CHECK (code_type IN ('commission', 'discount', 'both')),
+    referral_type text NOT NULL DEFAULT 'standard' CHECK (referral_type IN ('standard', 'influencer', 'affiliate', 'partner')),
     
     discount_type text CHECK (discount_type IN ('percentage', 'fixed', 'none')),
     discount_value integer DEFAULT 0,
     max_discount_cents integer,
     min_purchase_cents integer DEFAULT 0,
+    currency text DEFAULT 'USD' CHECK (currency IN ('USD', 'COP', 'EUR')),
     allow_stacking boolean DEFAULT false,
     
     commission_override_bps integer,
@@ -330,6 +332,8 @@ CREATE TABLE IF NOT EXISTS referral_codes (
     created_at timestamptz DEFAULT now(),
     updated_at timestamptz DEFAULT now()
 );
+
+COMMENT ON COLUMN referral_codes.referral_type IS 'standard: permite stacking con otros cupones. influencer/affiliate/partner: uso exclusivo, no permite stacking.';
 CREATE INDEX IF NOT EXISTS idx_referral_codes_owner ON referral_codes(owner_user_id);
 CREATE INDEX IF NOT EXISTS idx_referral_codes_active ON referral_codes(code) WHERE is_active = true;
 CREATE TRIGGER trg_referral_codes_updated_at BEFORE UPDATE ON referral_codes FOR EACH ROW EXECUTE FUNCTION set_updated_at();
@@ -360,6 +364,91 @@ CREATE TABLE IF NOT EXISTS referral_code_variants (
     created_at timestamptz DEFAULT now(),
     UNIQUE (parent_code_id, variant_name)
 );
+
+-- Cupones de Usuario (ganados por promociones, referidos, gamificación, etc.)
+CREATE TABLE IF NOT EXISTS user_coupons (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    
+    -- Información del cupón
+    code text UNIQUE NOT NULL,
+    coupon_type text NOT NULL CHECK (coupon_type IN ('user_earned', 'vip_subscription', 'promotional')),
+    description text,
+    
+    -- Descuento
+    discount_type text NOT NULL CHECK (discount_type IN ('percentage', 'fixed')),
+    discount_value integer NOT NULL CHECK (discount_value > 0), -- basis points para % o centavos para fijo
+    max_discount_cents integer,
+    min_purchase_cents integer DEFAULT 0,
+    currency text DEFAULT 'USD' CHECK (currency IN ('USD', 'COP', 'EUR')),
+    
+    -- Control de uso
+    is_used boolean DEFAULT false,
+    used_at timestamptz,
+    used_booking_id uuid, -- Se llena después de crear bookings table
+    
+    -- Validez
+    is_active boolean DEFAULT true,
+    expires_at timestamptz,
+    
+    -- Para VIP: duración de la suscripción
+    vip_duration_days integer DEFAULT 365, -- 1 año por defecto
+    
+    -- Restricciones opcionales
+    experience_id uuid REFERENCES experiences(id) ON DELETE SET NULL,
+    category_slug text,
+    resort_id uuid REFERENCES resorts(id) ON DELETE SET NULL,
+    
+    -- Origen del cupón
+    source_type text CHECK (source_type IN ('referral_bonus', 'promotional', 'vip_purchase', 'admin_granted', 'gamification', 'first_booking')),
+    source_reference_id uuid,
+    
+    created_at timestamptz DEFAULT now(),
+    updated_at timestamptz DEFAULT now()
+);
+
+CREATE INDEX idx_user_coupons_user ON user_coupons(user_id);
+CREATE INDEX idx_user_coupons_code ON user_coupons(code) WHERE is_active = true AND is_used = false;
+CREATE INDEX idx_user_coupons_type ON user_coupons(user_id, coupon_type) WHERE is_active = true;
+CREATE TRIGGER trg_user_coupons_updated_at BEFORE UPDATE ON user_coupons FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+COMMENT ON COLUMN user_coupons.discount_value IS 'Para percentage: basis points (1000 = 10%). Para fixed: centavos.';
+COMMENT ON COLUMN user_coupons.vip_duration_days IS 'Días de duración del VIP al activar. Default 365 (1 año). Configurable.';
+
+-- Suscripciones VIP (estado activo de membresía)
+CREATE TABLE IF NOT EXISTS vip_subscriptions (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    
+    -- Detalles de la suscripción
+    discount_type text NOT NULL DEFAULT 'percentage' CHECK (discount_type IN ('percentage', 'fixed')),
+    discount_value integer NOT NULL CHECK (discount_value > 0), -- basis points o centavos
+    currency text DEFAULT 'USD' CHECK (currency IN ('USD', 'COP', 'EUR')),
+    
+    -- Estado
+    status text NOT NULL DEFAULT 'active' CHECK (status IN ('pending', 'active', 'expired', 'cancelled')),
+    
+    -- Fechas
+    activated_at timestamptz,
+    expires_at timestamptz NOT NULL,
+    cancelled_at timestamptz,
+    
+    -- Origen
+    coupon_id uuid REFERENCES user_coupons(id) ON DELETE SET NULL,
+    
+    -- Restricciones opcionales
+    excluded_categories text[],
+    excluded_experiences uuid[],
+    
+    created_at timestamptz DEFAULT now(),
+    updated_at timestamptz DEFAULT now()
+);
+
+CREATE INDEX idx_vip_subscriptions_user_active ON vip_subscriptions(user_id) WHERE status = 'active';
+CREATE INDEX idx_vip_subscriptions_expiry ON vip_subscriptions(expires_at) WHERE status = 'active';
+CREATE TRIGGER trg_vip_subscriptions_updated_at BEFORE UPDATE ON vip_subscriptions FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+COMMENT ON TABLE vip_subscriptions IS 'Membresías VIP activas. Solo una suscripción activa por usuario.';
 
 -- ====================================================================================
 -- 6. RESERVAS (BOOKINGS)
@@ -423,6 +512,20 @@ CREATE TABLE IF NOT EXISTS booking_referral_codes (
     created_at timestamptz DEFAULT now(),
     PRIMARY KEY (booking_id, referral_code_id)
 );
+
+-- Cupones de usuario aplicados a reservas
+CREATE TABLE IF NOT EXISTS booking_coupons (
+    booking_id uuid NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+    user_coupon_id uuid NOT NULL REFERENCES user_coupons(id),
+    discount_applied_cents integer NOT NULL DEFAULT 0,
+    created_at timestamptz DEFAULT now(),
+    PRIMARY KEY (booking_id, user_coupon_id)
+);
+
+-- Agregar FK de used_booking_id a user_coupons (después de crear bookings)
+ALTER TABLE user_coupons 
+ADD CONSTRAINT fk_user_coupons_used_booking 
+FOREIGN KEY (used_booking_id) REFERENCES bookings(id) ON DELETE SET NULL;
 
 -- Bloqueos de inventario
 CREATE TABLE IF NOT EXISTS inventory_locks (

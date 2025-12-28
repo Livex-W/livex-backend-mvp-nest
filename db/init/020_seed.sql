@@ -2,6 +2,10 @@
 -- LIVEX SEED DATA - COMPLETE & ORGANIZED
 -- FECHA: Diciembre 2025
 -- ====================================================================================
+-- 
+-- ⚠️  CONTRASEÑA DE PRUEBA PARA TODOS LOS USUARIOS: Test1234
+-- 
+-- ====================================================================================
 
 -- ===========================
 -- BLOQUE 1: DATOS ESTRUCTURALES (Core)
@@ -9,11 +13,12 @@
 -- ===========================
 
 -- 1. Usuarios Base (Admin, Operadores, Turista)
+-- CONTRASEÑA: Test1234 (hash bcrypt)
 WITH u AS (
   INSERT INTO users (email, password_hash, full_name, phone, role, document_type, document_number) VALUES
     -- 1. ADMIN DEL SISTEMA
     ('admin@livex.app', 
-     '$2b$10$j54QekkMZucJ.hKpcRMmqe4SnETnpr.8OxLyRfAZVLnSVkBgP4eFS', 
+     '$2b$10$AUoDb4ExvjeUGT7r0kjkeuezbtKLalTUj.YRLcg0wHtMIdG4OxWye', 
      'Admin Livex', 
      '+573000000000', 
      'admin', 
@@ -21,29 +26,29 @@ WITH u AS (
 
     -- 2. RESORTS / OPERADORES
     ('operaciones@marysol.co', 
-     '$2b$10$5eTgOS5SOy7P1E/xsB4kBuUTTfEstsU4fM2wNhKGiHWp/HXl2cQ2.', 
+     '$2b$10$AUoDb4ExvjeUGT7r0kjkeuezbtKLalTUj.YRLcg0wHtMIdG4OxWye', 
      'Operaciones Mar y Sol', 
      '+573011111111', 
      'resort', 
      'NIT', '900111222'),
      
     ('coordinacion@islabrisa.co', 
-     '$2b$10$xo422QzD1EzJGyZw4ZX.uOGPhvH1O/AcZqGXiLXekrQxQWIrfmtB6', 
+     '$2b$10$AUoDb4ExvjeUGT7r0kjkeuezbtKLalTUj.YRLcg0wHtMIdG4OxWye', 
      'Coordinación Isla Brisa', 
      '+573022222222', 
      'resort', 
      'NIT', '900333444'),
      
     ('reservas@nauticabahia.co', 
-     '$2b$10$spwKr.1mndnqnkr1I4Y/keuLEUKmJ/AXvvTKvv9Jo.EwSdZIVe8Le', 
+     '$2b$10$AUoDb4ExvjeUGT7r0kjkeuezbtKLalTUj.YRLcg0wHtMIdG4OxWye', 
      'Reservas Náutica Bahía', 
      '+573033333333', 
      'resort', 
      'NIT', '900555666'),
 
-    -- 3. AGENTE DE VENTAS (Nuevo)
+    -- 3. AGENTE DE VENTAS
     ('carlos.ventas@livex.app', 
-     '$2b$10$2ll7SeL6f3FtaB1l3FYWiOoOBLxSousw97M2bDrBxqk9cxQiqOLnC', -- Hash genérico
+     '$2b$10$AUoDb4ExvjeUGT7r0kjkeuezbtKLalTUj.YRLcg0wHtMIdG4OxWye', 
      'Carlos El Vendedor', 
      '+573109998877', 
      'agent', 
@@ -51,17 +56,17 @@ WITH u AS (
 
     -- 4. TURISTAS (Variedad de Documentos)
     
-    -- Turista Local (CC)
+    -- Turista Local (CC) - TIENE CUPONES
     ('sofia.turista@gmail.com', 
-     '$2b$10$2ll7SeL6f3FtaB1l3FYWiOoOBLxSousw97M2bDrBxqk9cxQiqOLnC', 
+     '$2b$10$AUoDb4ExvjeUGT7r0kjkeuezbtKLalTUj.YRLcg0wHtMIdG4OxWye', 
      'Sofía Turista', 
      '+573154444444', 
      'tourist', 
      'CC', '1045678901'),
 
-    -- Turista Extranjero USA (PASSPORT)
+    -- Turista Extranjero USA (PASSPORT) - TIENE CUPONES
     ('john.doe@usmail.com', 
-     '$2b$10$2ll7SeL6f3FtaB1l3FYWiOoOBLxSousw97M2bDrBxqk9cxQiqOLnC', 
+     '$2b$10$AUoDb4ExvjeUGT7r0kjkeuezbtKLalTUj.YRLcg0wHtMIdG4OxWye', 
      'John Doe', 
      '+13055551234', 
      'tourist', 
@@ -69,7 +74,7 @@ WITH u AS (
 
     -- Turista Brasilero (FOREIGN_ID / DNI)
     ('lucia.silva@uol.com.br', 
-     '$2b$10$2ll7SeL6f3FtaB1l3FYWiOoOBLxSousw97M2bDrBxqk9cxQiqOLnC', 
+     '$2b$10$AUoDb4ExvjeUGT7r0kjkeuezbtKLalTUj.YRLcg0wHtMIdG4OxWye', 
      'Lucia Silva', 
      '+551199998888', 
      'tourist', 
@@ -77,7 +82,7 @@ WITH u AS (
 
     -- Residente Extranjero en Colombia (CE)
     ('pierre.frances@gmail.com', 
-     '$2b$10$2ll7SeL6f3FtaB1l3FYWiOoOBLxSousw97M2bDrBxqk9cxQiqOLnC', 
+     '$2b$10$AUoDb4ExvjeUGT7r0kjkeuezbtKLalTUj.YRLcg0wHtMIdG4OxWye', 
      'Pierre Dubois', 
      '+573205556677', 
      'tourist', 
@@ -85,7 +90,7 @@ WITH u AS (
 
     -- Migrante con Permiso (PPT)
     ('jose.perez@email.com', 
-     '$2b$10$2ll7SeL6f3FtaB1l3FYWiOoOBLxSousw97M2bDrBxqk9cxQiqOLnC', 
+     '$2b$10$AUoDb4ExvjeUGT7r0kjkeuezbtKLalTUj.YRLcg0wHtMIdG4OxWye', 
      'José Pérez', 
      '+573041234567', 
      'tourist', 
@@ -418,8 +423,118 @@ VALUES
   ((SELECT id FROM referral_codes WHERE code = 'VERANO2025'), 'Variant A - 15%', 'VERANO2025A', 1500),
   ((SELECT id FROM referral_codes WHERE code = 'VERANO2025'), 'Variant B - 5%', 'VERANO2025B', 500);
 
+-- 5.7 Código de Influencer (No permite stacking)
+INSERT INTO referral_codes (owner_user_id, code, code_type, referral_type, discount_type, discount_value, description)
+VALUES ((SELECT id FROM users WHERE email='agente.carlos@gmail.com'), 'INFLUENCER20', 'discount', 'influencer', 'percentage', 2000, 'Código de influencer - 20% descuento, uso exclusivo');
+
 -- ===========================
--- BLOQUE 6: ÍNDICES Y OPTIMIZACIÓN
+-- BLOQUE 6: CUPONES DE USUARIO Y VIP
+-- Cupones ganados, promocionales y VIP
+-- ===========================
+
+-- 6.1 Cupón ganado por referir amigo (para Sofía)
+INSERT INTO user_coupons (
+  user_id, code, coupon_type, description, 
+  discount_type, discount_value, currency,
+  source_type, expires_at
+)
+VALUES (
+  (SELECT id FROM users WHERE email='sofia.turista@gmail.com'),
+  'SOFIA-REF-001',
+  'user_earned',
+  'Cupón por referir a un amigo',
+  'fixed',
+  1500, -- $15 USD de descuento
+  'USD',
+  'referral_bonus',
+  now() + INTERVAL '6 months'
+);
+
+-- 6.2 Cupón promocional de bienvenida (para John Doe)
+INSERT INTO user_coupons (
+  user_id, code, coupon_type, description, 
+  discount_type, discount_value, currency,
+  source_type, expires_at
+)
+VALUES (
+  (SELECT id FROM users WHERE email='john.doe@usmail.com'),
+  'JOHN-WELCOME',
+  'promotional',
+  'Bienvenida - Primera reserva',
+  'percentage',
+  1500, -- 15% de descuento
+  'USD',
+  'admin_granted',
+  now() + INTERVAL '1 month'
+);
+
+-- 6.3 Cupón VIP (para Sofía - redimible por 1 año de membresía)
+INSERT INTO user_coupons (
+  user_id, code, coupon_type, description, 
+  discount_type, discount_value, currency,
+  vip_duration_days,
+  source_type, expires_at
+)
+VALUES (
+  (SELECT id FROM users WHERE email='sofia.turista@gmail.com'),
+  'VIP-SOFIA-2025',
+  'vip_subscription',
+  'Membresía VIP 1 año - 10% en todas las experiencias',
+  'percentage',
+  1000, -- 10% de descuento permanente
+  'USD',
+  365, -- 1 año
+  'promotional',
+  now() + INTERVAL '2 months' -- El cupón para redimir VIP vence en 2 meses
+);
+
+-- 6.4 Múltiples cupones para probar stacking (para Sofía)
+INSERT INTO user_coupons (
+  user_id, code, coupon_type, description, 
+  discount_type, discount_value, max_discount_cents, currency,
+  source_type, expires_at
+)
+VALUES 
+  -- Cupón de gamificación
+  ((SELECT id FROM users WHERE email='sofia.turista@gmail.com'),
+   'SOFIA-GAME-001',
+   'user_earned',
+   'Cupón por completar 3 reservas',
+   'percentage',
+   500, -- 5% extra
+   1000, -- Máximo $10 USD de descuento
+   'USD',
+   'gamification',
+   now() + INTERVAL '3 months'),
+  -- Cupón de primera reserva
+  ((SELECT id FROM users WHERE email='sofia.turista@gmail.com'),
+   'SOFIA-FIRST-001',
+   'user_earned',
+   'Cupón por primera reserva completada',
+   'fixed',
+   2000, -- $20 USD fijo
+   NULL,
+   'USD',
+   'first_booking',
+   now() + INTERVAL '1 year');
+
+-- 6.5 Suscripción VIP activa (para pruebas - Pierre ya es VIP)
+INSERT INTO vip_subscriptions (
+  user_id, discount_type, discount_value, currency,
+  status, activated_at, expires_at
+)
+VALUES (
+  (SELECT id FROM users WHERE email='pierre.frances@gmail.com'),
+  'percentage',
+  1200, -- 12% de descuento
+  'USD',
+  'active',
+  now() - INTERVAL '1 month', -- Activado hace 1 mes
+  now() + INTERVAL '11 months' -- Quedan 11 meses
+);
+
+-- ===========================
+-- BLOQUE 7: ÍNDICES Y OPTIMIZACIÓN
 -- ===========================
 
 CREATE INDEX IF NOT EXISTS idx_availability_slots_experience_date ON availability_slots(experience_id, start_time, end_time);

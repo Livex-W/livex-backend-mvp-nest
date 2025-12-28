@@ -7,12 +7,14 @@ import { PayPalProvider } from './providers/paypal.provider';
 import { PaymentProviderFactory } from './providers/payment-provider.factory';
 import { DatabaseModule } from '../database/database.module';
 import { NotificationModule } from '../notifications/notification.module';
+import { CouponsModule } from '../coupons/coupons.module';
 
 @Module({
   imports: [
     ConfigModule,
     DatabaseModule,
     NotificationModule,
+    CouponsModule,
   ],
   controllers: [PaymentsController],
   providers: [

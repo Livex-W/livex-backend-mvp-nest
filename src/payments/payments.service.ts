@@ -9,6 +9,7 @@ import { CreateRefundDto } from './dto/create-refund.dto';
 import { WebhookPayloadDto } from './dto/webhook-payload.dto';
 import { NotificationService } from '../notifications/services/notification.service';
 import { WebhookEvent } from './interfaces/payment-provider.interface';
+import { CouponsService } from '../coupons/coupons.service';
 
 interface Payment {
   id: string;
@@ -58,9 +59,15 @@ export class PaymentsService {
     private readonly paymentProviderFactory: PaymentProviderFactory,
     private readonly configService: ConfigService,
     private readonly notificationService: NotificationService,
+    private readonly couponsService: CouponsService,
   ) { }
 
   async createPayment(dto: CreatePaymentDto, userId: string): Promise<Payment> {
+    // 0. Aplicar cupones si existen (antes de la transacción de pago)
+    if (dto.couponCodes && dto.couponCodes.length > 0) {
+      await this.couponsService.applyCouponsToBooking(dto.bookingId, dto.couponCodes, userId);
+    }
+
     const payment = await this.db.transaction(async (client) => {
 
       // Verificar booking
