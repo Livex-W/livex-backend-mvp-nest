@@ -72,6 +72,7 @@ export class CouponsController {
         // Si no es cupón de usuario, intenta como código de referido
         const referralResult = await this.couponsService.validateReferralCode(
             dto.code,
+            req.user.sub,
             dto.experienceId,
             dto.totalCents,
         );

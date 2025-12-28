@@ -407,7 +407,7 @@ VALUES ((SELECT id FROM users WHERE email='agente.carlos@gmail.com'), 'VERANO202
 
 -- 5.3 Código Monto Fijo
 INSERT INTO referral_codes (owner_user_id, code, code_type, discount_type, discount_value, usage_limit, description)
-VALUES ((SELECT id FROM users WHERE email='agente.carlos@gmail.com'), 'PRIMERACOMPRA', 'both', 'fixed', 2000000, 50, 'Primera compra - $20,000 COP de descuento');
+VALUES ((SELECT id FROM users WHERE email='agente.carlos@gmail.com'), 'PRIMERACOMPRA', 'both', 'fixed', 2000, 50, 'Primera compra - $20 USD de descuento');
 
 -- 5.4 Código con Stacking
 INSERT INTO referral_codes (owner_user_id, code, code_type, discount_type, discount_value, allow_stacking, min_purchase_cents, description)

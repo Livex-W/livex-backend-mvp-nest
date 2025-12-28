@@ -472,7 +472,8 @@ CREATE TABLE IF NOT EXISTS bookings (
   -- Nuevas Columnas Integradas
   commission_cents  integer NOT NULL DEFAULT 0 CHECK (commission_cents >= 0),
   resort_net_cents  integer NOT NULL DEFAULT 0 CHECK (resort_net_cents >= 0),
-  
+  vip_discount_cents integer NOT NULL DEFAULT 0 CHECK (vip_discount_cents >= 0),
+
   total_cents       integer NOT NULL CHECK (total_cents >= 0),
   
   -- Agentes y Referidos

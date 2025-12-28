@@ -15,7 +15,7 @@ export interface Booking {
     resort_net_cents: number;
     total_cents: number;
     currency: string;
-    status: 'pending' | 'confirmed' | 'cancelled' | 'refunded' | 'expired';
+    status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'refunded' | 'expired';
     expires_at?: Date;
     cancel_reason?: string;
     idempotency_key?: string;

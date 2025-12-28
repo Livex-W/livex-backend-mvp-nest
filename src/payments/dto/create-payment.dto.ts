@@ -28,4 +28,8 @@ export class CreatePaymentDto {
   @IsArray()
   @IsString({ each: true })
   couponCodes?: string[];
+
+  @IsOptional()
+  @IsString()
+  referralCode?: string;
 }

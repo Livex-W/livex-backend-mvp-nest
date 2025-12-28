@@ -16,7 +16,7 @@ import type { BookingConfig } from '../common/config/booking.config';
 import type { PaginatedResult, PaginationMeta } from '../common/interfaces/pagination.interface';
 import type { PaginationDto } from '../common/dto/pagination.dto';
 import type { BookingWithDetailsDto } from './dto/booking-with-details.dto';
-import { PaymentsService } from '../payments/payments.service';
+import { PaymentsService, type Refund } from '../payments/payments.service';
 import type {
   Booking,
   ConfirmBookingOptions,
@@ -73,6 +73,9 @@ export class BookingsService {
         b.subtotal_cents,
         b.tax_cents,
         b.total_cents,
+        b.commission_cents,
+        b.resort_net_cents,
+        b.vip_discount_cents,
         b.currency,
         b.status,
         b.cancel_reason,
@@ -94,7 +97,17 @@ export class BookingsService {
           'start_time', s.start_time,
           'end_time', s.end_time,
           'capacity', s.capacity
-        ) as slot
+        ) as slot,
+        COALESCE((
+          SELECT json_agg(json_build_object(
+            'code', uc.code,
+            'amount_cents', bc.discount_applied_cents,
+            'description', uc.description
+          ))
+          FROM booking_coupons bc
+          JOIN user_coupons uc ON uc.id = bc.user_coupon_id
+          WHERE bc.booking_id = b.id
+        ), '[]'::json) as coupons
       FROM bookings b
       LEFT JOIN experiences e ON e.id = b.experience_id
       LEFT JOIN availability_slots s ON s.id = b.slot_id
@@ -604,7 +617,8 @@ export class BookingsService {
 
       return bookingInsert.rows[0];
     } catch (error) {
-      const pgError = error as { code?: string };
+      const pgError = error as { code?: string; message?: string; detail?: string };
+      this.logger.error(`Error inserting booking: ${JSON.stringify({ code: pgError.code, message: pgError.message, detail: pgError.detail })}`);
       if (pgError.code === '23505') {
         throw new ConflictException('Ya existe una reserva para esta operación');
       }
@@ -667,7 +681,12 @@ export class BookingsService {
   }> {
 
     // 1. Buscar la reserva con su información de pago
-    const bookingResult = await this.db.query(
+    const bookingResult = await this.db.query<Booking & {
+      payment_id: string | null;
+      payment_status: string | null;
+      payment_amount: number | null;
+      payment_paid_at: Date | null;
+    }>(
       `SELECT 
         b.*,
         p.id as payment_id,
@@ -707,7 +726,7 @@ export class BookingsService {
 
         try {
           // Delegar al PaymentsService (Reembolso centralizado con flag de 48h)
-          const refundResult = await this.paymentsService.createRefund(
+          const refundResult: Refund = await this.paymentsService.createRefund(
             {
               paymentId: booking.payment_id,
               reason: options.reason || 'Booking cancelled by customer',
@@ -763,7 +782,7 @@ export class BookingsService {
         );
 
         if (lockResult.rows.length > 0) {
-          const { slot_id, quantity } = lockResult.rows[0];
+          const { slot_id, quantity } = lockResult.rows[0] as { slot_id: string; quantity: number };
 
           await client.query(
             `UPDATE inventory_locks 

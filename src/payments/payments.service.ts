@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { Injectable, Logger, NotFoundException, ConflictException, BadRequestException, Inject } from '@nestjs/common';
+import { PoolClient } from 'pg';
 import { ConfigService } from '@nestjs/config';
 import { DatabaseClient } from '../database/database.client';
 import { DATABASE_CLIENT } from '../database/database.module';
@@ -50,6 +51,25 @@ interface Booking {
   expires_at?: Date;
 }
 
+export interface Refund {
+  id: string;
+  payment_id: string;
+  amount_cents: number;
+  currency: string;
+  status: 'pending' | 'processed' | 'failed' | 'cancelled';
+  reason?: string;
+  requested_by?: string;
+  requested_at: Date;
+  processed_at?: Date;
+  failed_at?: Date;
+  failure_reason?: string;
+  provider_refund_id?: string;
+  provider_reference?: string;
+  provider_metadata?: any;
+  created_at: Date;
+  updated_at: Date;
+}
+
 @Injectable()
 export class PaymentsService {
   private readonly logger = new Logger(PaymentsService.name);
@@ -63,10 +83,8 @@ export class PaymentsService {
   ) { }
 
   async createPayment(dto: CreatePaymentDto, userId: string): Promise<Payment> {
-    // 0. Aplicar cupones si existen (antes de la transacción de pago)
-    if (dto.couponCodes && dto.couponCodes.length > 0) {
-      await this.couponsService.applyCouponsToBooking(dto.bookingId, dto.couponCodes, userId);
-    }
+    // 0. Aplicar cupones y descuento VIP (siempre verificar VIP aunque no haya cupones)
+    await this.couponsService.applyCouponsToBooking(dto.bookingId, dto.couponCodes ?? [], dto.referralCode ?? null, userId);
 
     const payment = await this.db.transaction(async (client) => {
 
@@ -416,7 +434,7 @@ export class PaymentsService {
     dto: CreateRefundDto,
     userId: string,
     options: { check48hWindow?: boolean } = {}
-  ): Promise<any> {
+  ): Promise<Refund> {
     return await this.db.transaction(async (client) => {
 
       // Buscar el pago
@@ -789,6 +807,15 @@ export class PaymentsService {
 
     this.logger.log(`Booking ${bookingId} confirmed and commission created`);
 
+    // Marcar cupones como usados definitivamente
+    try {
+      await this.couponsService.markCouponsUsedForBooking(bookingId);
+      this.logger.log(`Coupons marked as used for booking ${bookingId}`);
+    } catch (error) {
+      this.logger.error(`Failed to mark coupons as used for booking ${bookingId}`, error);
+      // No fallamos el pago por esto, pero logueamos el error crítico
+    }
+
     // Enviar notificación de pago confirmado
     try {
       const userDetails = await client.query(
@@ -855,12 +882,12 @@ export class PaymentsService {
    * Used by createRefund
    */
   private async executeRefund(
-    client: any,
+    client: PoolClient,
     payment: Payment,
     amountCents: number,
     reason: string,
     userId: string
-  ): Promise<any> {
+  ): Promise<Refund> {
 
     // 1. Validaciones comunes
     if (payment.provider === 'paypal' && !payment.provider_capture_id) {
@@ -887,7 +914,7 @@ export class PaymentsService {
 
     // 3. Crear registro de refund (Pending)
     const refundId = crypto.randomUUID();
-    const refundResult = await client.query(
+    const refundResult = await client.query<Refund>(
       `INSERT INTO refunds (
         id, payment_id, amount_cents, currency, status, reason, 
         requested_by, requested_at, created_at, updated_at

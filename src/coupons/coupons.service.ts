@@ -13,6 +13,78 @@ import {
     AppliedDiscountsDto,
 } from './dto';
 
+interface UserCouponRow {
+    id: string;
+    code: string;
+    coupon_type: 'user_earned' | 'vip_subscription' | 'promotional';
+    description: string;
+    discount_type: 'percentage' | 'fixed';
+    discount_value: number;
+    max_discount_cents?: number;
+    min_purchase_cents: number;
+    currency: string;
+    is_used: boolean;
+    is_active: boolean;
+    expires_at?: Date;
+    vip_duration_days?: number;
+    source_type?: string;
+    created_at: Date;
+    experience_id?: string;
+    category_slug?: string;
+    resort_id?: string;
+}
+
+interface VipSubscriptionRow {
+    id: string;
+    discount_type: 'percentage' | 'fixed';
+    discount_value: number;
+    activated_at: Date;
+    expires_at: Date;
+}
+
+interface ReferralCodeRow {
+    id: string;
+    code_type: string;
+    referral_type: string;
+    discount_type: 'percentage' | 'fixed' | 'none';
+    discount_value: number;
+    max_discount_cents?: number;
+    min_purchase_cents: number;
+    allow_stacking: boolean;
+    is_active: boolean;
+    usage_limit?: number;
+    usage_count: number;
+    expires_at?: Date;
+}
+
+interface ReferralRestrictionRow {
+    restriction_type: 'experience' | 'category' | 'resort';
+    experience_id?: string;
+    category_slug?: string;
+    resort_id?: string;
+}
+
+interface BookingRow {
+    id: string;
+    experience_id: string;
+    subtotal_cents: number;
+    resort_net_cents: number;
+}
+
+interface ExperienceRow {
+    id: string;
+    category: string;
+    resort_id: string;
+}
+
+interface CouponIdRow {
+    id: string;
+}
+
+interface UserCouponIdRow {
+    user_coupon_id: string;
+}
+
 @Injectable()
 export class CouponsService {
     constructor(
@@ -23,7 +95,7 @@ export class CouponsService {
      * Obtiene todos los cupones del usuario autenticado
      */
     async getMyCoupons(userId: string): Promise<UserCouponResponseDto[]> {
-        const result = await this.db.query<any>(
+        const result = await this.db.query<UserCouponRow>(
             `SELECT id, code, coupon_type, description, 
                     discount_type, discount_value, max_discount_cents, min_purchase_cents, currency,
                     is_used, is_active, expires_at, vip_duration_days, source_type, created_at
@@ -63,6 +135,9 @@ export class CouponsService {
         const allCoupons = await this.getMyCoupons(userId);
 
         return allCoupons.filter((coupon) => {
+            // Excluir cupones VIP - se activan en otra pantalla
+            if (coupon.couponType === 'vip_subscription') return false;
+
             // Debe estar activo y no usado
             if (!coupon.isActive || coupon.isUsed) return false;
 
@@ -80,7 +155,7 @@ export class CouponsService {
      * Verifica el estado VIP del usuario
      */
     async getVipStatus(userId: string): Promise<VipStatusResponseDto> {
-        const result = await this.db.query<any>(
+        const result = await this.db.query<VipSubscriptionRow>(
             `SELECT id, discount_type, discount_value, activated_at, expires_at
              FROM vip_subscriptions 
              WHERE user_id = $1 AND status = 'active' AND expires_at > now()
@@ -116,7 +191,7 @@ export class CouponsService {
         experienceId?: string,
         totalCents?: number,
     ): Promise<CouponValidationResultDto> {
-        const result = await this.db.query<any>(
+        const result = await this.db.query<UserCouponRow>(
             `SELECT id, coupon_type, discount_type, discount_value, 
                     max_discount_cents, min_purchase_cents, is_used, is_active, expires_at,
                     experience_id, category_slug, resort_id
@@ -179,10 +254,11 @@ export class CouponsService {
      */
     async validateReferralCode(
         code: string,
+        userId: string,
         experienceId?: string,
         totalCents?: number,
     ): Promise<CouponValidationResultDto & { referralType?: string; allowsStacking?: boolean }> {
-        const result = await this.db.query<any>(
+        const result = await this.db.query<ReferralCodeRow>(
             `SELECT id, code_type, referral_type, discount_type, discount_value,
                     max_discount_cents, min_purchase_cents, allow_stacking, is_active,
                     usage_limit, usage_count, expires_at
@@ -203,6 +279,21 @@ export class CouponsService {
 
         if (refCode.usage_limit && refCode.usage_count >= refCode.usage_limit) {
             return { isValid: false, errorMessage: 'Código agotado' };
+        }
+
+        // Verificar si este usuario ya usó este código en una reserva completada
+        const userUsageResult = await this.db.query(
+            `SELECT COUNT(*) as count 
+             FROM booking_referral_codes brc
+             JOIN bookings b ON b.id = brc.booking_id
+             WHERE brc.referral_code_id = $1 
+               AND b.user_id = $2
+               AND b.status = 'confirmed'`,
+            [refCode.id, userId],
+        );
+
+        if (userUsageResult.rows[0]?.count > 0) {
+            return { isValid: false, errorMessage: 'Ya utilizaste este código anteriormente' };
         }
 
         if (refCode.expires_at && new Date(refCode.expires_at) < new Date()) {
@@ -241,7 +332,7 @@ export class CouponsService {
         return {
             isValid: true,
             couponType: refCode.code_type,
-            discountType: refCode.discount_type,
+            discountType: refCode.discount_type as 'percentage' | 'fixed',
             discountValue: refCode.discount_value,
             discountAmountCents,
             referralType: refCode.referral_type,
@@ -257,7 +348,7 @@ export class CouponsService {
         experienceId: string,
     ): Promise<CouponValidationResultDto> {
         // Obtener restricciones
-        const restrictions = await this.db.query<any>(
+        const restrictions = await this.db.query<ReferralRestrictionRow>(
             `SELECT restriction_type, experience_id, category_slug, resort_id
              FROM referral_code_restrictions
              WHERE referral_code_id = $1`,
@@ -269,7 +360,7 @@ export class CouponsService {
         }
 
         // Obtener info de la experiencia
-        const expResult = await this.db.query<any>(
+        const expResult = await this.db.query<ExperienceRow>(
             `SELECT id, category, resort_id FROM experiences WHERE id = $1`,
             [experienceId],
         );
@@ -313,11 +404,14 @@ export class CouponsService {
 
         // 1. Verificar VIP activo
         const vipStatus = await this.getVipStatus(userId);
+        console.log(`🔍 VIP Status for user ${userId}:`, JSON.stringify(vipStatus));
         if (vipStatus.isVip) {
             if (vipStatus.discountType === 'percentage') {
                 vipDiscount = Math.floor((totalCents * vipStatus.discountValue!) / 10000);
+                console.log(`💎 VIP percentage discount: ${vipStatus.discountValue} basis points of ${totalCents} = ${vipDiscount}`);
             } else {
                 vipDiscount = vipStatus.discountValue!;
+                console.log(`💎 VIP fixed discount: ${vipDiscount}`);
             }
             appliedCoupons.push({
                 code: 'VIP',
@@ -328,7 +422,7 @@ export class CouponsService {
 
         // 2. Verificar código de referido
         if (referralCode) {
-            const refValidation = await this.validateReferralCode(referralCode, experienceId, totalCents);
+            const refValidation = await this.validateReferralCode(referralCode, userId, experienceId, totalCents);
 
             if (refValidation.isValid) {
                 // Si es influencer y hay VIP, no se puede usar
@@ -402,7 +496,7 @@ export class CouponsService {
             );
 
             // Registrar en booking_coupons
-            const couponResult = await this.db.query<any>(
+            const couponResult = await this.db.query<CouponIdRow>(
                 `SELECT id FROM user_coupons WHERE user_id = $1 AND UPPER(code) = UPPER($2)`,
                 [userId, code],
             );
@@ -419,11 +513,35 @@ export class CouponsService {
     }
 
     /**
+     * Marca como usados los cupones asociados a una reserva ya existente (desde booking_coupons)
+     */
+    async markCouponsUsedForBooking(bookingId: string): Promise<void> {
+        // 1. Obtener los cupones asociados a esta reserva
+        const result = await this.db.query<UserCouponIdRow>(
+            `SELECT user_coupon_id FROM booking_coupons WHERE booking_id = $1`,
+            [bookingId],
+        );
+
+        const couponIds = result.rows.map((r) => r.user_coupon_id);
+
+        if (couponIds.length === 0) return;
+
+        // 2. Marcar como usados
+        // Usamos ANY($1) para pasar el array de UUIDs
+        await this.db.query(
+            `UPDATE user_coupons 
+             SET is_used = true, used_at = now(), used_booking_id = $2
+             WHERE id = ANY($1::uuid[])`,
+            [couponIds, bookingId],
+        );
+    }
+
+    /**
      * Activa cupón VIP y crea suscripción
      */
     async activateVipCoupon(userId: string, couponCode: string): Promise<VipStatusResponseDto> {
         // Buscar cupón VIP
-        const couponResult = await this.db.query<any>(
+        const couponResult = await this.db.query<UserCouponRow>(
             `SELECT id, discount_type, discount_value, vip_duration_days, is_used, is_active, expires_at
              FROM user_coupons 
              WHERE user_id = $1 AND UPPER(code) = UPPER($2) AND coupon_type = 'vip_subscription'`,
@@ -475,16 +593,19 @@ export class CouponsService {
 
     /**
      * Aplica cupones a una reserva y actualiza sus montos
+     * También aplica descuento VIP si el usuario tiene una suscripción activa
      */
     async applyCouponsToBooking(
         bookingId: string,
         couponCodes: string[],
+        referralCode: string | null,
         userId: string,
     ): Promise<void> {
-        if (!couponCodes || couponCodes.length === 0) return;
+        // Siempre ejecutar para verificar VIP, incluso sin cupones de usuario
+        const codes = couponCodes ?? [];
 
         // 1. Obtener reserva para cálculos
-        const bookingResult = await this.db.query<any>(
+        const bookingResult = await this.db.query<BookingRow>(
             `SELECT id, experience_id, subtotal_cents, resort_net_cents
              FROM bookings
              WHERE id = $1 AND user_id = $2 AND status = 'pending'`,
@@ -502,10 +623,11 @@ export class CouponsService {
         const originalCommissionCents = booking.subtotal_cents - booking.resort_net_cents;
 
         // 2. Calcular los descuentos usando la comisión base (lo que el usuario paga ahora)
+        // SIEMPRE calcular - esto incluye VIP automáticamente si está activo
         const calculation = await this.calculateDiscounts(
             userId,
-            couponCodes,
-            null, // TODO: Soporte referral code si viniera aparte
+            codes,
+            referralCode,
             booking.experience_id,
             originalCommissionCents,
         );
@@ -520,12 +642,13 @@ export class CouponsService {
         // En un modelo de marketplace, "Subtotal" suele ser precio lista. "Total Pagado" es menos descuento.
         // Aquí `commission_cents` es lo que cobra Livex (y la pasarela).
         const newCommissionCents = Math.max(0, originalCommissionCents - calculation.totalDiscount);
+        const newTotalCents = newCommissionCents + booking.resort_net_cents;
 
         await this.db.query(
             `UPDATE bookings 
-             SET commission_cents = $1, updated_at = now()
-             WHERE id = $2`,
-            [newCommissionCents, bookingId],
+             SET commission_cents = $1, total_cents = $2, vip_discount_cents = $3, updated_at = now()
+             WHERE id = $4`,
+            [newCommissionCents, newTotalCents, calculation.vipDiscount, bookingId],
         );
 
         // 5. Registrar uso de cupones
@@ -544,7 +667,7 @@ export class CouponsService {
         for (const applied of calculation.appliedCoupons) {
             // Buscar ID del cupón si es de usuario
             if (applied.type !== 'referral_standard' && applied.type !== 'vip_subscription') {
-                const couponRes = await this.db.query<any>(
+                const couponRes = await this.db.query<CouponIdRow>(
                     `SELECT id FROM user_coupons WHERE user_id = $1 AND code = $2`,
                     [userId, applied.code],
                 );
