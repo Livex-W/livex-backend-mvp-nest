@@ -16,7 +16,9 @@ import {
 } from './dto';
 import { Review } from './entities/experience.entity';
 import { UploadService, PresignedUrlOptions } from '../upload/upload.service';
-// Removed randomUUID import as we now use professional naming structure
+import { UserPreferencesService } from '../user-preferences/user-preferences.service';
+import { ExchangeRatesService } from '../exchange-rates/exchange-rates.service';
+import { convertPrice } from '../common/utils/price-converter';
 
 // Interface for PostgreSQL error objects
 interface PostgreSQLError extends Error {
@@ -41,6 +43,8 @@ export class ExperiencesService {
     private readonly paginationService: PaginationService,
     private readonly uploadService: UploadService,
     private readonly logger: CustomLoggerService,
+    private readonly userPreferencesService: UserPreferencesService,
+    private readonly exchangeRatesService: ExchangeRatesService,
   ) { }
 
   async create(createExperienceDto: CreateExperienceDto): Promise<Experience> {
@@ -283,8 +287,64 @@ export class ExperiencesService {
     return experience;
   }
 
+  /**
+   * Find all experiences with display prices converted to user's currency
+   */
+  async findAllWithPrices(
+    queryDto: QueryExperiencesDto,
+    userId?: string,
+  ): Promise<PaginatedResult<ExperienceWithImages>> {
+    const result = await this.findAll(queryDto);
+
+    if (userId && result.data.length > 0) {
+      const convertedData = await this.addDisplayPrices(result.data, userId) as ExperienceWithImages[];
+      return {
+        ...result,
+        data: convertedData,
+      };
+    }
+
+    return result;
+  }
+
+  /**
+   * Find one experience with display prices converted to user's currency
+   */
+  async findOneWithPrices(
+    id: string,
+    includeImages = false,
+    userId?: string,
+  ): Promise<ExperienceWithImages> {
+    const experience = await this.findOne(id, includeImages);
+
+    if (userId) {
+      return await this.addDisplayPrices(experience, userId) as ExperienceWithImages;
+    }
+
+    return experience;
+  }
+
+  /**
+   * Find experience by slug with display prices converted to user's currency
+   */
+  async findBySlugWithPrices(
+    resortId: string,
+    slug: string,
+    includeImages = false,
+    userId?: string,
+  ): Promise<ExperienceWithImages> {
+    const experience = await this.findBySlug(resortId, slug, includeImages);
+
+    if (userId) {
+      return await this.addDisplayPrices(experience, userId) as ExperienceWithImages;
+    }
+
+    return experience;
+  }
+
   async update(id: string, updateExperienceDto: UpdateExperienceDto): Promise<Experience> {
     const experience = await this.findOne(id);
+
 
     const updates: string[] = [];
     const params: any[] = [];
@@ -432,6 +492,96 @@ export class ExperiencesService {
 
     return result.rows;
   }
+
+  /**
+ * Add display prices to experience(s) based on user preferences
+ */
+  private async addDisplayPrices<T extends Experience>(
+    experiences: T | T[],
+    userId?: string,
+  ): Promise<T | T[]> {
+    if (!userId) {
+      return experiences;
+    }
+
+    try {
+      const preferences = await this.userPreferencesService.getOrCreateDefault(userId);
+
+      // Helper to convert a single experience
+      const convertExperience = async (exp: T): Promise<T> => {
+        // Case 1: Experience currency matches user preference - no conversion needed
+        if (exp.currency === preferences.currency) {
+          return {
+            ...exp,
+            display_price: exp.price_cents,
+            display_commission: exp.commission_cents ?? 0,
+            display_currency: exp.currency,
+          };
+        }
+
+        // Case 2: Get exchange rates for both currencies
+        const sourceRate = await this.exchangeRatesService.getRate(exp.currency);
+        const targetRate = await this.exchangeRatesService.getRate(preferences.currency);
+
+        if (!sourceRate || !targetRate) {
+          this.logger.log('Cannot convert - missing exchange rates', {
+            experienceCurrency: exp.currency,
+            userCurrency: preferences.currency,
+            experienceId: exp.id,
+            sourceRate,
+            targetRate,
+          });
+          return exp; // Return without display prices
+        }
+
+        // Case 3: Convert between any two currencies
+        const displayPrice = convertPrice(
+          (exp.price_cents / 100),
+          exp.currency,
+          preferences.currency,
+          sourceRate,
+          targetRate,
+        );
+
+        const displayCommission = convertPrice(
+          (exp.commission_cents ?? 0) / 100,
+          exp.currency,
+          preferences.currency,
+          sourceRate,
+          targetRate,
+        );
+
+        this.logger.log('Price conversion applied', {
+          experienceId: exp.id,
+          from: exp.currency,
+          to: preferences.currency,
+          originalPrice: exp.price_cents,
+          displayPrice,
+        });
+
+        return {
+          ...exp,
+          display_price: displayPrice,
+          display_commission: displayCommission,
+          display_currency: preferences.currency,
+        };
+      };
+
+      if (Array.isArray(experiences)) {
+        return Promise.all(experiences.map(convertExperience));
+      }
+
+      return convertExperience(experiences);
+    } catch (error) {
+      this.logger.logError(error as Error, {
+        action: 'add_display_prices',
+        userId,
+      });
+      return experiences;
+    }
+  }
+
+
 
   async getReviews(experienceId: string): Promise<any[]> {
     // Verify experience exists

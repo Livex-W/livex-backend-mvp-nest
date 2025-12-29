@@ -4,11 +4,13 @@ import { ExperiencesController } from './experiences.controller';
 import { DatabaseModule } from '../database/database.module';
 import { CommonModule } from '../common/common.module';
 import { UploadModule } from '../upload/upload.module';
+import { UserPreferencesModule } from '../user-preferences/user-preferences.module';
+import { ExchangeRatesModule } from '../exchange-rates/exchange-rates.module';
 
 @Module({
-  imports: [DatabaseModule, CommonModule, UploadModule],
+  imports: [DatabaseModule, CommonModule, UploadModule, UserPreferencesModule, ExchangeRatesModule],
   controllers: [ExperiencesController],
   providers: [ExperiencesService],
   exports: [ExperiencesService],
 })
-export class ExperiencesModule {}
+export class ExperiencesModule { }

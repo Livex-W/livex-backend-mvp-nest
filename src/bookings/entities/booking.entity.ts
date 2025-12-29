@@ -13,6 +13,7 @@ export interface Booking {
     tax_cents: number;
     commission_cents: number;
     resort_net_cents: number;
+    vip_discount_cents: number;
     total_cents: number;
     currency: string;
     status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'refunded' | 'expired';

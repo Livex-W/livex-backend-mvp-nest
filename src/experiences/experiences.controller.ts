@@ -32,6 +32,8 @@ import { PaginatedResult } from '../common/interfaces/pagination.interface';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import type { JwtPayload } from '../common/interfaces/jwt-payload.interface';
 import { CustomLoggerService } from '../common/services/logger.service';
 
 interface FastifyMultipartFile {
@@ -63,16 +65,20 @@ export class ExperiencesController {
   }
 
   @Get()
-  async findAll(@Query() queryDto: QueryExperiencesDto): Promise<PaginatedResult<ExperienceWithImages>> {
-    return this.experiencesService.findAll(queryDto);
+  async findAll(
+    @Query() queryDto: QueryExperiencesDto,
+    @CurrentUser() user: JwtPayload,
+  ): Promise<PaginatedResult<ExperienceWithImages>> {
+    return this.experiencesService.findAllWithPrices(queryDto, user?.sub);
   }
 
   @Get(':id')
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
     @Query('include_images', new ParseBoolPipe({ optional: true })) includeImages = false,
+    @CurrentUser() user: JwtPayload,
   ): Promise<ExperienceWithImages> {
-    return this.experiencesService.findOne(id, includeImages);
+    return this.experiencesService.findOneWithPrices(id, includeImages, user?.sub);
   }
 
   @Get('resort/:resortId/slug/:slug')
@@ -80,8 +86,9 @@ export class ExperiencesController {
     @Param('resortId', ParseUUIDPipe) resortId: string,
     @Param('slug') slug: string,
     @Query('include_images', new ParseBoolPipe({ optional: true })) includeImages = false,
+    @CurrentUser() user: JwtPayload,
   ): Promise<ExperienceWithImages> {
-    return this.experiencesService.findBySlug(resortId, slug, includeImages);
+    return this.experiencesService.findBySlugWithPrices(resortId, slug, includeImages, user?.sub);
   }
 
   @Patch(':id')

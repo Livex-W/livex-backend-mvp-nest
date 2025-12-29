@@ -24,6 +24,9 @@ import type {
   ExpireBookingsResult
 } from './entities/booking.entity';
 import type { PendingBookingResultDto } from './dto/pending-booking.dto';
+import { UserPreferencesService } from '../user-preferences/user-preferences.service';
+import { ExchangeRatesService } from '../exchange-rates/exchange-rates.service';
+import { convertPrice, roundToNearestThousand } from '../common/utils/price-converter';
 
 // Re-export for backwards compatibility
 export type PendingBookingResult = PendingBookingResultDto;
@@ -44,6 +47,8 @@ export class BookingsService {
     private readonly paymentsService: PaymentsService,
     private readonly logger: CustomLoggerService,
     private readonly configService: ConfigService,
+    private readonly userPreferencesService: UserPreferencesService,
+    private readonly exchangeRatesService: ExchangeRatesService,
   ) {
   }
 
@@ -129,6 +134,79 @@ export class BookingsService {
 
     const result = await this.db.query<BookingWithDetailsDto>(query, [userId, limit, offset]);
 
+    // Add display prices based on user preferences
+    // Add display prices based on user preferences
+    let bookingsWithDisplayPrices = result.rows;
+    try {
+      const preferences = await this.userPreferencesService.getOrCreateDefault(userId);
+
+      // Build rates object
+      const rates: Record<string, number> = { USD: 1 };
+
+      // Get user's preferred currency rate
+      if (preferences.currency !== 'USD') {
+        const userRate = await this.exchangeRatesService.getRate(preferences.currency);
+        if (userRate) {
+          rates[preferences.currency] = userRate;
+        }
+      }
+
+      bookingsWithDisplayPrices = await Promise.all(result.rows.map(async (booking) => {
+        // If currency matches, just divide by 100 (cents to currency)
+        if (booking.currency === preferences.currency) {
+          return {
+            ...booking,
+            display_subtotal: booking.subtotal_cents / 100,
+            display_tax: booking.tax_cents / 100,
+            display_total: booking.total_cents / 100,
+            display_currency: booking.currency,
+          };
+        }
+
+        // Get booking currency rate if not USD
+        if (booking.currency !== 'USD' && !rates[booking.currency]) {
+          const bookingRate = await this.exchangeRatesService.getRate(booking.currency);
+          if (bookingRate) {
+            rates[booking.currency] = bookingRate;
+          }
+        }
+
+        const sourceRate = rates[booking.currency];
+        const targetRate = rates[preferences.currency];
+
+        if (!sourceRate || !targetRate) {
+          return {
+            ...booking,
+            display_subtotal: booking.subtotal_cents / 100,
+            display_tax: booking.tax_cents / 100,
+            display_total: booking.total_cents / 100,
+            display_currency: booking.currency,
+          };
+        }
+
+        // 1️ convertir centavos a moneda real (÷100)
+        const subtotalInCurrency = booking.subtotal_cents / 100;
+        const taxInCurrency = booking.tax_cents / 100;
+        const totalInCurrency = booking.total_cents / 100;
+
+        // 2 convertir de moneda origen a moneda destino
+        // Fórmula: (valor / tasa_origen) × tasa_destino
+        const displaySubtotal = (subtotalInCurrency / sourceRate) * targetRate;
+        const displayTax = (taxInCurrency / sourceRate) * targetRate;
+        const displayTotal = (totalInCurrency / sourceRate) * targetRate;
+
+        return {
+          ...booking,
+          display_subtotal: Math.round(displaySubtotal),
+          display_tax: Math.round(displayTax),
+          display_total: Math.round(displayTotal),
+          display_currency: preferences.currency,
+        };
+      }));
+    } catch (error) {
+      this.logger.error(`Error adding display prices to bookings for user ${userId}`, error);
+    }
+
     const meta: PaginationMeta = {
       total,
       page,
@@ -139,7 +217,7 @@ export class BookingsService {
     };
 
     return {
-      data: result.rows,
+      data: bookingsWithDisplayPrices,
       meta,
     };
   }

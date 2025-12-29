@@ -21,6 +21,10 @@ export interface Experience {
   rejection_reason?: string;
   created_at: Date;
   updated_at: Date;
+  // Display prices in user's preferred currency
+  display_price?: number;
+  display_commission?: number;
+  display_currency?: string;
 }
 
 export interface ExperienceWithImages extends Experience {

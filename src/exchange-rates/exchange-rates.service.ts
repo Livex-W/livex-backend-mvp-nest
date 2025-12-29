@@ -67,6 +67,9 @@ export class ExchangeRatesService implements OnModuleInit {
     }
 
     async getRate(currencyCode: string): Promise<number | null> {
+        if (currencyCode === 'USD') {
+            return 1;
+        }
         const result = await this.db.query(
             'SELECT rate FROM exchange_rates WHERE code = $1',
             [currencyCode],
