@@ -24,6 +24,12 @@ export interface Booking {
     referral_code_id?: string;
     created_at: Date;
     updated_at: Date;
+
+    // Display prices in user's preferred currency
+    display_subtotal?: number;
+    display_tax?: number;
+    display_total?: number;
+    display_currency?: string;
 }
 
 /**

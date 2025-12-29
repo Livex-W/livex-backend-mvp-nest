@@ -134,78 +134,7 @@ export class BookingsService {
 
     const result = await this.db.query<BookingWithDetailsDto>(query, [userId, limit, offset]);
 
-    // Add display prices based on user preferences
-    // Add display prices based on user preferences
-    let bookingsWithDisplayPrices = result.rows;
-    try {
-      const preferences = await this.userPreferencesService.getOrCreateDefault(userId);
-
-      // Build rates object
-      const rates: Record<string, number> = { USD: 1 };
-
-      // Get user's preferred currency rate
-      if (preferences.currency !== 'USD') {
-        const userRate = await this.exchangeRatesService.getRate(preferences.currency);
-        if (userRate) {
-          rates[preferences.currency] = userRate;
-        }
-      }
-
-      bookingsWithDisplayPrices = await Promise.all(result.rows.map(async (booking) => {
-        // If currency matches, just divide by 100 (cents to currency)
-        if (booking.currency === preferences.currency) {
-          return {
-            ...booking,
-            display_subtotal: booking.subtotal_cents / 100,
-            display_tax: booking.tax_cents / 100,
-            display_total: booking.total_cents / 100,
-            display_currency: booking.currency,
-          };
-        }
-
-        // Get booking currency rate if not USD
-        if (booking.currency !== 'USD' && !rates[booking.currency]) {
-          const bookingRate = await this.exchangeRatesService.getRate(booking.currency);
-          if (bookingRate) {
-            rates[booking.currency] = bookingRate;
-          }
-        }
-
-        const sourceRate = rates[booking.currency];
-        const targetRate = rates[preferences.currency];
-
-        if (!sourceRate || !targetRate) {
-          return {
-            ...booking,
-            display_subtotal: booking.subtotal_cents / 100,
-            display_tax: booking.tax_cents / 100,
-            display_total: booking.total_cents / 100,
-            display_currency: booking.currency,
-          };
-        }
-
-        // 1️ convertir centavos a moneda real (÷100)
-        const subtotalInCurrency = booking.subtotal_cents / 100;
-        const taxInCurrency = booking.tax_cents / 100;
-        const totalInCurrency = booking.total_cents / 100;
-
-        // 2 convertir de moneda origen a moneda destino
-        // Fórmula: (valor / tasa_origen) × tasa_destino
-        const displaySubtotal = (subtotalInCurrency / sourceRate) * targetRate;
-        const displayTax = (taxInCurrency / sourceRate) * targetRate;
-        const displayTotal = (totalInCurrency / sourceRate) * targetRate;
-
-        return {
-          ...booking,
-          display_subtotal: Math.round(displaySubtotal),
-          display_tax: Math.round(displayTax),
-          display_total: Math.round(displayTotal),
-          display_currency: preferences.currency,
-        };
-      }));
-    } catch (error) {
-      this.logger.error(`Error adding display prices to bookings for user ${userId}`, error);
-    }
+    const bookingsWithDisplayPrices = await this.addDisplayPricesToBookings(userId, result.rows) as BookingWithDetailsDto[];
 
     const meta: PaginationMeta = {
       total,
@@ -904,15 +833,94 @@ export class BookingsService {
         refundAmount: refundInfo?.amount,
       });
 
+      const bookingWithDisplayPrices = await this.addDisplayPricesToBookings(options.userId, cancelledBooking.rows[0]) as Booking;
+
       return {
-        booking: cancelledBooking.rows[0],
+        booking: bookingWithDisplayPrices,
         refundId: refundInfo?.refundId,
         refundAmount: refundInfo?.amount,
         message: refundInfo
-          ? `Booking cancelled and refund of ${(refundInfo.amount / 100).toFixed(2)} USD processed successfully`
+          ? `Booking cancelled and refund of ${(refundInfo.amount / 100).toFixed(2)} ${booking.currency} processed successfully`
           : 'Booking cancelled successfully',
       };
     });
   }
 
+  /**
+   * Adds display prices to booking(s) based on user preferences.
+   * Converted values are in real currency (cents / 100).
+   */
+  private async addDisplayPricesToBookings<T extends Booking | BookingWithDetailsDto>(
+    userId: string,
+    bookings: T | T[],
+  ): Promise<T | T[]> {
+    const isArray = Array.isArray(bookings);
+    const bookingsList = isArray ? (bookings as T[]) : [bookings as T];
+
+    try {
+      const preferences = await this.userPreferencesService.getOrCreateDefault(userId);
+
+      const convertedBookings = await Promise.all(bookingsList.map(async (booking) => {
+        // If currency matches, just divide by 100
+        if (booking.currency === preferences.currency) {
+          return {
+            ...booking,
+            display_subtotal: (booking as any).subtotal_cents / 100,
+            display_tax: (booking as any).tax_cents / 100,
+            display_total: (booking as any).total_cents / 100,
+            display_currency: booking.currency,
+          } as T;
+        }
+
+        // Get exchange rates
+        const sourceRate = booking.currency === 'USD' ? 1 : await this.exchangeRatesService.getRate(booking.currency);
+        const targetRate = preferences.currency === 'USD' ? 1 : await this.exchangeRatesService.getRate(preferences.currency);
+
+        if (!sourceRate || !targetRate) {
+          return {
+            ...booking,
+            display_subtotal: (booking as any).subtotal_cents / 100,
+            display_tax: (booking as any).tax_cents / 100,
+            display_total: (booking as any).total_cents / 100,
+            display_currency: booking.currency,
+          } as T;
+        }
+
+        const commonParams = {
+          sourceCurrency: booking.currency,
+          targetCurrency: preferences.currency,
+          sourceRate: sourceRate / 100,
+          targetRate: targetRate / 100,
+        };
+
+        const displaySubtotal = convertPrice({
+          ...commonParams,
+          priceCents: (booking as any).subtotal_cents,
+        });
+
+        const displayTax = convertPrice({
+          ...commonParams,
+          priceCents: (booking as any).tax_cents,
+        });
+
+        const displayTotal = convertPrice({
+          ...commonParams,
+          priceCents: (booking as any).total_cents,
+        });
+
+        return {
+          ...booking,
+          display_subtotal: displaySubtotal / 100,
+          display_tax: displayTax / 100,
+          display_total: displayTotal / 100,
+          display_currency: preferences.currency,
+        } as T;
+      }));
+
+      return isArray ? convertedBookings : convertedBookings[0];
+    } catch (error) {
+      this.logger.error(`Error adding display prices to bookings for user ${userId}`, error);
+      return bookings;
+    }
+  }
 }
