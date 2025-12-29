@@ -106,6 +106,18 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE INDEX idx_users_phone ON users(phone) WHERE phone IS NOT NULL;
 CREATE TRIGGER trg_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
+-- Preferencias del usuario
+CREATE TABLE IF NOT EXISTS user_preferences (
+    user_id uuid PRIMARY KEY,
+    language VARCHAR(5) DEFAULT 'es' NOT NULL,
+    currency VARCHAR(3) DEFAULT 'USD' NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_preferences_currency ON user_preferences(currency);
+
 -- Tokens de seguridad
 CREATE TABLE IF NOT EXISTS refresh_tokens (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -136,6 +148,18 @@ CREATE TABLE IF NOT EXISTS email_verifications (
   expires_at  timestamptz NOT NULL,
   used_at     timestamptz
 );
+
+-- Table to exchange_rates
+CREATE TABLE IF NOT EXISTS exchange_rates (
+    code VARCHAR(3) PRIMARY KEY,
+    rate DECIMAL(20, 10) NOT NULL,
+    base_code VARCHAR(3) DEFAULT 'USD',
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Index for faster lookups if needed (though PK is indexed)
+CREATE INDEX IF NOT EXISTS idx_exchange_rates_updated_at ON exchange_rates(updated_at);
+
 
 -- ====================================================================================
 -- 3. DOMINIO DE RESORTS (PROVEEDORES)
@@ -472,8 +496,7 @@ CREATE TABLE IF NOT EXISTS bookings (
   -- Nuevas Columnas Integradas
   commission_cents  integer NOT NULL DEFAULT 0 CHECK (commission_cents >= 0),
   resort_net_cents  integer NOT NULL DEFAULT 0 CHECK (resort_net_cents >= 0),
-  vip_discount_cents integer NOT NULL DEFAULT 0 CHECK (vip_discount_cents >= 0),
-
+  
   total_cents       integer NOT NULL CHECK (total_cents >= 0),
   
   -- Agentes y Referidos
