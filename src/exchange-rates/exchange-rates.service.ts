@@ -28,56 +28,56 @@ export class ExchangeRatesService implements OnModuleInit {
             this.logger.log(`Fetching exchange rates from ${this.apiUrl}...`);
             const response = await fetch(this.apiUrl);
 
-            if (response.ok) {
-                const data = await response.json();
-
-                if (data.result === 'success') {
-                    const rates = data.conversion_rates;
-                    const baseCode = data.base_code;
-
-                    this.logger.log(`Received rates for base: ${baseCode}. Updating database...`);
-
-                    // Use a transaction for bulk update safety
-                    await this.db.transaction(async (client) => {
-                        for (const [code, rate] of Object.entries(rates)) {
-                            const query = `
-              INSERT INTO exchange_rates (code, rate, base_code, updated_at)
-              VALUES ($1, $2, $3, NOW())
-              ON CONFLICT (code) 
-              DO UPDATE SET 
-                rate = EXCLUDED.rate, 
-                base_code = EXCLUDED.base_code, 
-                updated_at = NOW();
-            `;
-                            // @ts-ignore
-                            await client.query(query, [code, rate, baseCode]);
-                        }
-                    });
-
-                    this.logger.log('Exchange rates updated successfully.');
-                } else {
-                    this.logger.error('Failed to fetch rates: API returned error', data);
-                }
-            } else {
+            if (!response.ok) {
                 this.logger.error(`Failed to fetch rates: HTTP status ${response.status}`);
+                return;
             }
+
+            const data = await response.json();
+
+            if (data.result !== 'success') {
+                this.logger.error('Failed to fetch rates: API returned error', data);
+                return;
+            }
+
+            const rates = data.conversion_rates;
+            const baseCode = data.base_code;
+
+            this.logger.log(`Received rates for base: ${baseCode}. Updating database...`);
+
+            // Use a transaction for bulk update safety
+            await this.db.transaction(async (client) => {
+                for (const [code, rate] of Object.entries(rates)) {
+                    const query = `
+                        INSERT INTO exchange_rates (code, rate, base_code, updated_at)
+                        VALUES ($1, $2, $3, NOW())
+                        ON CONFLICT (code) 
+                        DO UPDATE SET 
+                            rate = EXCLUDED.rate, 
+                            base_code = EXCLUDED.base_code, 
+                            updated_at = NOW();
+                    `;
+                    // @ts-ignore
+                    await client.query(query, [code, rate, baseCode]);
+                }
+            });
+
+            this.logger.log('Exchange rates updated successfully.');
         } catch (error) {
             this.logger.error('Error updating exchange rates', error);
         }
     }
 
     async getRate(currencyCode: string): Promise<number | null> {
-        if (currencyCode === 'USD') {
-            return 1;
-        }
+        if (currencyCode === 'USD') return 1;
+
         const result = await this.db.query(
             'SELECT rate FROM exchange_rates WHERE code = $1',
             [currencyCode],
         );
 
-        if (result.rows.length > 0) {
-            return parseFloat(result.rows[0].rate);
-        }
-        return null;
+        if (result.rows.length === 0) return null;
+
+        return parseFloat(result.rows[0].rate);
     }
 }
