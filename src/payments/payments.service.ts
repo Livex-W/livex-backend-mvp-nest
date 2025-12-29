@@ -1036,13 +1036,13 @@ export class PaymentsService {
       }
 
       // Convert payment amount
-      const displayAmount = convertPrice(
-        (payment.amount_cents / 100),
-        payment.currency,
-        preferences.currency,
-        sourceRate,
-        targetRate,
-      );
+      const displayAmount = convertPrice({
+        sourceCurrency: payment.currency,
+        targetCurrency: preferences.currency,
+        priceCents: payment.amount_cents,
+        sourceRate: sourceRate / 100,
+        targetRate: targetRate / 100,
+      });
 
       return {
         ...payment,
@@ -1079,13 +1079,13 @@ export class PaymentsService {
       }
 
       // Convert refund amount
-      const displayAmount = convertPrice(
-        (refund.amount_cents / 100),
-        refund.currency,
-        preferences.currency,
-        sourceRate,
-        targetRate,
-      );
+      const displayAmount = convertPrice({
+        sourceCurrency: refund.currency,
+        targetCurrency: preferences.currency,
+        priceCents: refund.amount_cents,
+        sourceRate: sourceRate / 100,
+        targetRate: targetRate / 100,
+      });
 
       return {
         ...refund,

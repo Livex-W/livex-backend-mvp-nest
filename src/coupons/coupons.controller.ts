@@ -111,21 +111,21 @@ export class CouponsController {
                 const targetRate = await this.exchangeRatesService.getRate(preferences.currency);
 
                 if (targetRate) {
-                    const displayTotalDiscount = convertPrice(
-                        result.totalDiscount,
-                        'USD', // Assuming coupons are in USD
-                        preferences.currency,
-                        (sourceRate ?? 1) / 100,
-                        targetRate / 100,
-                    );
+                    const displayTotalDiscount = convertPrice({
+                        sourceCurrency: 'USD',
+                        targetCurrency: preferences.currency,
+                        priceCents: result.totalDiscount,
+                        sourceRate: (sourceRate ?? 1) / 100,
+                        targetRate: targetRate / 100,
+                    });
 
-                    const displayFinalTotal = convertPrice(
-                        result.finalTotal,
-                        'USD',
-                        preferences.currency,
-                        (sourceRate ?? 1) / 100,
-                        targetRate / 100,
-                    );
+                    const displayFinalTotal = convertPrice({
+                        sourceCurrency: 'USD',
+                        targetCurrency: preferences.currency,
+                        priceCents: result.finalTotal,
+                        sourceRate: (sourceRate ?? 1) / 100,
+                        targetRate: targetRate / 100,
+                    });
 
                     return {
                         ...result,

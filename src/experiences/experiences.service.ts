@@ -535,21 +535,21 @@ export class ExperiencesService {
         }
 
         // Case 3: Convert between any two currencies
-        const displayPrice = convertPrice(
-          (exp.price_cents / 100),
-          exp.currency,
-          preferences.currency,
-          sourceRate,
-          targetRate,
-        );
+        const displayPrice = convertPrice({
+          sourceCurrency: exp.currency,
+          targetCurrency: preferences.currency,
+          priceCents: exp.price_cents,
+          sourceRate: sourceRate / 100,
+          targetRate: targetRate / 100,
+        });
 
-        const displayCommission = convertPrice(
-          (exp.commission_cents ?? 0) / 100,
-          exp.currency,
-          preferences.currency,
-          sourceRate,
-          targetRate,
-        );
+        const displayCommission = convertPrice({
+          sourceCurrency: exp.currency,
+          targetCurrency: preferences.currency,
+          priceCents: exp.commission_cents ?? 0,
+          sourceRate: sourceRate / 100,
+          targetRate: targetRate / 100,
+        });
 
         this.logger.log('Price conversion applied', {
           experienceId: exp.id,
