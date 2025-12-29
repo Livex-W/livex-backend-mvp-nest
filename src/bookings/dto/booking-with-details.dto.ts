@@ -120,6 +120,26 @@ export class BookingWithDetailsDto {
     @IsString()
     updated_at!: string;
 
+    // Display prices in user's preferred currency
+    @IsOptional()
+    @Type(() => Number)
+    @Min(0)
+    display_subtotal?: number;
+
+    @IsOptional()
+    @Type(() => Number)
+    @Min(0)
+    display_tax?: number;
+
+    @IsOptional()
+    @Type(() => Number)
+    @Min(0)
+    display_total?: number;
+
+    @IsOptional()
+    @IsString()
+    display_currency?: string;
+
     @IsOptional()
     @ValidateNested()
     @Type(() => BookingExperienceDto)

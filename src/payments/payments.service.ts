@@ -11,6 +11,9 @@ import { WebhookPayloadDto } from './dto/webhook-payload.dto';
 import { NotificationService } from '../notifications/services/notification.service';
 import { WebhookEvent } from './interfaces/payment-provider.interface';
 import { CouponsService } from '../coupons/coupons.service';
+import { UserPreferencesService } from '../user-preferences/user-preferences.service';
+import { ExchangeRatesService } from '../exchange-rates/exchange-rates.service';
+import { convertPrice } from '../common/utils/price-converter';
 
 interface Payment {
   id: string;
@@ -34,6 +37,10 @@ interface Payment {
   created_at: Date;
   updated_at: Date;
   user_id?: string; // Para consultas con JOIN
+
+  // Display prices in user's preferred currency
+  display_amount?: number;
+  display_currency?: string;
 }
 
 interface Booking {
@@ -45,6 +52,7 @@ interface Booking {
   children: number;
   commission_cents: number;
   resort_net_cents: number;
+  vip_discount_cents: number;
   total_cents: number;
   currency: string;
   status: string;
@@ -68,6 +76,10 @@ export interface Refund {
   provider_metadata?: any;
   created_at: Date;
   updated_at: Date;
+
+  // Display prices in user's preferred currency
+  display_amount?: number;
+  display_currency?: string;
 }
 
 @Injectable()
@@ -80,6 +92,8 @@ export class PaymentsService {
     private readonly configService: ConfigService,
     private readonly notificationService: NotificationService,
     private readonly couponsService: CouponsService,
+    private readonly userPreferencesService: UserPreferencesService,
+    private readonly exchangeRatesService: ExchangeRatesService,
   ) { }
 
   async createPayment(dto: CreatePaymentDto, userId: string): Promise<Payment> {
@@ -213,7 +227,7 @@ export class PaymentsService {
     });
 
     this.logger.log(`Payment created: ${payment.id} for booking ${dto.bookingId}`);
-    return updatedPayment;
+    return this.addDisplayPriceToPayment(updatedPayment, userId);
   }
 
   async processWebhook(dto: WebhookPayloadDto): Promise<void> {
@@ -476,13 +490,15 @@ export class PaymentsService {
       const refundAmount = dto.amountCents || payment.amount_cents;
 
       // Delegar ejecución al núcleo centralizado
-      return await this.executeRefund(
+      const refund = await this.executeRefund(
         client,
         payment,
         refundAmount,
         dto.reason ?? '',
         userId
       );
+
+      return this.addDisplayPriceToRefund(refund, userId);
     });
   }
 
@@ -856,7 +872,7 @@ export class PaymentsService {
       throw new NotFoundException('Payment not found');
     }
 
-    return result.rows[0];
+    return this.addDisplayPriceToPayment(result.rows[0], userId);
   }
 
   async getPaymentsByBooking(bookingId: string, userId?: string): Promise<Payment[]> {
@@ -873,6 +889,11 @@ export class PaymentsService {
     query += ' ORDER BY p.created_at DESC';
 
     const result = await this.db.query<Payment>(query, params);
+
+    if (userId) {
+      return Promise.all(result.rows.map(p => this.addDisplayPriceToPayment(p, userId)));
+    }
+
     return result.rows;
   }
 
@@ -990,4 +1011,91 @@ export class PaymentsService {
 
     return refundResult.rows[0];
   }
+
+  private async addDisplayPriceToPayment(payment: Payment, userId?: string): Promise<Payment> {
+    if (!userId) return payment;
+
+    try {
+      const preferences = await this.userPreferencesService.getOrCreateDefault(userId);
+
+      // If currency matches, no conversion needed
+      if (payment.currency === preferences.currency) {
+        return {
+          ...payment,
+          display_amount: payment.amount_cents,
+          display_currency: payment.currency,
+        };
+      }
+
+      // Get exchange rates
+      const sourceRate = await this.exchangeRatesService.getRate(payment.currency);
+      const targetRate = await this.exchangeRatesService.getRate(preferences.currency);
+
+      if (!sourceRate || !targetRate) {
+        return payment;
+      }
+
+      // Convert payment amount
+      const displayAmount = convertPrice({
+        sourceCurrency: payment.currency,
+        targetCurrency: preferences.currency,
+        priceCents: payment.amount_cents,
+        sourceRate: sourceRate / 100,
+        targetRate: targetRate / 100,
+      });
+
+      return {
+        ...payment,
+        display_amount: displayAmount,
+        display_currency: preferences.currency,
+      };
+    } catch (error) {
+      this.logger.error(`Error adding display price to payment ${payment.id}`, error);
+      return payment;
+    }
+  }
+
+  private async addDisplayPriceToRefund(refund: Refund, userId?: string): Promise<Refund> {
+    if (!userId) return refund;
+
+    try {
+      const preferences = await this.userPreferencesService.getOrCreateDefault(userId);
+
+      // If currency matches, no conversion needed
+      if (refund.currency === preferences.currency) {
+        return {
+          ...refund,
+          display_amount: refund.amount_cents,
+          display_currency: refund.currency,
+        };
+      }
+
+      // Get exchange rates
+      const sourceRate = await this.exchangeRatesService.getRate(refund.currency);
+      const targetRate = await this.exchangeRatesService.getRate(preferences.currency);
+
+      if (!sourceRate || !targetRate) {
+        return refund;
+      }
+
+      // Convert refund amount
+      const displayAmount = convertPrice({
+        sourceCurrency: refund.currency,
+        targetCurrency: preferences.currency,
+        priceCents: refund.amount_cents,
+        sourceRate: sourceRate / 100,
+        targetRate: targetRate / 100,
+      });
+
+      return {
+        ...refund,
+        display_amount: displayAmount,
+        display_currency: preferences.currency,
+      };
+    } catch (error) {
+      this.logger.error(`Error adding display price to refund ${refund.id}`, error);
+      return refund;
+    }
+  }
+
 }

@@ -28,6 +28,12 @@ import { FavoritesModule } from './favorites/favorites.module';
 import { CouponsModule } from './coupons/coupons.module';
 import bookingConfig from './common/config/booking.config';
 
+import { ScheduleModule } from '@nestjs/schedule';
+import { ExchangeRatesModule } from './exchange-rates/exchange-rates.module';
+import { UserPreferencesModule } from './user-preferences/user-preferences.module';
+
+
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -50,6 +56,9 @@ import bookingConfig from './common/config/booking.config';
     AgentsModule,
     FavoritesModule,
     CouponsModule,
+    ScheduleModule.forRoot(),
+    ExchangeRatesModule,
+    UserPreferencesModule,
   ],
   controllers: [AppController],
   providers: [

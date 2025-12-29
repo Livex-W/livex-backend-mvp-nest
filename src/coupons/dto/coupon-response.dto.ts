@@ -156,4 +156,19 @@ export class AppliedDiscountsDto {
     @ValidateNested({ each: true })
     @Type(() => AppliedCouponItemDto)
     appliedCoupons: AppliedCouponItemDto[];
+
+    // Display prices in user's preferred currency
+    @IsOptional()
+    @Type(() => Number)
+    @Min(0)
+    display_total_discount?: number;
+
+    @IsOptional()
+    @Type(() => Number)
+    @Min(0)
+    display_final_total?: number;
+
+    @IsOptional()
+    @IsString()
+    display_currency?: string;
 }

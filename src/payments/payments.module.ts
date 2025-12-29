@@ -8,6 +8,8 @@ import { PaymentProviderFactory } from './providers/payment-provider.factory';
 import { DatabaseModule } from '../database/database.module';
 import { NotificationModule } from '../notifications/notification.module';
 import { CouponsModule } from '../coupons/coupons.module';
+import { UserPreferencesModule } from '../user-preferences/user-preferences.module';
+import { ExchangeRatesModule } from '../exchange-rates/exchange-rates.module';
 
 @Module({
   imports: [
@@ -15,6 +17,8 @@ import { CouponsModule } from '../coupons/coupons.module';
     DatabaseModule,
     NotificationModule,
     CouponsModule,
+    UserPreferencesModule,
+    ExchangeRatesModule,
   ],
   controllers: [PaymentsController],
   providers: [

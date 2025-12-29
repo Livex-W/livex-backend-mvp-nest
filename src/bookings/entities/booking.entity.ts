@@ -13,6 +13,7 @@ export interface Booking {
     tax_cents: number;
     commission_cents: number;
     resort_net_cents: number;
+    vip_discount_cents: number;
     total_cents: number;
     currency: string;
     status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'refunded' | 'expired';
@@ -23,6 +24,12 @@ export interface Booking {
     referral_code_id?: string;
     created_at: Date;
     updated_at: Date;
+
+    // Display prices in user's preferred currency
+    display_subtotal?: number;
+    display_tax?: number;
+    display_total?: number;
+    display_currency?: string;
 }
 
 /**

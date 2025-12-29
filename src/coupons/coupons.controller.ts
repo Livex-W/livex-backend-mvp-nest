@@ -10,11 +10,18 @@ import {
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CouponsService } from './coupons.service';
 import { ValidateCouponDto, ApplyCouponsDto } from './dto';
+import { UserPreferencesService } from '../user-preferences/user-preferences.service';
+import { ExchangeRatesService } from '../exchange-rates/exchange-rates.service';
+import { convertPrice } from '../common/utils/price-converter';
 
 @Controller('api/v1/coupons')
 @UseGuards(JwtAuthGuard)
 export class CouponsController {
-    constructor(private readonly couponsService: CouponsService) { }
+    constructor(
+        private readonly couponsService: CouponsService,
+        private readonly userPreferencesService: UserPreferencesService,
+        private readonly exchangeRatesService: ExchangeRatesService,
+    ) { }
 
     /**
      * GET /coupons/my
@@ -83,16 +90,57 @@ export class CouponsController {
     /**
      * POST /coupons/calculate
      * Calcula descuentos totales con múltiples cupones
+     * Includes display prices in user's preferred currency
      */
     @Post('calculate')
     async calculateDiscounts(@Req() req: any, @Body() dto: ApplyCouponsDto) {
-        return this.couponsService.calculateDiscounts(
+        const result = await this.couponsService.calculateDiscounts(
             req.user.sub,
             dto.couponCodes,
             dto.referralCode || null,
             dto.experienceId,
             dto.totalCents,
         );
+
+        // Add display prices based on user preferences
+        try {
+            const preferences = await this.userPreferencesService.getOrCreateDefault(req.user.sub);
+
+            if (preferences.currency !== 'USD') {
+                const sourceRate = await this.exchangeRatesService.getRate('USD'); // Always 1
+                const targetRate = await this.exchangeRatesService.getRate(preferences.currency);
+
+                if (targetRate) {
+                    const displayTotalDiscount = convertPrice({
+                        sourceCurrency: 'USD',
+                        targetCurrency: preferences.currency,
+                        priceCents: result.totalDiscount,
+                        sourceRate: (sourceRate ?? 1) / 100,
+                        targetRate: targetRate / 100,
+                    });
+
+                    const displayFinalTotal = convertPrice({
+                        sourceCurrency: 'USD',
+                        targetCurrency: preferences.currency,
+                        priceCents: result.finalTotal,
+                        sourceRate: (sourceRate ?? 1) / 100,
+                        targetRate: targetRate / 100,
+                    });
+
+                    return {
+                        ...result,
+                        display_total_discount: displayTotalDiscount,
+                        display_final_total: displayFinalTotal,
+                        display_currency: preferences.currency,
+                    };
+                }
+            }
+
+        } catch {
+            // If conversion fails, return result without display prices
+        }
+
+        return result;
     }
 
     /**
