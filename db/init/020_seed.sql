@@ -162,45 +162,45 @@ e AS (
     includes, excludes, main_image_url, status, approved_by, approved_at
   )
   VALUES
-    -- 1. City Tour (Imagen: Calle colonial clásica con balcones y flores - Cartagena Vibe)
-    -- price_cents = $120 neto resort (pago presencial), commission_cents = $30 (pago online)
+    -- 1. City Tour
+    -- price_cents = $480.000 COP, commission = $120.000
     ((SELECT id FROM r WHERE name='Mar y Sol Cartagena'),
-      'City Tour Histórico', 'Recorrido por el Centro Histórico y Getsemaní', 'city_tour', 12000, 3000, 'USD',
+      'City Tour Histórico', 'Recorrido por el Centro Histórico y Getsemaní', 'city_tour', 48000000, 12000000, 'COP',
       'Guía certificado, hidratación', 'Almuerzo', 'https://images.unsplash.com/photo-1536308037887-165852797016?w=800', 'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
       
-    -- 2. Islas del Rosario (Existente)
-    -- price_cents = $250 neto resort, commission_cents = $50 (pago online)
+    -- 2. Islas del Rosario
+    -- price_cents = $1.000.000 COP, commission = $200.000
     ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
-      'Full Day Islas del Rosario', 'Traslado en lancha y día de playa en Isla Brisa', 'islands', 25000, 5000, 'USD',
+      'Full Day Islas del Rosario', 'Traslado en lancha y día de playa en Isla Brisa', 'islands', 100000000, 20000000, 'COP',
       'Traslados, coctel de bienvenida, carpa', 'Impuesto de muelle', 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800', 'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
       
-    -- 3. Sunset Sailing (Existente)
-    -- price_cents = $180 neto resort, commission_cents = $40 (pago online)
+    -- 3. Sunset Sailing
+    -- price_cents = $720.000 COP, commission = $160.000
     ((SELECT id FROM r WHERE name='Náutica Bahía Club'),
-      'Sunset Sailing', 'Navegación a vela por la Bahía al atardecer', 'nautical', 18000, 4000, 'USD',
+      'Sunset Sailing', 'Navegación a vela por la Bahía al atardecer', 'nautical', 72000000, 16000000, 'COP',
       'Capitán, seguro, snacks', 'Traslados al muelle', 'https://images.unsplash.com/photo-1500514966906-fe245eea9344?w=800', 'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
-    -- 4. NUEVA: Cholón Party (Imagen: Grupo de amigos en bote, agua turquesa - Party Vibe)
-    -- price_cents = $450 neto resort, commission_cents = $80 (pago online)
+    -- 4. NUEVA: Cholón Party
+    -- price_cents = $1.800.000 COP, commission = $320.000
     ((SELECT id FROM r WHERE name='Náutica Bahía Club'),
-      'Fiesta en Bote Deportivo Cholón', 'Experiencia de fiesta en el agua con música y amigos', 'nautical', 45000, 8000, 'USD',
+      'Fiesta en Bote Deportivo Cholón', 'Experiencia de fiesta en el agua con música y amigos', 'nautical', 180000000, 32000000, 'COP',
       'Bote deportivo, capitán, nevera con hielo', 'Bebidas alcohólicas, comida', 'https://images.unsplash.com/photo-1520116468816-95b69f847357?w=800', 'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
-    -- 5. NUEVA: Tour Gastronómico (Existente)
-    -- price_cents = $350 neto resort, commission_cents = $60 (pago online)
+    -- 5. NUEVA: Tour Gastronómico
+    -- price_cents = $1.400.000 COP, commission = $240.000
     ((SELECT id FROM r WHERE name='Mar y Sol Cartagena'),
-      'Street Food Tour Getsemaní', 'Prueba las mejores arepas, fritos y frutas locales', 'city_tour', 35000, 6000, 'USD',
+      'Street Food Tour Getsemaní', 'Prueba las mejores arepas, fritos y frutas locales', 'city_tour', 140000000, 24000000, 'COP',
       'Degustaciones en 5 paradas, guía local', 'Transporte al punto de encuentro', 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800', 'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
-    -- 6. NUEVA: Beach Club Tierra Bomba (Imagen: Piscina frente al mar estilo club de playa)
-    -- price_cents = $550 neto resort, commission_cents = $100 (pago online)
+    -- 6. NUEVA: Beach Club Tierra Bomba
+    -- price_cents = $2.200.000 COP, commission = $400.000
     ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
-      'Relax Day Tierra Bomba', 'Día de piscina y playa frente a la ciudad', 'islands', 55000, 10000, 'USD',
+      'Relax Day Tierra Bomba', 'Día de piscina y playa frente a la ciudad', 'islands', 220000000, 40000000, 'COP',
       'Transporte en lancha, bono consumible', 'Toallas', 'https://images.unsplash.com/photo-1540206351-d6465b3ac5c1?w=800', 'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now())
 
@@ -354,7 +354,7 @@ SELECT
   (SELECT id FROM experiences WHERE title='City Tour Histórico'),
   (SELECT id FROM availability_slots WHERE experience_id=(SELECT id FROM experiences WHERE title='City Tour Histórico') LIMIT 1),
   (SELECT id FROM users WHERE email='agente.carlos@gmail.com'), -- Agente
-  2, 0, 24000, 0, 6000, 24000, 30000, 'USD',  -- 2 personas × ($120 neto + $30 comisión) = $300 total, $60 comisión
+  2, 0, 96000000, 0, 24000000, 96000000, 120000000, 'COP',  -- 2 personas × ($480k neto + $120k comisión) = $1.2M total, $240k comisión
   'confirmed', now(), now();
 
 -- 4.5 Registrar Pago
@@ -365,7 +365,7 @@ INSERT INTO payments (
 SELECT
   (SELECT id FROM bookings WHERE user_id=(SELECT id FROM users WHERE email='sofia.turista@gmail.com') AND agent_id=(SELECT id FROM users WHERE email='agente.carlos@gmail.com') ORDER BY created_at DESC LIMIT 1),
   'wompi', 'WOMPI-TEST-AGENT-01', 
-  238000, 'USD',
+  952000000, 'COP',
   'paid', 'card', now();
 
 -- 4.6 Generar Comisiones
@@ -373,7 +373,7 @@ SELECT
 INSERT INTO commissions (booking_id, rate_bps, commission_cents, created_at)
 SELECT
   (SELECT id FROM bookings WHERE user_id=(SELECT id FROM users WHERE email='sofia.turista@gmail.com') AND agent_id=(SELECT id FROM users WHERE email='agente.carlos@gmail.com') ORDER BY created_at DESC LIMIT 1),
-  1000, FLOOR(238000 * 0.10), now();
+  1000, FLOOR(952000000 * 0.10), now();
 
 -- B) Comisión del Agente (15%)
 INSERT INTO agent_commissions (
@@ -383,7 +383,7 @@ SELECT
   b.id, 
   b.agent_id, 
   (SELECT id FROM resorts WHERE name='Mar y Sol Cartagena'),
-  FLOOR(b.total_cents * 0.15), -- 15% de 238,000
+  FLOOR(b.total_cents * 0.15), -- 15% de 952,000,000
   1500,
   'pending',
   now()
@@ -407,11 +407,11 @@ VALUES ((SELECT id FROM users WHERE email='agente.carlos@gmail.com'), 'VERANO202
 
 -- 5.3 Código Monto Fijo
 INSERT INTO referral_codes (owner_user_id, code, code_type, discount_type, discount_value, usage_limit, description)
-VALUES ((SELECT id FROM users WHERE email='agente.carlos@gmail.com'), 'PRIMERACOMPRA', 'both', 'fixed', 2000, 50, 'Primera compra - $20 USD de descuento');
+VALUES ((SELECT id FROM users WHERE email='agente.carlos@gmail.com'), 'PRIMERACOMPRA', 'both', 'fixed', 8000000, 50, 'Primera compra - $80.000 COP de descuento');
 
 -- 5.4 Código con Stacking
 INSERT INTO referral_codes (owner_user_id, code, code_type, discount_type, discount_value, allow_stacking, min_purchase_cents, description)
-VALUES ((SELECT id FROM users WHERE email='agente.carlos@gmail.com'), 'EXTRA10', 'discount', 'percentage', 1000, true, 5000000, 'Extra 10% - Combinable');
+VALUES ((SELECT id FROM users WHERE email='agente.carlos@gmail.com'), 'EXTRA10', 'discount', 'percentage', 1000, true, 200000000, 'Extra 10% - Combinable');
 
 -- 5.5 Restricciones (Solo Náutica)
 INSERT INTO referral_code_restrictions (referral_code_id, restriction_type, category_slug)
@@ -444,8 +444,8 @@ VALUES (
   'user_earned',
   'Cupón por referir a un amigo',
   'fixed',
-  1500, -- $15 USD de descuento
-  'USD',
+  6000000, -- $60.000 COP de descuento
+  'COP',
   'referral_bonus',
   now() + INTERVAL '6 months'
 );
@@ -463,7 +463,7 @@ VALUES (
   'Bienvenida - Primera reserva',
   'percentage',
   1500, -- 15% de descuento
-  'USD',
+  'COP',
   'admin_granted',
   now() + INTERVAL '1 month'
 );
@@ -482,7 +482,7 @@ VALUES (
   'Membresía VIP 1 año - 10% en todas las experiencias',
   'percentage',
   1000, -- 10% de descuento permanente
-  'USD',
+  'COP',
   365, -- 1 año
   'promotional',
   now() + INTERVAL '2 months' -- El cupón para redimir VIP vence en 2 meses
@@ -502,8 +502,8 @@ VALUES
    'Cupón por completar 3 reservas',
    'percentage',
    500, -- 5% extra
-   1000, -- Máximo $10 USD de descuento
-   'USD',
+   4000000, -- Máximo $40.000 COP de descuento
+   'COP',
    'gamification',
    now() + INTERVAL '3 months'),
   -- Cupón de primera reserva
@@ -512,9 +512,9 @@ VALUES
    'user_earned',
    'Cupón por primera reserva completada',
    'fixed',
-   2000, -- $20 USD fijo
+   8000000, -- $80.000 COP fijo
    NULL,
-   'USD',
+   'COP',
    'first_booking',
    now() + INTERVAL '1 year');
 
@@ -527,7 +527,16 @@ VALUES (
   (SELECT id FROM users WHERE email='pierre.frances@gmail.com'),
   'percentage',
   1200, -- 12% de descuento
-  'USD',
+  'COP',
+  'active',
+  now() - INTERVAL '1 month', -- Activado hace 1 mes
+  now() + INTERVAL '11 months' -- Quedan 11 meses
+),
+(
+  (SELECT id FROM users WHERE email='sofia.turista@gmail.com'),
+  'percentage',
+  1000, -- 10% de descuento
+  'COP',
   'active',
   now() - INTERVAL '1 month', -- Activado hace 1 mes
   now() + INTERVAL '11 months' -- Quedan 11 meses

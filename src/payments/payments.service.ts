@@ -140,6 +140,23 @@ export class PaymentsService {
       const paymentId = crypto.randomUUID();
       const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
+      // Determine payment currency and amount (PayPal requires USD usually, or we force it to ensure compatibility)
+      let paymentAmount = booking.commission_cents;
+      let paymentCurrency = booking.currency;
+
+      if (dto.provider === 'paypal' && paymentCurrency !== 'USD') {
+        const convertedAmount = await this.exchangeRatesService.convertCents(
+          paymentAmount,
+          paymentCurrency,
+          'USD',
+        );
+        this.logger.log(
+          `Converting PayPal payment from ${paymentCurrency} to USD: ${paymentAmount} -> ${convertedAmount}`,
+        );
+        paymentAmount = convertedAmount;
+        paymentCurrency = 'USD';
+      }
+
       const insertResult = await client.query<Payment>(
         `INSERT INTO payments (
         id, booking_id, provider, amount_cents, currency, status, 
@@ -150,8 +167,8 @@ export class PaymentsService {
           paymentId,
           dto.bookingId,
           dto.provider,
-          booking.commission_cents, // Only charge commission online
-          booking.currency,
+          paymentAmount, // Converted or original
+          paymentCurrency, // Converted or original
           'pending',
           dto.paymentMethod,
           dto.idempotencyKey,
@@ -174,8 +191,8 @@ export class PaymentsService {
 
       paymentResult = await provider.createPayment({
         id: payment.id,
-        amount: booking.commission_cents, // Only charge commission online
-        currency: booking.currency,
+        amount: payment.amount_cents, // Use the (potentially converted) payment amount
+        currency: payment.currency, // Use the (potentially converted) payment currency
         description: `LIVEX Commission - Booking ${booking.id}`,
         expiresAt: payment.expires_at,
         metadata: {

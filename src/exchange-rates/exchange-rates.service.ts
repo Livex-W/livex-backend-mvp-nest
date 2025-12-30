@@ -3,10 +3,16 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { DatabaseClient } from '../database/database.client';
 import { DATABASE_CLIENT } from '../database/database.module';
 
+interface ExchangeRateResponse {
+    result: string;
+    base_code: string;
+    conversion_rates: Record<string, number>;
+}
+
 @Injectable()
 export class ExchangeRatesService implements OnModuleInit {
     private readonly logger = new Logger(ExchangeRatesService.name);
-    private readonly apiKey = process.env.EXCHANGE_RATE_API_KEY || 'my_key';
+    private readonly apiKey = process.env.EXCHANGE_RATE_API_KEY;
     private readonly apiUrl = `https://v6.exchangerate-api.com/v6/${this.apiKey}/latest/USD`;
 
     constructor(@Inject(DATABASE_CLIENT) private readonly db: DatabaseClient) { }
@@ -33,7 +39,7 @@ export class ExchangeRatesService implements OnModuleInit {
                 return;
             }
 
-            const data = await response.json();
+            const data = (await response.json()) as ExchangeRateResponse;
 
             if (data.result !== 'success') {
                 this.logger.error('Failed to fetch rates: API returned error', data);
@@ -57,7 +63,6 @@ export class ExchangeRatesService implements OnModuleInit {
                             base_code = EXCLUDED.base_code, 
                             updated_at = NOW();
                     `;
-                    // @ts-ignore
                     await client.query(query, [code, rate, baseCode]);
                 }
             });
@@ -79,5 +84,22 @@ export class ExchangeRatesService implements OnModuleInit {
         if (result.rows.length === 0) return null;
 
         return parseFloat(result.rows[0].rate);
+    }
+
+    async convertCents(cents: number, from: string, to: string): Promise<number> {
+        if (from === to) return cents;
+        if (cents === 0) return 0;
+
+        const rateFrom = await this.getRate(from);
+        const rateTo = await this.getRate(to);
+
+        if (!rateFrom || !rateTo) {
+            throw new Error(`Exchange rate not found for conversion: ${from} -> ${to}`);
+        }
+
+        // Convert from -> USD -> to
+        // USD = from / rateFrom
+        // to = USD * rateTo
+        return Math.round((cents / rateFrom) * rateTo);
     }
 }

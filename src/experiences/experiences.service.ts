@@ -539,16 +539,16 @@ export class ExperiencesService {
           sourceCurrency: exp.currency,
           targetCurrency: preferences.currency,
           priceCents: exp.price_cents,
-          sourceRate: sourceRate / 100,
-          targetRate: targetRate / 100,
+          sourceRate: sourceRate,
+          targetRate: targetRate,
         });
 
         const displayCommission = convertPrice({
           sourceCurrency: exp.currency,
           targetCurrency: preferences.currency,
           priceCents: exp.commission_cents ?? 0,
-          sourceRate: sourceRate / 100,
-          targetRate: targetRate / 100,
+          sourceRate: sourceRate,
+          targetRate: targetRate,
         });
 
         this.logger.log('Price conversion applied', {

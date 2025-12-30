@@ -49,6 +49,15 @@ export class BookingsController {
     return await this.bookingsService.getUserBookings(user.sub, paginationDto);
   }
 
+  @Get('active-pending/:experienceId')
+  @Roles(USER_ROLES[0])
+  async getActivePendingBooking(
+    @Param('experienceId') experienceId: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return await this.bookingsService.findActivePendingBooking(user.sub, experienceId);
+  }
+
   @Post()
   @Roles(USER_ROLES[0])
   @ThrottlePayment()
@@ -80,6 +89,31 @@ export class BookingsController {
       bookingId: result.bookingId,
       lockId: result.lockId,
       expiresAt: result.expiresAt,
+      status: result.status,
+    });
+
+    return result;
+  }
+
+  @Patch(':bookingId')
+  @Roles(USER_ROLES[0])
+  @ThrottlePayment()
+  async updatePendingBooking(
+    @Param('bookingId') bookingId: string,
+    @Body() dto: CreateBookingDto,
+    @CurrentUser() user: JwtPayload,
+  ): Promise<PendingBookingResult> {
+    this.logger.logBusinessEvent('booking_update_pending_request', {
+      userId: user.sub,
+      bookingId,
+      slotId: dto.slotId,
+      experienceId: dto.experienceId,
+    });
+
+    const result = await this.bookingsService.updatePendingBooking(bookingId, dto, user.sub);
+
+    this.logger.logBusinessEvent('booking_update_pending_response', {
+      bookingId,
       status: result.status,
     });
 

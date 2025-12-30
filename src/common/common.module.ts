@@ -12,12 +12,12 @@ import { PaginationService } from './services/pagination.service';
       {
         name: 'default',
         ttl: 60000, // 1 minute
-        limit: 200, // 200 requests per minute
+        limit: 1000, // Increased from 200 to 1000 requests per minute
       },
       {
         name: 'auth',
         ttl: 60000, // 1 minute
-        limit: 5, // 5 requests per minute for auth endpoints
+        limit: 20, // Increased from 5 to 20 requests per minute
       },
     ]),
     DatabaseModule,
@@ -41,4 +41,4 @@ import { PaginationService } from './services/pagination.service';
     DatabaseModule,
   ],
 })
-export class CommonModule {}
+export class CommonModule { }

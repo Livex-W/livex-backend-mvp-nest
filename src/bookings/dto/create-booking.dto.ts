@@ -21,23 +21,27 @@ export class CreateBookingDto {
 
   @Type(() => Number)
   @IsInt()
+  @IsOptional()
   @Min(0)
-  subtotalCents!: number;
+  subtotalCents: number = 0;
 
   @Type(() => Number)
   @IsInt()
+  @IsOptional()
   @Min(0)
-  taxCents!: number;
+  taxCents: number = 0;
 
   @Type(() => Number)
   @IsInt()
+  @IsOptional()
   @Min(0)
-  commissionCents!: number;
+  commissionCents: number = 0;
 
   @Type(() => Number)
   @IsInt()
+  @IsOptional()
   @Min(0)
-  resortNetCents!: number;
+  resortNetCents: number = 0;
 
   @IsOptional()
   @IsString()

@@ -26,7 +26,7 @@ import type {
 import type { PendingBookingResultDto } from './dto/pending-booking.dto';
 import { UserPreferencesService } from '../user-preferences/user-preferences.service';
 import { ExchangeRatesService } from '../exchange-rates/exchange-rates.service';
-import { convertPrice, roundToNearestThousand } from '../common/utils/price-converter';
+import { convertPrice } from '../common/utils/price-converter';
 
 // Re-export for backwards compatibility
 export type PendingBookingResult = PendingBookingResultDto;
@@ -151,6 +151,22 @@ export class BookingsService {
     };
   }
 
+  async findActivePendingBooking(userId: string, experienceId: string): Promise<(Booking & { start_time?: string }) | null> {
+    const query = `
+      SELECT b.*, s.start_time 
+      FROM bookings b
+      LEFT JOIN availability_slots s ON s.id = b.slot_id
+      WHERE b.user_id = $1 
+      AND b.experience_id = $2 
+      AND b.status = 'pending' 
+      AND b.expires_at > NOW()
+      ORDER BY b.created_at DESC
+      LIMIT 1
+    `;
+    const result = await this.db.query<Booking & { start_time?: string }>(query, [userId, experienceId]);
+    return result.rows[0] || null;
+  }
+
   async createPendingBooking(input: CreatePendingBookingInput): Promise<PendingBookingResult> {
     const { dto, userId, idempotencyKey } = input;
 
@@ -159,18 +175,9 @@ export class BookingsService {
 
     try {
       return await this.db.transaction(async (client) => {
-        const remaining = await this.lockSlotCapacity(client, dto.slotId, dto.adults, dto.children, idempotencyKey);
-        if (remaining == null) {
-          throw new BadRequestException('El horario no se encuentra o no está disponible');
-        }
-        if (remaining < 0) {
-          throw new BadRequestException('Capacidad insuficiente para el horario seleccionado');
-        }
-
-        const expiresAt = this.calculateExpiry();
-
+        const { finalDto: createBookingData, expiresAt } = await this.prepareBookingData(client, dto);
         const bookingRow = await this.insertBooking(client, {
-          dto,
+          dto: createBookingData,
           userId,
           expiresAt,
           idempotencyKey,
@@ -191,26 +198,150 @@ export class BookingsService {
           expiresAt,
           slotId: dto.slotId,
           experienceId: dto.experienceId,
-          subtotalCents: dto.subtotalCents,
-          taxCents: dto.taxCents,
-          commissionCents: dto.commissionCents,
-          resortNetCents: dto.resortNetCents,
-          totalCents: dto.commissionCents + dto.resortNetCents,
-          currency: dto.currency,
+          subtotalCents: createBookingData.subtotalCents,
+          taxCents: createBookingData.taxCents,
+          commissionCents: createBookingData.commissionCents,
+          resortNetCents: createBookingData.resortNetCents,
+          totalCents: createBookingData.commissionCents + createBookingData.resortNetCents,
+          currency: createBookingData.currency,
         } satisfies PendingBookingResult;
       });
     } catch (error) {
-      this.logger.logError(error as Error, {
-        method: 'createPendingBooking',
-        data: {
-          userId,
-          slotId: dto.slotId,
-          experienceId: dto.experienceId,
-          idempotencyKey,
-        },
-      });
-      throw error;
+      if (error instanceof BadRequestException || error instanceof ConflictException || error instanceof NotFoundException) {
+        throw error;
+      }
+      this.logger.error(`Error creating pending booking: ${error.message}`, error.stack);
+      throw new InternalServerErrorException('Error al iniciar el proceso de reserva');
     }
+  }
+
+  async updatePendingBooking(bookingId: string, dto: CreateBookingDto, userId: string): Promise<PendingBookingResult> {
+    this.validateQuantities(dto);
+
+    try {
+      return await this.db.transaction(async (client) => {
+        // 1. Verify and Lock Booking Row
+        const bookingResult = await client.query<Booking>(
+          'SELECT * FROM bookings WHERE id = $1 AND user_id = $2 FOR UPDATE',
+          [bookingId, userId]
+        );
+        if (bookingResult.rows.length === 0) throw new NotFoundException('Reserva no encontrada');
+        const booking = bookingResult.rows[0];
+        if (booking.status !== 'pending') throw new BadRequestException('Solo se pueden actualizar reservas pendientes');
+
+        // 2. Remove old lock
+        await client.query('DELETE FROM inventory_locks WHERE booking_id = $1', [bookingId]);
+
+        // 3. Prepare new data and Check Capacity
+        const { finalDto: updateBookingData, expiresAt } = await this.prepareBookingData(client, dto);
+
+        // 4. Update Booking
+        const totalCents = updateBookingData.subtotalCents + (updateBookingData.taxCents || 0);
+        await client.query(
+          `UPDATE bookings SET 
+            slot_id = $1, 
+            adults = $2, 
+            children = $3, 
+            commission_cents = $4, 
+            resort_net_cents = $5, 
+            total_cents = $6,
+            expires_at = $7,
+            subtotal_cents = $8,
+            currency = $9,
+            tax_cents = $11
+          WHERE id = $10`,
+          [
+            updateBookingData.slotId,
+            updateBookingData.adults,
+            updateBookingData.children,
+            updateBookingData.commissionCents,
+            updateBookingData.resortNetCents,
+            totalCents,
+            expiresAt,
+            updateBookingData.subtotalCents,
+            updateBookingData.currency,
+            bookingId,
+            updateBookingData.taxCents || 0
+          ]
+        );
+
+        // 5. Insert new Inventory Lock
+        const lockRow = await this.insertInventoryLock(client, {
+          slotId: updateBookingData.slotId,
+          userId,
+          bookingId,
+          quantity: updateBookingData.adults + updateBookingData.children,
+          expiresAt,
+        });
+
+        return {
+          bookingId,
+          lockId: lockRow.id,
+          status: 'pending',
+          expiresAt,
+          slotId: updateBookingData.slotId,
+          experienceId: updateBookingData.experienceId,
+          subtotalCents: updateBookingData.subtotalCents,
+          taxCents: updateBookingData.taxCents,
+          commissionCents: updateBookingData.commissionCents,
+          resortNetCents: updateBookingData.resortNetCents,
+          totalCents: updateBookingData.commissionCents + updateBookingData.resortNetCents,
+          currency: updateBookingData.currency,
+        } satisfies PendingBookingResult;
+      });
+    } catch (error) {
+      if (error instanceof BadRequestException || error instanceof ConflictException || error instanceof NotFoundException) {
+        throw error;
+      }
+      this.logger.error(`Error updating pending booking: ${error.message}`, error.stack);
+      throw new InternalServerErrorException('Error al actualizar la reserva');
+    }
+  }
+
+  private async prepareBookingData(client: PoolClient, dto: CreateBookingDto, idempotencyKey?: string) {
+    const remaining = await this.lockSlotCapacity(client, dto.slotId, dto.adults, dto.children, idempotencyKey);
+    if (remaining == null) {
+      throw new BadRequestException('El horario no se encuentra o no está disponible');
+    }
+    if (remaining < 0) {
+      throw new BadRequestException('Capacidad insuficiente para el horario seleccionado');
+    }
+
+    // Calculate costs (Backend forced calculation per person)
+    const experienceResult = await client.query<{
+      price_cents: number;
+      commission_cents: number;
+      currency: string;
+    }>(
+      'SELECT price_cents, commission_cents, currency FROM experiences WHERE id = $1',
+      [dto.experienceId],
+    );
+    if (experienceResult.rows.length === 0)
+      throw new NotFoundException('Experience not found');
+    const expr = experienceResult.rows[0];
+
+    const guests = dto.adults + (dto.children || 0);
+
+    // Base calc
+    let commissionCents = expr.commission_cents * guests;
+    let resortNetCents = expr.price_cents * guests;
+
+    // Conversion
+    if (expr.currency !== dto.currency) {
+      commissionCents = await this.exchangeRatesService.convertCents(commissionCents, expr.currency, dto.currency);
+      resortNetCents = await this.exchangeRatesService.convertCents(resortNetCents, expr.currency, dto.currency);
+    }
+
+    const preparedData: CreateBookingDto = {
+      ...dto,
+      commissionCents,
+      resortNetCents,
+      subtotalCents: commissionCents + resortNetCents,
+    };
+
+    const expiresAt = this.calculateExpiry();
+
+    return { finalDto: preparedData, expiresAt };
   }
 
   async confirmPendingBooking(options: ConfirmBookingOptions): Promise<void> {
@@ -855,7 +986,7 @@ export class BookingsService {
     bookings: T | T[],
   ): Promise<T | T[]> {
     const isArray = Array.isArray(bookings);
-    const bookingsList = isArray ? (bookings as T[]) : [bookings as T];
+    const bookingsList = isArray ? bookings : [bookings];
 
     try {
       const preferences = await this.userPreferencesService.getOrCreateDefault(userId);
@@ -879,9 +1010,9 @@ export class BookingsService {
         if (!sourceRate || !targetRate) {
           return {
             ...booking,
-            display_subtotal: (booking as any).subtotal_cents / 100,
-            display_tax: (booking as any).tax_cents / 100,
-            display_total: (booking as any).total_cents / 100,
+            display_subtotal: (booking as Booking).subtotal_cents / 100,
+            display_tax: (booking as Booking).tax_cents / 100,
+            display_total: (booking as Booking).total_cents / 100,
             display_currency: booking.currency,
           } as T;
         }
@@ -895,17 +1026,17 @@ export class BookingsService {
 
         const displaySubtotal = convertPrice({
           ...commonParams,
-          priceCents: (booking as any).subtotal_cents,
+          priceCents: (booking as Booking).subtotal_cents,
         });
 
         const displayTax = convertPrice({
           ...commonParams,
-          priceCents: (booking as any).tax_cents,
+          priceCents: (booking as Booking).tax_cents,
         });
 
         const displayTotal = convertPrice({
           ...commonParams,
-          priceCents: (booking as any).total_cents,
+          priceCents: (booking as Booking).total_cents,
         });
 
         return {
