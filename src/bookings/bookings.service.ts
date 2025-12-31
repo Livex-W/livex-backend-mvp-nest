@@ -93,7 +93,9 @@ export class BookingsService {
           'slug', e.slug,
           'main_image_url', COALESCE(e.main_image_url, ''),
           'category', e.category,
-          'price_cents', e.price_cents,
+          'price_per_adult_cents', e.price_per_adult_cents,
+          'price_per_child_cents', e.price_per_child_cents,
+          'allows_children', e.allows_children,
           'currency', e.currency
         ) as experience,
         json_build_object(
@@ -309,22 +311,36 @@ export class BookingsService {
 
     // Calculate costs (Backend forced calculation per person)
     const experienceResult = await client.query<{
-      price_cents: number;
-      commission_cents: number;
+      price_per_adult_cents: number;
+      price_per_child_cents: number;
+      commission_per_adult_cents: number;
+      commission_per_child_cents: number;
+      allows_children: boolean;
+      child_min_age: number | null;
+      child_max_age: number | null;
       currency: string;
     }>(
-      'SELECT price_cents, commission_cents, currency FROM experiences WHERE id = $1',
+      `SELECT price_per_adult_cents, price_per_child_cents, 
+              commission_per_adult_cents, commission_per_child_cents,
+              allows_children, child_min_age, child_max_age, currency 
+       FROM experiences WHERE id = $1`,
       [dto.experienceId],
     );
     if (experienceResult.rows.length === 0)
       throw new NotFoundException('Experience not found');
     const expr = experienceResult.rows[0];
 
-    const guests = dto.adults + (dto.children || 0);
+    // Validate children are allowed
+    if (!expr.allows_children && (dto.children || 0) > 0) {
+      throw new BadRequestException('Esta experiencia no permite niños');
+    }
 
-    // Base calc
-    let commissionCents = expr.commission_cents * guests;
-    let resortNetCents = expr.price_cents * guests;
+    const adults = dto.adults;
+    const children = dto.children || 0;
+
+    // Calculate per person type
+    let commissionCents = (expr.commission_per_adult_cents * adults) + (expr.commission_per_child_cents * children);
+    let resortNetCents = (expr.price_per_adult_cents * adults) + (expr.price_per_child_cents * children);
 
     // Conversion
     if (expr.currency !== dto.currency) {

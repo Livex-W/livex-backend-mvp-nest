@@ -53,8 +53,13 @@ export class ExperiencesService {
       title,
       description,
       category,
-      price_cents,
-      commission_cents,
+      price_per_adult_cents,
+      price_per_child_cents,
+      commission_per_adult_cents,
+      commission_per_child_cents,
+      allows_children,
+      child_min_age,
+      child_max_age,
       currency,
       includes,
       excludes,
@@ -65,17 +70,25 @@ export class ExperiencesService {
     try {
       const result = await this.db.query<Experience>(
         `INSERT INTO experiences (
-          resort_id, title, description, category, price_cents, commission_cents, currency,
-          includes, excludes, main_image_url, status
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) 
+          resort_id, title, description, category,
+          price_per_adult_cents, price_per_child_cents,
+          commission_per_adult_cents, commission_per_child_cents,
+          allows_children, child_min_age, child_max_age,
+          currency, includes, excludes, main_image_url, status
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) 
         RETURNING *`,
         [
           resort_id,
           title,
           description,
           category,
-          price_cents,
-          commission_cents ?? 0,
+          price_per_adult_cents,
+          price_per_child_cents ?? 0,
+          commission_per_adult_cents ?? 0,
+          commission_per_child_cents ?? 0,
+          allows_children ?? true,
+          child_min_age,
+          child_max_age,
           currency,
           includes,
           excludes,
@@ -92,7 +105,7 @@ export class ExperiencesService {
         resortId: experience.resort_id,
         title: experience.title,
         category: experience.category,
-        priceUSD: experience.price_cents / 100
+        pricePerAdultUSD: experience.price_per_adult_cents / 100
       });
 
       return experience;
@@ -161,13 +174,13 @@ export class ExperiencesService {
     }
 
     if (queryDto.min_price !== undefined) {
-      conditions.push(`e.price_cents >= $${paramIndex}`);
+      conditions.push(`e.price_per_adult_cents >= $${paramIndex}`);
       params.push(queryDto.min_price);
       paramIndex++;
     }
 
     if (queryDto.max_price !== undefined) {
-      conditions.push(`e.price_cents <= $${paramIndex}`);
+      conditions.push(`e.price_per_adult_cents <= $${paramIndex}`);
       params.push(queryDto.max_price);
       paramIndex++;
     }
@@ -195,7 +208,7 @@ export class ExperiencesService {
     // Build sort options
     const sortOptions = this.paginationService.parseSortOptions(
       queryDto.sort,
-      ['title', 'category', 'price_cents', 'rating_avg', 'rating_count', 'created_at', 'updated_at'],
+      ['title', 'category', 'price_per_adult_cents', 'rating_avg', 'rating_count', 'created_at', 'updated_at'],
     );
     const orderByClause = this.paginationService.buildOrderByClause(
       sortOptions,
@@ -513,8 +526,10 @@ export class ExperiencesService {
         if (exp.currency === preferences.currency) {
           return {
             ...exp,
-            display_price: exp.price_cents,
-            display_commission: exp.commission_cents ?? 0,
+            display_price_per_adult: exp.price_per_adult_cents,
+            display_price_per_child: exp.price_per_child_cents,
+            display_commission_per_adult: exp.commission_per_adult_cents ?? 0,
+            display_commission_per_child: exp.commission_per_child_cents ?? 0,
             display_currency: exp.currency,
           };
         }
@@ -535,18 +550,34 @@ export class ExperiencesService {
         }
 
         // Case 3: Convert between any two currencies
-        const displayPrice = convertPrice({
+        const displayPricePerAdult = convertPrice({
           sourceCurrency: exp.currency,
           targetCurrency: preferences.currency,
-          priceCents: exp.price_cents,
+          priceCents: exp.price_per_adult_cents,
           sourceRate: sourceRate,
           targetRate: targetRate,
         });
 
-        const displayCommission = convertPrice({
+        const displayPricePerChild = convertPrice({
           sourceCurrency: exp.currency,
           targetCurrency: preferences.currency,
-          priceCents: exp.commission_cents ?? 0,
+          priceCents: exp.price_per_child_cents,
+          sourceRate: sourceRate,
+          targetRate: targetRate,
+        });
+
+        const displayCommissionPerAdult = convertPrice({
+          sourceCurrency: exp.currency,
+          targetCurrency: preferences.currency,
+          priceCents: exp.commission_per_adult_cents ?? 0,
+          sourceRate: sourceRate,
+          targetRate: targetRate,
+        });
+
+        const displayCommissionPerChild = convertPrice({
+          sourceCurrency: exp.currency,
+          targetCurrency: preferences.currency,
+          priceCents: exp.commission_per_child_cents ?? 0,
           sourceRate: sourceRate,
           targetRate: targetRate,
         });
@@ -555,14 +586,16 @@ export class ExperiencesService {
           experienceId: exp.id,
           from: exp.currency,
           to: preferences.currency,
-          originalPrice: exp.price_cents,
-          displayPrice,
+          originalAdultPrice: exp.price_per_adult_cents,
+          displayAdultPrice: displayPricePerAdult,
         });
 
         return {
           ...exp,
-          display_price: displayPrice,
-          display_commission: displayCommission,
+          display_price_per_adult: displayPricePerAdult,
+          display_price_per_child: displayPricePerChild,
+          display_commission_per_adult: displayCommissionPerAdult,
+          display_commission_per_child: displayCommissionPerChild,
           display_currency: preferences.currency,
         };
       };

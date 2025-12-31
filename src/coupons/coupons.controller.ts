@@ -100,6 +100,7 @@ export class CouponsController {
             dto.referralCode || null,
             dto.experienceId,
             dto.totalCents,
+            dto.guestCount ?? 1, // Default to 1 if not provided
         );
 
         // Add display prices based on user preferences

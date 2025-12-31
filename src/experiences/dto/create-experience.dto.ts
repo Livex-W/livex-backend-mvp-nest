@@ -51,13 +51,37 @@ export class CreateExperienceDto {
   @IsNotEmpty()
   @IsInt()
   @IsPositive()
-  @Min(1)
-  price_cents: number;
+  @Min(0)
+  price_per_adult_cents: number;
 
   @IsOptional()
   @IsInt()
   @Min(0)
-  commission_cents?: number = 0;
+  price_per_child_cents?: number = 0;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  commission_per_adult_cents?: number = 0;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  commission_per_child_cents?: number = 0;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  child_min_age?: number = 3;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  child_max_age?: number = 9;
+
+  @IsOptional()
+  @IsString()
+  allows_children?: boolean = true;
 
   @IsOptional()
   @IsString()

@@ -158,50 +158,82 @@ c AS (
 -- 6. Experiencias
 e AS (
   INSERT INTO experiences (
-    resort_id, title, description, category, price_cents, commission_cents, currency,
-    includes, excludes, main_image_url, status, approved_by, approved_at
+    resort_id, title, description, category,
+    price_per_adult_cents, price_per_child_cents,
+    commission_per_adult_cents, commission_per_child_cents,
+    allows_children, child_min_age, child_max_age,
+    currency, includes, excludes, main_image_url, status, approved_by, approved_at
   )
   VALUES
-    -- 1. City Tour
-    -- price_cents = $480.000 COP, commission = $120.000
+    -- 1. City Tour Histórico
     ((SELECT id FROM r WHERE name='Mar y Sol Cartagena'),
-      'City Tour Histórico', 'Recorrido por el Centro Histórico y Getsemaní', 'city_tour', 48000000, 12000000, 'COP',
-      'Guía certificado, hidratación', 'Almuerzo', 'https://images.unsplash.com/photo-1536308037887-165852797016?w=800', 'active'::experience_status,
+      'City Tour Histórico', 'Recorrido por el Centro Histórico y Getsemaní', 'city_tour',
+      19000000, 18000000,  -- price_per_adult ($190k), price_per_child ($180k)
+      3500000, 2500000,   -- commission_per_adult ($35k), commission_per_child ($25k)
+      true, 3, 9,          -- allows_children, min_age, max_age
+      'COP', 'Guía certificado, hidratación', 'Almuerzo',
+      'https://images.unsplash.com/photo-1536308037887-165852797016?w=800', 'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
       
-    -- 2. Islas del Rosario
-    -- price_cents = $1.000.000 COP, commission = $200.000
+    -- 2. Full Day Islas del Rosario - SOL Y PAPAYA CLASSIC
+    -- precio_adulto = $320.000 COP, niño = $280.000 COP
     ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
-      'Full Day Islas del Rosario', 'Traslado en lancha y día de playa en Isla Brisa', 'islands', 100000000, 20000000, 'COP',
-      'Traslados, coctel de bienvenida, carpa', 'Impuesto de muelle', 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800', 'active'::experience_status,
+      'Sol y Papaya Classic', 'Día de playa en Islas del Rosario, traslado ida y vuelta', 'islands',
+      32000000, 28000000,  -- price_per_adult, price_per_child
+      9000000, 8000000,    -- commission_per_adult ($90k), commission_per_child ($80k)
+      true, 3, 10,           -- allows_children, min_age=3, max_age=10
+      'COP', 'Traslados, coctel de bienvenida, carpa', 'Impuesto de muelle',
+      'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800', 'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
       
     -- 3. Sunset Sailing
-    -- price_cents = $720.000 COP, commission = $160.000
     ((SELECT id FROM r WHERE name='Náutica Bahía Club'),
-      'Sunset Sailing', 'Navegación a vela por la Bahía al atardecer', 'nautical', 72000000, 16000000, 'COP',
-      'Capitán, seguro, snacks', 'Traslados al muelle', 'https://images.unsplash.com/photo-1500514966906-fe245eea9344?w=800', 'active'::experience_status,
+      'Sunset Sailing', 'Navegación a vela por la Bahía al atardecer', 'nautical',
+      17000000, 0,          -- price_per_adult ($170k), price_per_child (no aplica)
+      4000000, 0,          -- commission_per_adult ($40k), commission_per_child (no aplica)
+      false, NULL, NULL,    -- allows_children=false, sin rango de edad
+      'COP', 'Capitán, seguro, snacks', 'Traslados al muelle',
+      'https://images.unsplash.com/photo-1500514966906-fe245eea9344?w=800', 'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
-    -- 4. NUEVA: Cholón Party
-    -- price_cents = $1.800.000 COP, commission = $320.000
+    -- 4. Cholón Party - Solo adultos (18+)
     ((SELECT id FROM r WHERE name='Náutica Bahía Club'),
-      'Fiesta en Bote Deportivo Cholón', 'Experiencia de fiesta en el agua con música y amigos', 'nautical', 180000000, 32000000, 'COP',
-      'Bote deportivo, capitán, nevera con hielo', 'Bebidas alcohólicas, comida', 'https://images.unsplash.com/photo-1520116468816-95b69f847357?w=800', 'active'::experience_status,
+      'Fiesta en Bote Deportivo Cholón', 'Experiencia de fiesta en el agua con música y amigos', 'nautical',
+      42000000, 0,         -- Luxury Beach Area ($420k)
+      8000000, 0,          -- Commission ($80k)
+      false, NULL, NULL,    -- NO permite niños
+      'COP', 'Bote deportivo, capitán, nevera con hielo', 'Bebidas alcohólicas, comida',
+      'https://images.unsplash.com/photo-1520116468816-95b69f847357?w=800', 'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
-    -- 5. NUEVA: Tour Gastronómico
-    -- price_cents = $1.400.000 COP, commission = $240.000
-    ((SELECT id FROM r WHERE name='Mar y Sol Cartagena'),
-      'Street Food Tour Getsemaní', 'Prueba las mejores arepas, fritos y frutas locales', 'city_tour', 140000000, 24000000, 'COP',
-      'Degustaciones en 5 paradas, guía local', 'Transporte al punto de encuentro', 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800', 'active'::experience_status,
-      (SELECT id FROM u WHERE email='admin@livex.app'), now()),
-
-    -- 6. NUEVA: Beach Club Tierra Bomba
-    -- price_cents = $2.200.000 COP, commission = $400.000
+    -- 5. Street Food Tour - TIERRA BOMBA PALMARITO
     ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
-      'Relax Day Tierra Bomba', 'Día de piscina y playa frente a la ciudad', 'islands', 220000000, 40000000, 'COP',
-      'Transporte en lancha, bono consumible', 'Toallas', 'https://images.unsplash.com/photo-1540206351-d6465b3ac5c1?w=800', 'active'::experience_status,
+      'Palmarito Beach Day', 'Día de playa en Tierra Bomba con almuerzo incluido', 'islands',
+      23000000, 18000000, -- Adult ($230k), Niño ($180k)
+      3000000, 2500000,   -- Comm Adult ($30k), Comm Child ($25k)
+      true, 4, 10,          -- Niños de 4-10 años
+      'COP', 'Almuerzo típico, uso de instalaciones', 'Toallas',
+      'https://images.unsplash.com/photo-1573046738959-1e35593f0b24?w=800', 'active'::experience_status,
+      (SELECT id FROM u WHERE email='admin@livex.app'), now()),
+
+    -- 6. Isla Bela - ISLAS DEL ROSARIO
+    ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
+      'Isla Bela Deluxe', 'Experiencia exclusiva en Isla Bela', 'islands',
+      39000000, 30000000, -- Adult ($390k), Child ($300k)
+      7000000, 2000000,   -- Comm Adult ($70k), Comm Child ($20k)
+      true, 3, 10,
+      'COP', 'Transporte rápido, almuerzo gourmet', 'Bebidas premium',
+      'https://images.unsplash.com/photo-1540206351-d6465b3ac5c1?w=800', 'active'::experience_status,
+      (SELECT id FROM u WHERE email='admin@livex.app'), now()),
+
+    -- 7. Lizamar - ISLAS DEL ROSARIO
+    ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
+      'Lizamar Island Escape', 'Escapada relajante a Lizamar', 'islands',
+      40000000, 0,        -- Adult ($400k)
+      8000000, 0,         -- Comm ($80k)
+      false, NULL, NULL,  -- Solo adultos por ahora en este ejemplo
+      'COP', 'Transporte, almuerzo buffet, piscina', 'Snorkel',
+      'https://images.unsplash.com/photo-1590523741831-ab7e8b8f9c7f?w=800', 'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now())
 
   RETURNING id, title, category, resort_id
@@ -223,25 +255,29 @@ imgs AS (
     ((SELECT id FROM e WHERE title='City Tour Histórico'), 'https://images.unsplash.com/photo-1583531172005-893e7e366d3f?w=800', 0),
     ((SELECT id FROM e WHERE title='City Tour Histórico'), 'https://images.unsplash.com/photo-1578632292335-df3abbb0d586?w=800', 1),
     
-    -- Full Day Islas
-    ((SELECT id FROM e WHERE title='Full Day Islas del Rosario'), 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800', 0),
-    ((SELECT id FROM e WHERE title='Full Day Islas del Rosario'), 'https://images.unsplash.com/photo-1519046904884-53103b34b206?w=800', 1),
+    -- Sol y Papaya (Classic)
+    ((SELECT id FROM e WHERE title='Sol y Papaya Classic'), 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800', 0),
+    ((SELECT id FROM e WHERE title='Sol y Papaya Classic'), 'https://images.unsplash.com/photo-1519046904884-53103b34b206?w=800', 1),
     
     -- Sunset Sailing
     ((SELECT id FROM e WHERE title='Sunset Sailing'), 'https://images.unsplash.com/photo-1500514966906-fe245eea9344?w=800', 0),
     ((SELECT id FROM e WHERE title='Sunset Sailing'), 'https://images.unsplash.com/photo-1540946485063-a40da27545f8?w=800', 1),
 
-    -- NUEVO: Cholón Party
+    -- Cholón Party
     ((SELECT id FROM e WHERE title='Fiesta en Bote Deportivo Cholón'), 'https://images.unsplash.com/photo-1566412435010-b747372c0506?w=800', 0),
     ((SELECT id FROM e WHERE title='Fiesta en Bote Deportivo Cholón'), 'https://images.unsplash.com/photo-1544551763-46a42a4571da?w=800', 1),
     
-    -- NUEVO: Street Food Tour
-    ((SELECT id FROM e WHERE title='Street Food Tour Getsemaní'), 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800', 0),
-    ((SELECT id FROM e WHERE title='Street Food Tour Getsemaní'), 'https://images.unsplash.com/photo-1626202162624-9b578c7c9800?w=800', 1),
+    -- Palmarito (Tierra Bomba)
+    ((SELECT id FROM e WHERE title='Palmarito Beach Day'), 'https://images.unsplash.com/photo-1573046738959-1e35593f0b24?w=800', 0),
+    ((SELECT id FROM e WHERE title='Palmarito Beach Day'), 'https://images.unsplash.com/photo-1596436889106-be35e843f974?w=800', 1),
     
-    -- NUEVO: Tierra Bomba
-    ((SELECT id FROM e WHERE title='Relax Day Tierra Bomba'), 'https://images.unsplash.com/photo-1573046738959-1e35593f0b24?w=800', 0),
-    ((SELECT id FROM e WHERE title='Relax Day Tierra Bomba'), 'https://images.unsplash.com/photo-1596436889106-be35e843f974?w=800', 1)
+    -- Isla Bela
+    ((SELECT id FROM e WHERE title='Isla Bela Deluxe'), 'https://images.unsplash.com/photo-1540206351-d6465b3ac5c1?w=800', 0),
+    ((SELECT id FROM e WHERE title='Isla Bela Deluxe'), 'https://images.unsplash.com/photo-1626202162624-9b578c7c9800?w=800', 1),
+
+    -- Lizamar
+    ((SELECT id FROM e WHERE title='Lizamar Island Escape'), 'https://images.unsplash.com/photo-1590523741831-ab7e8b8f9c7f?w=800', 0),
+    ((SELECT id FROM e WHERE title='Lizamar Island Escape'), 'https://images.unsplash.com/photo-1544551763-46a42a4571da?w=800', 1)
 
   RETURNING experience_id
 ),
@@ -252,13 +288,14 @@ loc AS (
   VALUES
     -- Existentes
     ((SELECT id FROM e WHERE title='City Tour Histórico'), 'Monumento Camellón de los Mártires', 'Camellón de los Mártires, Centro', 10.422300, -75.545500, 'Llegar 10 min antes. Busca al guía con sombrero vueltiao.'),
-    ((SELECT id FROM e WHERE title='Full Day Islas del Rosario'), 'Muelle La Bodeguita', 'Av. Blas de Lezo, Centro', 10.421900, -75.548300, 'Impuesto de muelle no incluido. Presentar documento.'),
+    ((SELECT id FROM e WHERE title='Sol y Papaya Classic'), 'Muelle La Bodeguita', 'Av. Blas de Lezo, Centro', 10.421900, -75.548300, 'Impuesto de muelle no incluido. Presentar documento.'),
     ((SELECT id FROM e WHERE title='Sunset Sailing'), 'Marina Santa Cruz', 'Manga, Cartagena', 10.409800, -75.535100, 'Ingresar por portería principal, muelle 3.'),
     
     -- Nuevas
     ((SELECT id FROM e WHERE title='Fiesta en Bote Deportivo Cholón'), 'Muelle de los Pegasos', 'Centro Histórico, muelle lateral', 10.420500, -75.546000, 'Preguntar por el bote "La Fantástica".'),
-    ((SELECT id FROM e WHERE title='Street Food Tour Getsemaní'), 'Plaza de la Trinidad', 'Getsemaní, frente a la iglesia', 10.419500, -75.542000, 'El guía lleva camiseta naranja de Livex.'),
-    ((SELECT id FROM e WHERE title='Relax Day Tierra Bomba'), 'Muelle Hospital Bocagrande', 'Cra 1, Bocagrande', 10.398000, -75.556000, 'Lancha sale cada 30 minutos.')
+    ((SELECT id FROM e WHERE title='Palmarito Beach Day'), 'Muelle Hospital Bocagrande', 'Cra 1, Bocagrande', 10.398000, -75.556000, 'Lancha sale cada 30 minutos.'),
+    ((SELECT id FROM e WHERE title='Isla Bela Deluxe'), 'Muelle La Bodeguita', 'Puerta 4', 10.421900, -75.548300, 'Hora de salida 8:30 AM puntual.'),
+    ((SELECT id FROM e WHERE title='Lizamar Island Escape'), 'Muelle La Bodeguita', 'Puerta 5', 10.421900, -75.548300, 'Presentar voucher impreso o digital.')
 
   RETURNING experience_id
 )
@@ -287,13 +324,14 @@ FROM
     VALUES
       ('City Tour Histórico', '09:00:00'::time, '12:00:00'::time, 20),
       ('City Tour Histórico', '15:00:00'::time, '18:00:00'::time, 20),
-      ('Full Day Islas del Rosario', '08:00:00'::time, '16:00:00'::time, 40),
+      ('Sol y Papaya Classic', '08:00:00'::time, '16:00:00'::time, 40),
       ('Sunset Sailing', '17:30:00'::time, '19:30:00'::time, 10),
       
       -- Datos de disponibilidad para las NUEVAS experiencias
       ('Fiesta en Bote Deportivo Cholón', '10:00:00'::time, '16:00:00'::time, 12),
-      ('Street Food Tour Getsemaní', '17:00:00'::time, '19:30:00'::time, 15),
-      ('Relax Day Tierra Bomba', '09:00:00'::time, '17:00:00'::time, 30)
+      ('Palmarito Beach Day', '09:00:00'::time, '17:00:00'::time, 30),
+      ('Isla Bela Deluxe', '08:30:00'::time, '15:30:00'::time, 25),
+      ('Lizamar Island Escape', '08:00:00'::time, '16:00:00'::time, 30)
   ) AS t(title, start_time, end_time, capacity) ON e.title = t.title;
 
 
@@ -307,15 +345,15 @@ VALUES
   ((SELECT id FROM users WHERE email='sofia.turista@gmail.com'),
    (SELECT id FROM experiences WHERE title='City Tour Histórico'), 5, '¡Increíble experiencia! El guía fue muy amable.', now() - INTERVAL '2 days'),
   ((SELECT id FROM users WHERE email='sofia.turista@gmail.com'),
-   (SELECT id FROM experiences WHERE title='Full Day Islas del Rosario'), 5, 'El paraíso en la tierra.', now() - INTERVAL '1 week'),
+   (SELECT id FROM experiences WHERE title='Sol y Papaya Classic'), 5, 'El paraíso en la tierra.', now() - INTERVAL '1 week'),
   
   -- Nuevas Reseñas
   ((SELECT id FROM users WHERE email='sofia.turista@gmail.com'),
    (SELECT id FROM experiences WHERE title='Fiesta en Bote Deportivo Cholón'), 5, '¡La mejor fiesta de mi vida! Muy recomendado ir con amigos.', now() - INTERVAL '1 day'),
   ((SELECT id FROM users WHERE email='sofia.turista@gmail.com'),
-   (SELECT id FROM experiences WHERE title='Street Food Tour Getsemaní'), 4, 'La comida deliciosa, pero hay que caminar bastante.', now() - INTERVAL '4 days'),
+   (SELECT id FROM experiences WHERE title='Isla Bela Deluxe'), 4, 'La comida deliciosa y el servicio excelente.', now() - INTERVAL '4 days'),
   ((SELECT id FROM users WHERE email='sofia.turista@gmail.com'),
-   (SELECT id FROM experiences WHERE title='Relax Day Tierra Bomba'), 5, 'Un lugar muy exclusivo y tranquilo. El almuerzo estuvo 10/10.', now() - INTERVAL '6 days');
+   (SELECT id FROM experiences WHERE title='Palmarito Beach Day'), 5, 'Un lugar muy exclusivo y tranquilo. El almuerzo estuvo 10/10.', now() - INTERVAL '6 days');
 
 -- ===========================
 -- BLOQUE 4: SISTEMA DE AGENTES
@@ -403,7 +441,7 @@ VALUES ((SELECT id FROM users WHERE email='agente.carlos@gmail.com'), 'CARLOSVIP
 
 -- 5.2 Código Mixto (Descuento 10% + Comisión)
 INSERT INTO referral_codes (owner_user_id, code, code_type, discount_type, discount_value, description)
-VALUES ((SELECT id FROM users WHERE email='agente.carlos@gmail.com'), 'VERANO2025', 'both', 'percentage', 1000, 'Promoción de verano - 10% de descuento');
+VALUES ((SELECT id FROM users WHERE email='agente.carlos@gmail.com'), 'VERANO2025', 'both', 'fixed', 2500000, 'Promoción de verano - $25.000 de descuento');
 
 -- 5.3 Código Monto Fijo
 INSERT INTO referral_codes (owner_user_id, code, code_type, discount_type, discount_value, usage_limit, description)
@@ -420,12 +458,12 @@ VALUES ((SELECT id FROM referral_codes WHERE code = 'VERANO2025'), 'category', '
 -- 5.6 A/B Testing
 INSERT INTO referral_code_variants (parent_code_id, variant_name, code, discount_value)
 VALUES 
-  ((SELECT id FROM referral_codes WHERE code = 'VERANO2025'), 'Variant A - 15%', 'VERANO2025A', 1500),
-  ((SELECT id FROM referral_codes WHERE code = 'VERANO2025'), 'Variant B - 5%', 'VERANO2025B', 500);
+  ((SELECT id FROM referral_codes WHERE code = 'VERANO2025'), 'Variant A - 20k', 'VERANO2025A', 2000000),
+  ((SELECT id FROM referral_codes WHERE code = 'VERANO2025'), 'Variant B - 50k', 'VERANO2025B', 5000000);
 
 -- 5.7 Código de Influencer (No permite stacking)
 INSERT INTO referral_codes (owner_user_id, code, code_type, referral_type, discount_type, discount_value, description)
-VALUES ((SELECT id FROM users WHERE email='agente.carlos@gmail.com'), 'INFLUENCER20', 'discount', 'influencer', 'percentage', 2000, 'Código de influencer - 20% descuento, uso exclusivo');
+VALUES ((SELECT id FROM users WHERE email='agente.carlos@gmail.com'), 'INFLUENCER20', 'discount', 'influencer', 'fixed', 2000000, 'Código de influencer - $20.000 descuento, uso exclusivo');
 
 -- ===========================
 -- BLOQUE 6: CUPONES DE USUARIO Y VIP
@@ -444,7 +482,7 @@ VALUES (
   'user_earned',
   'Cupón por referir a un amigo',
   'fixed',
-  6000000, -- $60.000 COP de descuento
+  3000000, -- $30.000 COP de descuento
   'COP',
   'referral_bonus',
   now() + INTERVAL '6 months'
@@ -462,7 +500,7 @@ VALUES (
   'promotional',
   'Bienvenida - Primera reserva',
   'percentage',
-  1500, -- 15% de descuento
+  2000000, -- $20.000 COP de descuento
   'COP',
   'admin_granted',
   now() + INTERVAL '1 month'
@@ -500,10 +538,10 @@ VALUES
    'SOFIA-GAME-001',
    'user_earned',
    'Cupón por completar 3 reservas',
-   'percentage',
-   500, -- 5% extra
-   4000000, -- Máximo $40.000 COP de descuento
-   'COP',
+   'fixed',
+    2000000, -- $20.000 extra
+    NULL, -- Sin tope porcentual
+    'COP',
    'gamification',
    now() + INTERVAL '3 months'),
   -- Cupón de primera reserva
@@ -512,7 +550,7 @@ VALUES
    'user_earned',
    'Cupón por primera reserva completada',
    'fixed',
-   8000000, -- $80.000 COP fijo
+    5000000, -- $50.000 COP fijo
    NULL,
    'COP',
    'first_booking',

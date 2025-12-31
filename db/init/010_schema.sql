@@ -252,10 +252,17 @@ CREATE TABLE IF NOT EXISTS experiences (
   description     text,
   category        text NOT NULL CHECK (category IN ('islands','nautical','city_tour')),
   
-  -- Precios e Ingresos
-  price_cents      integer NOT NULL CHECK (price_cents >= 0),
-  commission_cents integer NOT NULL DEFAULT 0 CHECK (commission_cents >= 0), -- INTEGRADO AQUÍ
-  currency         text NOT NULL DEFAULT 'USD',
+  -- Precios diferenciados por adultos y niños
+  price_per_adult_cents      integer NOT NULL CHECK (price_per_adult_cents >= 0),
+  price_per_child_cents      integer NOT NULL DEFAULT 0 CHECK (price_per_child_cents >= 0),
+  commission_per_adult_cents integer NOT NULL DEFAULT 0 CHECK (commission_per_adult_cents >= 0),
+  commission_per_child_cents integer NOT NULL DEFAULT 0 CHECK (commission_per_child_cents >= 0),
+  currency                   text NOT NULL DEFAULT 'USD',
+  
+  -- Configuración de niños
+  allows_children boolean NOT NULL DEFAULT true,
+  child_min_age   integer DEFAULT 3 CHECK (child_min_age >= 0),
+  child_max_age   integer DEFAULT 9 CHECK (child_max_age >= child_min_age),
   
   includes        text,
   excludes        text,
@@ -275,13 +282,19 @@ CREATE TABLE IF NOT EXISTS experiences (
   updated_at      timestamptz NOT NULL DEFAULT now()
 );
 
--- Comentarios sobre columnas integradas
-COMMENT ON COLUMN experiences.commission_cents IS 'Fixed commission amount in cents that LIVEX charges online. Resort net (price_cents) is paid on-site.';
+-- Comentarios sobre columnas
+COMMENT ON COLUMN experiences.price_per_adult_cents IS 'Price per adult in cents. Customer pays this amount on-site.';
+COMMENT ON COLUMN experiences.price_per_child_cents IS 'Price per child in cents. Customer pays this amount on-site. 0 if children don''t pay.';
+COMMENT ON COLUMN experiences.commission_per_adult_cents IS 'LIVEX commission per adult charged online at booking time.';
+COMMENT ON COLUMN experiences.commission_per_child_cents IS 'LIVEX commission per child charged online at booking time.';
+COMMENT ON COLUMN experiences.allows_children IS 'Whether this experience allows children. If false, children field must be 0.';
+COMMENT ON COLUMN experiences.child_min_age IS 'Minimum age to be considered a child (inclusive). Below this age, the person does not pay.';
+COMMENT ON COLUMN experiences.child_max_age IS 'Maximum age to be considered a child (inclusive). Above this age, the person is considered an adult.';
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_experiences_resort_slug ON experiences(resort_id, slug);
 CREATE INDEX IF NOT EXISTS idx_experiences_category ON experiences(category);
 CREATE INDEX IF NOT EXISTS idx_experiences_status ON experiences(status);
-CREATE INDEX IF NOT EXISTS idx_experiences_price_currency ON experiences(price_cents, currency);
+CREATE INDEX IF NOT EXISTS idx_experiences_price_currency ON experiences(price_per_adult_cents, currency);
 CREATE TRIGGER trg_experiences_updated_at BEFORE UPDATE ON experiences FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 CREATE TABLE IF NOT EXISTS experience_categories (

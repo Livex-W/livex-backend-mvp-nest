@@ -7,9 +7,16 @@ export interface Experience {
   slug: string;
   description?: string;
   category: 'islands' | 'nautical' | 'city_tour';
-  price_cents: number;
-  commission_cents: number;
+  // Precios diferenciados
+  price_per_adult_cents: number;
+  price_per_child_cents: number;
+  commission_per_adult_cents: number;
+  commission_per_child_cents: number;
   currency: string;
+  // Configuración de niños
+  allows_children: boolean;
+  child_min_age?: number;
+  child_max_age?: number;
   includes?: string;
   excludes?: string;
   main_image_url?: string;
@@ -22,8 +29,10 @@ export interface Experience {
   created_at: Date;
   updated_at: Date;
   // Display prices in user's preferred currency
-  display_price?: number;
-  display_commission?: number;
+  display_price_per_adult?: number;
+  display_price_per_child?: number;
+  display_commission_per_adult?: number;
+  display_commission_per_child?: number;
   display_currency?: string;
 }
 

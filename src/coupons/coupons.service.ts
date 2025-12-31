@@ -69,6 +69,8 @@ interface BookingRow {
     experience_id: string;
     subtotal_cents: number;
     resort_net_cents: number;
+    adults: number;
+    children: number;
 }
 
 interface ExperienceRow {
@@ -389,6 +391,7 @@ export class CouponsService {
 
     /**
      * Calcula descuentos totales aplicando reglas de stacking
+     * Los descuentos se calculan POR PERSONA y luego se multiplican por guestCount
      */
     async calculateDiscounts(
         userId: string,
@@ -396,6 +399,7 @@ export class CouponsService {
         referralCode: string | null,
         experienceId: string,
         totalCents: number,
+        guestCount: number = 1,
     ): Promise<AppliedDiscountsDto> {
         const appliedCoupons: { code: string; type: string; discountApplied: number }[] = [];
         let userCouponsDiscount = 0;
@@ -403,16 +407,17 @@ export class CouponsService {
         let vipDiscount = 0;
 
         // 1. Verificar VIP activo
+        // 1. Verificar VIP activo
         const vipStatus = await this.getVipStatus(userId);
-        console.log(`🔍 VIP Status for user ${userId}:`, JSON.stringify(vipStatus));
         if (vipStatus.isVip) {
             if (vipStatus.discountType === 'percentage') {
+                // Calcular descuento porcentual sobre el total (NO multiplicar por guestCount)
                 vipDiscount = Math.floor((totalCents * vipStatus.discountValue!) / 10000);
-                console.log(`💎 VIP percentage discount: ${vipStatus.discountValue} basis points of ${totalCents} = ${vipDiscount}`);
             } else {
-                vipDiscount = vipStatus.discountValue!;
-                console.log(`💎 VIP fixed discount: ${vipDiscount}`);
+                // Descuento fijo (se aplica una vez por persona)
+                vipDiscount = vipStatus.discountValue! * guestCount;
             }
+
             appliedCoupons.push({
                 code: 'VIP',
                 type: 'vip_subscription',
@@ -439,7 +444,18 @@ export class CouponsService {
                     );
                 }
 
-                referralCodeDiscount = refValidation.discountAmountCents || 0;
+                // Calcular descuento según tipo
+                let currentRefDiscount = refValidation.discountAmountCents || 0;
+
+                // Si es porcentaje, validateReferralCode ya calculó el % sobre el totalCents. NO multiplicar.
+                // Si es fijo, validateReferralCode devolvió el valor unitario. SI multiplicar.
+
+                if (refValidation.discountType === 'fixed') {
+                    currentRefDiscount = (refValidation.discountValue || 0) * guestCount;
+                }
+
+                referralCodeDiscount = currentRefDiscount;
+
                 appliedCoupons.push({
                     code: referralCode,
                     type: `referral_${refValidation.referralType}`,
@@ -458,11 +474,21 @@ export class CouponsService {
                 throw new BadRequestException(`Cupón ${code}: ${validation.errorMessage}`);
             }
 
-            userCouponsDiscount += validation.discountAmountCents || 0;
+            let currentCouponDiscount = validation.discountAmountCents || 0;
+
+            // Si es porcentaje, validateUserCoupon ya calculó el % sobre el totalCents. NO multiplicar.
+            // Si es fijo, `validateUserCoupon` devuelve el valor fijo unitario. SI multiplicar.
+            if (validation.discountType === 'fixed') {
+                currentCouponDiscount = (validation.discountValue || 0) * guestCount;
+            }
+
+            console.log(`🎟️ Coupon ${code} discount: ${currentCouponDiscount} (Type: ${validation.discountType})`);
+
+            userCouponsDiscount += currentCouponDiscount;
             appliedCoupons.push({
                 code,
                 type: validation.couponType || 'user_earned',
-                discountApplied: validation.discountAmountCents || 0,
+                discountApplied: currentCouponDiscount,
             });
         }
 
@@ -604,9 +630,9 @@ export class CouponsService {
         // Siempre ejecutar para verificar VIP, incluso sin cupones de usuario
         const codes = couponCodes ?? [];
 
-        // 1. Obtener reserva para cálculos
+        // 1. Obtener reserva para cálculos (incluyendo cantidad de personas)
         const bookingResult = await this.db.query<BookingRow>(
-            `SELECT id, experience_id, subtotal_cents, resort_net_cents
+            `SELECT id, experience_id, subtotal_cents, resort_net_cents, adults, children
              FROM bookings
              WHERE id = $1 AND user_id = $2 AND status = 'pending'`,
             [bookingId, userId],
@@ -617,19 +643,21 @@ export class CouponsService {
         }
 
         const booking = bookingResult.rows[0];
+        const guestCount = booking.adults + booking.children;
 
         // Calcular comisión base original para aplicar descuentos
         // La comisión puede haber sido modificada antes, así que la recalculamos del subtotal
         const originalCommissionCents = booking.subtotal_cents - booking.resort_net_cents;
 
         // 2. Calcular los descuentos usando la comisión base (lo que el usuario paga ahora)
-        // SIEMPRE calcular - esto incluye VIP automáticamente si está activo
+        // Los descuentos se calculan POR PERSONA y luego se multiplican por guestCount
         const calculation = await this.calculateDiscounts(
             userId,
             codes,
             referralCode,
             booking.experience_id,
             originalCommissionCents,
+            guestCount,
         );
 
         // 3. Limpiar cupones previos de esta reserva (idempotencia)

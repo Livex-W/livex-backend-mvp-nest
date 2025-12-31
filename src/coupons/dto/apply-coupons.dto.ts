@@ -29,4 +29,9 @@ export class ApplyCouponsDto {
     @IsInt()
     @Min(0)
     totalCents: number;
+
+    @IsOptional()
+    @IsInt()
+    @Min(1)
+    guestCount?: number;
 }
