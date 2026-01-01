@@ -67,7 +67,7 @@ DO $$ BEGIN
 
     -- Sistema (Webhooks/Outbox)
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'webhook_status') THEN
-        CREATE TYPE webhook_status AS ENUM ('pending','processed','failed','ignored');
+        CREATE TYPE webhook_status AS ENUM ('pending','processed','failed','ignored', 'validated');
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'outbox_status') THEN
         CREATE TYPE outbox_status AS ENUM ('pending','sent','failed');
