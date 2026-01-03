@@ -243,18 +243,26 @@ export class ExperiencesService {
       // Always fetch locations for proximity filtering
       const locations = await this.getExperienceLocations(experienceIds);
 
+      // Fetch slot info (duration and capacity)
+      const slotInfo = await this.getSlotInfo(experienceIds);
+
       // Optionally fetch images
       const images = queryDto.include_images
         ? await this.getExperienceImages(experienceIds)
         : [];
 
-      const experiencesWithData: ExperienceWithImages[] = result.data.map(experience => ({
-        ...experience,
-        locations: locations.filter(loc => loc.experience_id === experience.id),
-        images: queryDto.include_images
-          ? images.filter(img => img.experience_id === experience.id)
-          : undefined,
-      }));
+      const experiencesWithData: ExperienceWithImages[] = result.data.map(experience => {
+        const info = slotInfo.get(experience.id);
+        return {
+          ...experience,
+          locations: locations.filter(loc => loc.experience_id === experience.id),
+          images: queryDto.include_images
+            ? images.filter(img => img.experience_id === experience.id)
+            : undefined,
+          duration_minutes: info?.duration_minutes,
+          max_capacity: info?.max_capacity,
+        };
+      });
 
       return {
         ...result,
@@ -280,6 +288,10 @@ export class ExperiencesService {
     // Always fetch locations for consistency
     const locations = await this.getExperienceLocations([id]);
 
+    // Fetch slot info
+    const slotInfo = await this.getSlotInfo([id]);
+    const info = slotInfo.get(id);
+
     // Optionally fetch images
     const images = includeImages ? await this.getExperienceImages([id]) : undefined;
 
@@ -287,6 +299,8 @@ export class ExperiencesService {
       ...experience,
       locations,
       images,
+      duration_minutes: info?.duration_minutes,
+      max_capacity: info?.max_capacity,
     };
   }
 
@@ -305,6 +319,10 @@ export class ExperiencesService {
     // Always fetch locations for consistency
     const locations = await this.getExperienceLocations([experience.id]);
 
+    // Fetch slot info
+    const slotInfo = await this.getSlotInfo([experience.id]);
+    const info = slotInfo.get(experience.id);
+
     // Optionally fetch images
     const images = includeImages ? await this.getExperienceImages([experience.id]) : undefined;
 
@@ -312,6 +330,8 @@ export class ExperiencesService {
       ...experience,
       locations,
       images,
+      duration_minutes: info?.duration_minutes,
+      max_capacity: info?.max_capacity,
     };
   }
 
@@ -354,15 +374,21 @@ export class ExperiencesService {
 
     const experienceIds = result.rows.map(exp => exp.id);
 
-    // Fetch locations and images
+    // Fetch locations, images, and slot info
     const locations = await this.getExperienceLocations(experienceIds);
     const images = await this.getExperienceImages(experienceIds);
+    const slotInfo = await this.getSlotInfo(experienceIds);
 
-    let experiencesWithData: ExperienceWithImages[] = result.rows.map(experience => ({
-      ...experience,
-      locations: locations.filter(loc => loc.experience_id === experience.id),
-      images: images.filter(img => img.experience_id === experience.id),
-    }));
+    let experiencesWithData: ExperienceWithImages[] = result.rows.map(experience => {
+      const info = slotInfo.get(experience.id);
+      return {
+        ...experience,
+        locations: locations.filter(loc => loc.experience_id === experience.id),
+        images: images.filter(img => img.experience_id === experience.id),
+        duration_minutes: info?.duration_minutes,
+        max_capacity: info?.max_capacity,
+      };
+    });
 
     // Add display prices if user ID is provided
     if (userId) {
@@ -573,6 +599,47 @@ export class ExperiencesService {
 
     return result.rows;
   }
+
+  /**
+   * Get slot info (duration and capacity) for experiences
+   * Returns the typical duration (mode) and max capacity from availability_slots
+   */
+  private async getSlotInfo(experienceIds: string[]): Promise<Map<string, { duration_minutes: number; max_capacity: number }>> {
+    if (experienceIds.length === 0) return new Map();
+
+    const placeholders = experienceIds.map((_, index) => `$${index + 1}`).join(', ');
+
+    // Get the most common duration and max capacity for each experience
+    const result = await this.db.query<{
+      experience_id: string;
+      duration_minutes: number;
+      max_capacity: number;
+    }>(
+      `SELECT 
+        experience_id,
+        EXTRACT(EPOCH FROM (end_time - start_time))::integer / 60 AS duration_minutes,
+        MAX(capacity) AS max_capacity
+       FROM availability_slots
+       WHERE experience_id IN (${placeholders})
+       GROUP BY experience_id, EXTRACT(EPOCH FROM (end_time - start_time))::integer / 60
+       ORDER BY experience_id, COUNT(*) DESC`,
+      experienceIds,
+    );
+
+    // Build map with first (most common) duration per experience
+    const slotInfoMap = new Map<string, { duration_minutes: number; max_capacity: number }>();
+    for (const row of result.rows) {
+      if (!slotInfoMap.has(row.experience_id)) {
+        slotInfoMap.set(row.experience_id, {
+          duration_minutes: row.duration_minutes,
+          max_capacity: row.max_capacity,
+        });
+      }
+    }
+
+    return slotInfoMap;
+  }
+
 
 
   /**

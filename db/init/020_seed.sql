@@ -99,6 +99,27 @@ WITH u AS (
   RETURNING id, email, role
 ),
 
+-- User Preferences (currency settings for each user)
+up AS (
+  INSERT INTO user_preferences (user_id, language, currency)
+  SELECT id, 'es', 'COP' FROM u WHERE email = 'sofia.turista@gmail.com'
+  UNION ALL
+  SELECT id, 'en', 'USD' FROM u WHERE email = 'john.doe@usmail.com'
+  UNION ALL
+  SELECT id, 'es', 'COP' FROM u WHERE email = 'pedro.brasil@email.br'
+  UNION ALL
+  SELECT id, 'es', 'COP' FROM u WHERE email = 'pierre.france@email.fr'
+  UNION ALL
+  SELECT id, 'es', 'COP' FROM u WHERE email = 'jose.perez@email.com'
+  UNION ALL
+  SELECT id, 'es', 'COP' FROM u WHERE email = 'admin@livex.app'
+  UNION ALL
+  SELECT id, 'es', 'COP' FROM u WHERE email = 'operador@marysol.co'
+  UNION ALL
+  SELECT id, 'es', 'COP' FROM u WHERE email = 'carlos.ventas@livex.app'
+  RETURNING user_id, currency
+),
+
 -- 2. Prestadores (Resorts)
 r AS (
   INSERT INTO resorts (
@@ -701,7 +722,7 @@ VALUES
    'user_earned',
    'Cupón por primera reserva completada',
    'fixed',
-    5000000, -- $50.000 COP fijo
+    3000000, -- $30.000 COP fijo
    NULL,
    'COP',
    'first_booking',

@@ -34,6 +34,9 @@ export interface Experience {
   display_commission_per_adult?: number;
   display_commission_per_child?: number;
   display_currency?: string;
+  // Computed from availability_slots
+  duration_minutes?: number;
+  max_capacity?: number;
 }
 
 export interface ExperienceWithImages extends Experience {
