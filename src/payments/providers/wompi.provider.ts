@@ -68,6 +68,10 @@ interface WompiRefundResponse {
   };
 }
 
+type WompiStatus = 'pending' | 'authorized' | 'paid' | 'failed' | 'expired';
+type WompiRefundStatus = 'pending' | 'processed' | 'failed';
+
+
 @Injectable()
 export class WompiProvider implements PaymentProvider {
   private readonly logger = new Logger(WompiProvider.name);
@@ -411,17 +415,22 @@ export class WompiProvider implements PaymentProvider {
 
   async createRefund(request: RefundRequest): Promise<RefundResult> {
     try {
-      const payload = {
-        transaction_id: request.paymentId,
-        amount_in_cents: request.amount,
-        reason: request.reason || 'Requested by customer',
-      };
+      const wompiTransactionId = request.metadata?.wompiTransactionId;
+
+      if (!wompiTransactionId) {
+        throw new Error('Wompi transaction ID not found in payment metadata');
+      }
+
+      this.logger.log(`Creating Wompi VOID for transaction ${wompiTransactionId}`);
+
 
       const response = await this.makeRequest<WompiRefundResponse>(
         'POST',
-        '/v1/transactions/void',
-        payload
+        `/v1/transactions/${wompiTransactionId}/void`,
+        {}
       );
+
+      this.logger.log(`Wompi VOID response for ${request.paymentId}: ${JSON.stringify(response.data)}`);
 
       return {
         id: `refund_${response.data.id}`,
@@ -541,7 +550,8 @@ export class WompiProvider implements PaymentProvider {
     return response.json();
   }
 
-  private mapWompiStatus(wompiStatus: string): 'pending' | 'authorized' | 'paid' | 'failed' | 'expired' {
+
+  private mapWompiStatus(wompiStatus: string): WompiStatus {
     switch (wompiStatus?.toUpperCase()) {
       case 'PENDING':
         return 'pending';
@@ -557,11 +567,12 @@ export class WompiProvider implements PaymentProvider {
     }
   }
 
-  private mapWompiRefundStatus(wompiStatus: string): 'pending' | 'processed' | 'failed' {
+  private mapWompiRefundStatus(wompiStatus: string): WompiRefundStatus {
     switch (wompiStatus?.toUpperCase()) {
       case 'PENDING':
         return 'pending';
       case 'APPROVED':
+      case 'VOIDED': // Voided transaction means refund/cancellation is complete
         return 'processed';
       case 'DECLINED':
       case 'ERROR':

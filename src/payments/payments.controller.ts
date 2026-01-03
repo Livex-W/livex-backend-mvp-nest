@@ -22,13 +22,13 @@ import { CreateRefundDto } from './dto/create-refund.dto';
 import { WebhookPayloadDto } from './dto/webhook-payload.dto';
 import { Public } from '../common/decorators/public.decorator';
 import { PSEBanksService } from './pse-banks.service';
-import { PaymentProviderEnum } from './providers/payment-provider.factory';
+import { EPaymentProvider } from './providers/payment-provider.factory';
 
 
 @Controller('api/v1/payments')
 export class PaymentsController {
   private readonly logger = new Logger(PaymentsController.name);
-  private readonly ALLOWED_PROVIDERS = Object.values(PaymentProviderEnum);
+  private readonly ALLOWED_PROVIDERS = Object.values(EPaymentProvider);
 
   constructor(
     private readonly paymentsService: PaymentsService,
@@ -160,6 +160,7 @@ export class PaymentsController {
     @Body() payload: any,
     @Headers() headers: Record<string, string>,
   ) {
+    this.logger.log(`Webhook received from ${provider}`);
 
     try {
       // 1. Validar proveedor
@@ -173,10 +174,10 @@ export class PaymentsController {
         throw new BadRequestException('Invalid webhook payload');
       }
 
-      const sanitizedProvider = provider.toLowerCase().trim() as PaymentProviderEnum;
+      const sanitizedProvider = provider.toLowerCase().trim() as EPaymentProvider;
 
       // 3. Validaciones específicas por proveedor
-      if (sanitizedProvider === PaymentProviderEnum.PAYPAL) {
+      if (sanitizedProvider === EPaymentProvider.PAYPAL) {
         // PayPal: Validar campos requeridos
         if (!payload.id || !payload.event_type || !payload.create_time) {
           this.logger.warn('Webhook rejected: missing required PayPal fields');
@@ -191,7 +192,7 @@ export class PaymentsController {
           throw new BadRequestException('Missing required PayPal webhook headers');
         }
 
-      } else if (sanitizedProvider === PaymentProviderEnum.WOMPI) {
+      } else if (sanitizedProvider === EPaymentProvider.WOMPI) {
         // Wompi: Validar campos requeridos
         if (!payload.event || !payload.data || !payload.timestamp) {
           this.logger.warn('Webhook rejected: missing required Wompi fields');
@@ -216,10 +217,10 @@ export class PaymentsController {
       // 4. Extraer firma según el proveedor
       let signature: string | undefined;
 
-      if (sanitizedProvider === PaymentProviderEnum.PAYPAL) {
+      if (sanitizedProvider === EPaymentProvider.PAYPAL) {
         // PayPal no usa un solo header de firma, se valida con múltiples headers
         signature = undefined; // Se pasarán todos los headers
-      } else if (sanitizedProvider === PaymentProviderEnum.WOMPI) {
+      } else if (sanitizedProvider === EPaymentProvider.WOMPI) {
         // Wompi usa x-event-signature (o fallback a otros nombres)
         signature = headers['x-event-signature'] || headers['x-signature'] || headers['wompi-signature'];
       }
@@ -270,7 +271,7 @@ export class PaymentsController {
     }
 
     // Forzar provider a wompi y método específico
-    createPaymentDto.provider = PaymentProviderEnum.WOMPI;
+    createPaymentDto.provider = EPaymentProvider.WOMPI;
     createPaymentDto.paymentMethod = upperMethod;
 
     // Combinar wompiMetadata con metadata general
