@@ -1,13 +1,13 @@
 import { IsUUID, IsEnum, IsOptional, IsString, IsUrl, IsEmail, IsArray, IsObject } from 'class-validator';
-import { PaymentProviderEnum } from '../providers/payment-provider.factory';
+import { EPaymentProvider } from '../providers/payment-provider.factory';
 import type { WompiMetadata } from '../interfaces/payment-metadata.interfaces';
 
 export class CreatePaymentDto {
   @IsUUID()
   bookingId: string;
 
-  @IsEnum(PaymentProviderEnum)
-  provider: PaymentProviderEnum;
+  @IsEnum(EPaymentProvider)
+  provider: EPaymentProvider;
 
   @IsOptional()
   @IsString()

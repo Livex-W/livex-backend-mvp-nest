@@ -4,8 +4,8 @@ import { PoolClient } from 'pg';
 import { ConfigService } from '@nestjs/config';
 import { DatabaseClient } from '../database/database.client';
 import { DATABASE_CLIENT } from '../database/database.module';
-import { PaymentProviderFactory, PaymentProviderEnum } from './providers/payment-provider.factory';
-import { CurrencyEnum } from '../common/enums/currency.enum';
+import { PaymentProviderFactory, EPaymentProvider } from './providers/payment-provider.factory';
+import { ECurrency } from '../common/enums/currency.enum';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { CreateRefundDto } from './dto/create-refund.dto';
 import { WebhookPayloadDto } from './dto/webhook-payload.dto';
@@ -145,30 +145,30 @@ export class PaymentsService {
       let paymentAmount = booking.commission_cents;
       let paymentCurrency = booking.currency;
 
-      if (dto.provider === PaymentProviderEnum.PAYPAL && paymentCurrency !== CurrencyEnum.USD) {
+      if (dto.provider === EPaymentProvider.PAYPAL && paymentCurrency !== ECurrency.USD) {
         const convertedAmount = await this.exchangeRatesService.convertCents(
           paymentAmount,
           paymentCurrency,
-          CurrencyEnum.USD,
+          ECurrency.USD,
         );
         this.logger.log(
           `Converting PayPal payment from ${paymentCurrency} to USD: ${paymentAmount} -> ${convertedAmount}`,
         );
         paymentAmount = convertedAmount;
-        paymentCurrency = CurrencyEnum.USD;
+        paymentCurrency = ECurrency.USD;
       }
 
-      if (dto.provider === PaymentProviderEnum.WOMPI && paymentCurrency !== CurrencyEnum.COP) {
+      if (dto.provider === EPaymentProvider.WOMPI && paymentCurrency !== ECurrency.COP) {
         const convertedAmount = await this.exchangeRatesService.convertCents(
           paymentAmount,
           paymentCurrency,
-          CurrencyEnum.COP,
+          ECurrency.COP,
         );
         this.logger.log(
           `Converting Wompi payment from ${paymentCurrency} to COP: ${paymentAmount} -> ${convertedAmount}`,
         );
         paymentAmount = convertedAmount;
-        paymentCurrency = CurrencyEnum.COP;
+        paymentCurrency = ECurrency.COP;
       }
 
       const insertResult = await client.query<Payment>(
@@ -273,14 +273,14 @@ export class PaymentsService {
       // ========================================
       // 1. VALIDAR TIMESTAMP Y EVENT ID
       // ========================================
-      if (dto.provider === PaymentProviderEnum.PAYPAL) {
+      if (dto.provider === EPaymentProvider.PAYPAL) {
         webhookTime = new Date(dto.payload.create_time);
         webhookEventId = String(dto.payload.id).trim();
 
         if (!webhookEventId.match(/^WH-[A-Z0-9-]+$/i)) {
           throw new BadRequestException('Invalid webhook event ID format');
         }
-      } else if (dto.provider === PaymentProviderEnum.WOMPI) {
+      } else if (dto.provider === EPaymentProvider.WOMPI) {
         const timestamp = dto.payload.timestamp || dto.payload.sent_at;
 
         if (typeof timestamp === 'number') {
@@ -365,11 +365,11 @@ export class PaymentsService {
       // ========================================
       // 4. VALIDAR WEBHOOK CON EL PROVEEDOR
       // ========================================
-      const provider = this.paymentProviderFactory.getProvider(dto.provider as PaymentProviderEnum);
+      const provider = this.paymentProviderFactory.getProvider(dto.provider as EPaymentProvider);
       let webhookEvent: WebhookEvent;
 
       try {
-        const validationData = dto.provider === PaymentProviderEnum.PAYPAL
+        const validationData = dto.provider === EPaymentProvider.PAYPAL
           ? dto.headers
           : (dto.signature || dto.headers);
 
@@ -393,7 +393,7 @@ export class PaymentsService {
         }
 
         // Construir webhookEvent manualmente en dev
-        if (dto.provider === PaymentProviderEnum.WOMPI) {
+        if (dto.provider === EPaymentProvider.WOMPI) {
           const transaction = dto.payload.data?.transaction || dto.payload.data || dto.payload;
           webhookEvent = {
             provider: dto.provider,
@@ -406,7 +406,7 @@ export class PaymentsService {
             },
             rawPayload: dto.payload,
           };
-        } else if (dto.provider === PaymentProviderEnum.PAYPAL) {
+        } else if (dto.provider === EPaymentProvider.PAYPAL) {
           const resource = dto.payload.resource || {};
           const referenceId = resource.purchase_units?.[0]?.reference_id;
           const customId = resource.purchase_units?.[0]?.custom_id;
@@ -438,7 +438,8 @@ export class PaymentsService {
         webhookEvent.eventType === 'transaction.voided' ||
         webhookEvent.eventType === 'void.created' ||
         webhookEvent.eventType === 'void.updated' ||
-        (dto.provider === PaymentProviderEnum.WOMPI && webhookEvent.metadata?.wompiStatus === 'VOIDED');
+        webhookEvent.eventType?.includes('void') ||
+        (dto.provider === EPaymentProvider.WOMPI && webhookEvent.metadata?.wompiStatus === 'VOIDED');
 
       if (isRefundEvent) {
         await this.handleRefundWebhook(client, webhookEvent, internalWebhookId);
@@ -469,7 +470,7 @@ export class PaymentsService {
       // ========================================
       let payment: Payment | null = null;
 
-      if (dto.provider === PaymentProviderEnum.PAYPAL) {
+      if (dto.provider === EPaymentProvider.PAYPAL) {
         // Para PayPal, el paymentId del webhook es el order_id, no nuestro UUID interno
         // Estrategia 1: Buscar por provider_payment_id (PayPal order_id)
         const paymentByProviderResult = await client.query<Payment>(
@@ -568,7 +569,7 @@ export class PaymentsService {
           updateFields.push(`authorized_at = NOW()`);
 
           // Si es PayPal, capturar la orden de forma asincrona
-          if (dto.provider === PaymentProviderEnum.PAYPAL && webhookEvent.paymentId && provider.capturePayment) {
+          if (dto.provider === EPaymentProvider.PAYPAL && webhookEvent.paymentId && provider.capturePayment) {
             provider.capturePayment(webhookEvent.paymentId)
               .then((captureResult) => {
               })
@@ -616,7 +617,7 @@ export class PaymentsService {
   private mapProviderStatusLocal(provider: string, providerStatus: string): PaymentStatus {
     const status = providerStatus?.toUpperCase();
 
-    if (provider === PaymentProviderEnum.PAYPAL) {
+    if (provider === EPaymentProvider.PAYPAL) {
       switch (status) {
         case 'CREATED':
         case 'SAVED':
@@ -633,7 +634,7 @@ export class PaymentsService {
         default:
           return 'pending';
       }
-    } else if (provider === PaymentProviderEnum.WOMPI) {
+    } else if (provider === EPaymentProvider.WOMPI) {
       switch (status) {
         case 'PENDING':
           return 'pending';
@@ -901,7 +902,7 @@ export class PaymentsService {
 
       // 3. Intentar cancelar con el proveedor (si existe provider_payment_id)
       if (payment.provider_payment_id) {
-        const provider = this.paymentProviderFactory.getProvider(payment.provider as PaymentProviderEnum);
+        const provider = this.paymentProviderFactory.getProvider(payment.provider as EPaymentProvider);
 
         if (provider.cancelPayment) {
           try {
@@ -1120,7 +1121,7 @@ export class PaymentsService {
   ): Promise<Refund> {
 
     // 1. Validaciones comunes
-    if (payment.provider === PaymentProviderEnum.PAYPAL && !payment.provider_capture_id) {
+    if (payment.provider === EPaymentProvider.PAYPAL && !payment.provider_capture_id) {
       throw new BadRequestException(
         'Payment does not have a capture ID. Cannot process refund. Please contact support.'
       );
@@ -1162,9 +1163,9 @@ export class PaymentsService {
     );
 
     // 4. Procesar con el proveedor
-    const provider = this.paymentProviderFactory.getProvider(payment.provider as PaymentProviderEnum);
+    const provider = this.paymentProviderFactory.getProvider(payment.provider as EPaymentProvider);
 
-    const providerPaymentId = payment.provider === PaymentProviderEnum.PAYPAL
+    const providerPaymentId = payment.provider === EPaymentProvider.PAYPAL
       ? (payment.provider_capture_id || payment.provider_payment_id || '')
       : (payment.provider_payment_id || '');
 
@@ -1177,6 +1178,7 @@ export class PaymentsService {
         amount: amountCents,
         reason: reason,
         metadata: {
+          wompiTransactionId: payment.provider_payment_id,
           refundId,
           bookingId: payment.booking_id,
         },
@@ -1192,14 +1194,15 @@ export class PaymentsService {
     }
 
     // 5. Actualizar registro con respuesta del proveedor
-    await client.query(
+    const updateResult = await client.query(
       `UPDATE refunds SET 
         provider_refund_id = $1,
         provider_reference = $2,
         status = $3,
         provider_metadata = $4,
         updated_at = NOW()
-      WHERE id = $5`,
+      WHERE id = $5
+      RETURNING *`,
       [
         refundProviderResult.providerRefundId,
         refundProviderResult.providerReference,
@@ -1208,6 +1211,8 @@ export class PaymentsService {
         refundId,
       ]
     );
+
+    const updatedRefund = updateResult.rows[0];
 
     this.logger.log(`Refund ${refundId} executed. Status: ${refundProviderResult.status}`);
 
@@ -1218,7 +1223,7 @@ export class PaymentsService {
       this.logger.log(`Refund ${refundId} is pending. Notification delegated to webhook.`);
     }
 
-    return refundResult.rows[0];
+    return updatedRefund;
   }
 
   private async addDisplayPriceToPayment(payment: Payment, userId?: string): Promise<Payment> {
