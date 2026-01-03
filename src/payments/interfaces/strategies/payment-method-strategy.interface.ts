@@ -1,5 +1,7 @@
+import { WompiMetadata, WompiPaymentMethod } from '../payment-metadata.interfaces';
+
 export interface PaymentMethodStrategy {
-    readonly methodType: string; // 'NEQUI', 'PSE', 'CARD', ETC.
+    readonly methodType: WompiPaymentMethod;
 
 
     buildPaymentPayload(data: {
@@ -10,9 +12,9 @@ export interface PaymentMethodStrategy {
         redirectUrl?: string;
         expiresAt?: Date;
         acceptanceToken: string;
-        metadata?: Record<string, any>;
+        metadata?: WompiMetadata;
     }): Promise<any>;
 
 
-    validatePaymentData(metadata?: Record<string, any>): void;
+    validatePaymentData(metadata?: WompiMetadata): void | Promise<void>;
 }

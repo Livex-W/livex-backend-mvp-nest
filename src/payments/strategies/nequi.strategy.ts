@@ -1,18 +1,21 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PaymentMethodStrategy } from '../interfaces/strategies/payment-method-strategy.interface';
+import { NequiMetadata, WompiMetadata, WompiPaymentMethod } from '../interfaces/payment-metadata.interfaces';
 
 @Injectable()
 export class NequiStrategy implements PaymentMethodStrategy {
-    readonly methodType = 'NEQUI';
+    readonly methodType: WompiPaymentMethod = 'NEQUI';
 
-    validatePaymentData(metadata?: Record<string, any>): void {
-        if (!metadata?.phoneNumber) {
+    validatePaymentData(metadata?: WompiMetadata): void {
+        const nequiData = metadata as NequiMetadata;
+
+        if (!nequiData?.phoneNumber) {
             throw new BadRequestException('Phone number is required for Nequi payments');
         }
 
         // Validar formato de teléfono colombiano
         const phoneRegex = /^3\d{9}$/;
-        if (!phoneRegex.test(metadata.phoneNumber)) {
+        if (!phoneRegex.test(nequiData.phoneNumber)) {
             throw new BadRequestException('Invalid Colombian phone number format');
         }
     }
@@ -25,9 +28,11 @@ export class NequiStrategy implements PaymentMethodStrategy {
         redirectUrl?: string;
         expiresAt?: Date;
         acceptanceToken: string;
-        metadata?: Record<string, any>;
+        metadata?: WompiMetadata;
     }): Promise<any> {
         this.validatePaymentData(data.metadata);
+
+        const nequiData = data.metadata as NequiMetadata;
 
         return {
             amount_in_cents: data.amountCents,
@@ -35,7 +40,7 @@ export class NequiStrategy implements PaymentMethodStrategy {
             customer_email: data.customerEmail,
             payment_method: {
                 type: 'NEQUI',
-                phone_number: data.metadata?.phoneNumber,
+                phone_number: nequiData?.phoneNumber,
             },
             reference: data.reference,
             redirect_url: data.redirectUrl,

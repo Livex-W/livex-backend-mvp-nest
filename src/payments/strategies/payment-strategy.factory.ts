@@ -3,8 +3,7 @@ import { PaymentMethodStrategy } from '../interfaces/strategies/payment-method-s
 import { NequiStrategy } from './nequi.strategy';
 import { PSEStrategy } from './pse.strategy';
 import { CardStrategy } from './card.strategy';
-
-export type WompiPaymentMethod = 'NEQUI' | 'PSE' | 'CARD';
+import { WompiPaymentMethod } from '../interfaces/payment-metadata.interfaces';
 
 @Injectable()
 export class PaymentStrategyFactory {

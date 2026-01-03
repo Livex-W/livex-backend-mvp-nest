@@ -4,12 +4,13 @@ import { PoolClient } from 'pg';
 import { ConfigService } from '@nestjs/config';
 import { DatabaseClient } from '../database/database.client';
 import { DATABASE_CLIENT } from '../database/database.module';
-import { PaymentProviderFactory, PaymentProviderType } from './providers/payment-provider.factory';
+import { PaymentProviderFactory, PaymentProviderEnum } from './providers/payment-provider.factory';
+import { CurrencyEnum } from '../common/enums/currency.enum';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { CreateRefundDto } from './dto/create-refund.dto';
 import { WebhookPayloadDto } from './dto/webhook-payload.dto';
 import { NotificationService } from '../notifications/services/notification.service';
-import { WebhookEvent } from './interfaces/payment-provider.interface';
+import { PaymentStatus, WebhookEvent } from './interfaces/payment-provider.interface';
 import { CouponsService } from '../coupons/coupons.service';
 import { UserPreferencesService } from '../user-preferences/user-preferences.service';
 import { ExchangeRatesService } from '../exchange-rates/exchange-rates.service';
@@ -144,30 +145,30 @@ export class PaymentsService {
       let paymentAmount = booking.commission_cents;
       let paymentCurrency = booking.currency;
 
-      if (dto.provider === 'paypal' && paymentCurrency !== 'USD') {
+      if (dto.provider === PaymentProviderEnum.PAYPAL && paymentCurrency !== CurrencyEnum.USD) {
         const convertedAmount = await this.exchangeRatesService.convertCents(
           paymentAmount,
           paymentCurrency,
-          'USD',
+          CurrencyEnum.USD,
         );
         this.logger.log(
           `Converting PayPal payment from ${paymentCurrency} to USD: ${paymentAmount} -> ${convertedAmount}`,
         );
         paymentAmount = convertedAmount;
-        paymentCurrency = 'USD';
+        paymentCurrency = CurrencyEnum.USD;
       }
 
-      if (dto.provider === 'wompi' && paymentCurrency !== 'COP') {
+      if (dto.provider === PaymentProviderEnum.WOMPI && paymentCurrency !== CurrencyEnum.COP) {
         const convertedAmount = await this.exchangeRatesService.convertCents(
           paymentAmount,
           paymentCurrency,
-          'COP',
+          CurrencyEnum.COP,
         );
         this.logger.log(
           `Converting Wompi payment from ${paymentCurrency} to COP: ${paymentAmount} -> ${convertedAmount}`,
         );
         paymentAmount = convertedAmount;
-        paymentCurrency = 'COP';
+        paymentCurrency = CurrencyEnum.COP;
       }
 
       const insertResult = await client.query<Payment>(
@@ -220,7 +221,6 @@ export class PaymentsService {
         },
       });
 
-      this.logger.log(`Provider response: ${JSON.stringify(paymentResult)}`);
 
     } catch (error) {
       this.logger.error(`Failed to create payment with provider ${dto.provider}`, error);
@@ -273,15 +273,14 @@ export class PaymentsService {
       // ========================================
       // 1. VALIDAR TIMESTAMP Y EVENT ID
       // ========================================
-      if (dto.provider === 'paypal') {
+      if (dto.provider === PaymentProviderEnum.PAYPAL) {
         webhookTime = new Date(dto.payload.create_time);
         webhookEventId = String(dto.payload.id).trim();
 
         if (!webhookEventId.match(/^WH-[A-Z0-9-]+$/i)) {
-          this.logger.warn(`Webhook rejected: invalid PayPal event ID format:  ${webhookEventId}`);
           throw new BadRequestException('Invalid webhook event ID format');
         }
-      } else if (dto.provider === 'wompi') {
+      } else if (dto.provider === PaymentProviderEnum.WOMPI) {
         const timestamp = dto.payload.timestamp || dto.payload.sent_at;
 
         if (typeof timestamp === 'number') {
@@ -362,16 +361,15 @@ export class PaymentsService {
         ]
       );
 
-      this.logger.log(`Webhook event registered:  ${internalWebhookId}`);
 
       // ========================================
       // 4. VALIDAR WEBHOOK CON EL PROVEEDOR
       // ========================================
-      const provider = this.paymentProviderFactory.getProvider(dto.provider as PaymentProviderType);
+      const provider = this.paymentProviderFactory.getProvider(dto.provider as PaymentProviderEnum);
       let webhookEvent: WebhookEvent;
 
       try {
-        const validationData = dto.provider === 'paypal'
+        const validationData = dto.provider === PaymentProviderEnum.PAYPAL
           ? dto.headers
           : (dto.signature || dto.headers);
 
@@ -381,8 +379,6 @@ export class PaymentsService {
           'UPDATE webhook_events SET status = $1, signature_valid = $2 WHERE id = $3',
           ['validated', true, internalWebhookId]
         );
-
-        this.logger.log(`Webhook validated: paymentId=${webhookEvent.paymentId}, status=${webhookEvent.status}`);
 
       } catch (error: any) {
         this.logger.error(`Webhook validation failed: ${error.message}`);
@@ -397,7 +393,7 @@ export class PaymentsService {
         }
 
         // Construir webhookEvent manualmente en dev
-        if (dto.provider === 'wompi') {
+        if (dto.provider === PaymentProviderEnum.WOMPI) {
           const transaction = dto.payload.data?.transaction || dto.payload.data || dto.payload;
           webhookEvent = {
             provider: dto.provider,
@@ -410,7 +406,7 @@ export class PaymentsService {
             },
             rawPayload: dto.payload,
           };
-        } else if (dto.provider === 'paypal') {
+        } else if (dto.provider === PaymentProviderEnum.PAYPAL) {
           const resource = dto.payload.resource || {};
           const referenceId = resource.purchase_units?.[0]?.reference_id;
           const customId = resource.purchase_units?.[0]?.custom_id;
@@ -442,7 +438,7 @@ export class PaymentsService {
         webhookEvent.eventType === 'transaction.voided' ||
         webhookEvent.eventType === 'void.created' ||
         webhookEvent.eventType === 'void.updated' ||
-        (dto.provider === 'wompi' && webhookEvent.metadata?.wompiStatus === 'VOIDED');
+        (dto.provider === PaymentProviderEnum.WOMPI && webhookEvent.metadata?.wompiStatus === 'VOIDED');
 
       if (isRefundEvent) {
         await this.handleRefundWebhook(client, webhookEvent, internalWebhookId);
@@ -473,7 +469,7 @@ export class PaymentsService {
       // ========================================
       let payment: Payment | null = null;
 
-      if (dto.provider === 'paypal') {
+      if (dto.provider === PaymentProviderEnum.PAYPAL) {
         // Para PayPal, el paymentId del webhook es el order_id, no nuestro UUID interno
         // Estrategia 1: Buscar por provider_payment_id (PayPal order_id)
         const paymentByProviderResult = await client.query<Payment>(
@@ -483,7 +479,6 @@ export class PaymentsService {
 
         if (paymentByProviderResult.rows.length > 0) {
           payment = paymentByProviderResult.rows[0];
-          this.logger.log(`Payment found by provider_payment_id:  ${payment.id}`);
         }
 
         // Estrategia 2: Buscar por reference_id o custom_id del payload
@@ -500,7 +495,6 @@ export class PaymentsService {
 
             if (paymentByRefResult.rows.length > 0) {
               payment = paymentByRefResult.rows[0];
-              this.logger.log(`Payment found by reference_id/custom_id: ${payment.id}`);
             }
           }
         }
@@ -514,7 +508,6 @@ export class PaymentsService {
 
         if (paymentByIdResult.rows.length > 0) {
           payment = paymentByIdResult.rows[0];
-          this.logger.log(`Payment found by internal ID: ${payment.id}`);
         }
 
         // Estrategia 2: Si no encuentra, buscar por provider_payment_id
@@ -528,7 +521,6 @@ export class PaymentsService {
 
             if (paymentByProviderResult.rows.length > 0) {
               payment = paymentByProviderResult.rows[0];
-              this.logger.log(`Payment found by provider_payment_id:  ${payment.id}`);
             }
           }
         }
@@ -543,13 +535,10 @@ export class PaymentsService {
 
         if (paymentByRefResult.rows.length > 0) {
           payment = paymentByRefResult.rows[0];
-          this.logger.log(`Payment found by provider_reference: ${payment.id}`);
         }
       }
 
       if (!payment) {
-        this.logger.warn(`Payment not found for reference: ${sanitizedPaymentId}`);
-        this.logger.warn(`Provider: ${dto.provider}, metadata: ${JSON.stringify(webhookEvent.metadata)}`);
         await client.query(
           'UPDATE webhook_events SET status = $1, error = $2 WHERE id = $3',
           ['ignored', 'Payment not found', internalWebhookId]
@@ -557,15 +546,11 @@ export class PaymentsService {
         return;
       }
 
-      this.logger.log(`Payment found: ${payment.id}, current status: ${payment.status}`);
-
       // ========================================
       // 8. ACTUALIZAR ESTADO DEL PAYMENT
       // ========================================
       const newStatus = webhookEvent.status;
       const statusChanged = payment.status !== newStatus;
-
-      this.logger.log(`Status change: ${payment.status} -> ${newStatus} (changed: ${statusChanged})`);
 
       if (statusChanged) {
         const updateFields: string[] = ['status = $1', 'provider_metadata = $2', 'updated_at = NOW()'];
@@ -576,7 +561,6 @@ export class PaymentsService {
         if (webhookEvent.metadata?.paypal_capture_id) {
           updateFields.push(`provider_capture_id = $${paramIndex++}`);
           updateValues.push(webhookEvent.metadata.paypal_capture_id);
-          this.logger.log(`Saving capture_id: ${webhookEvent.metadata.paypal_capture_id}`);
         }
 
         // Actualizar timestamps segun el estado
@@ -584,12 +568,9 @@ export class PaymentsService {
           updateFields.push(`authorized_at = NOW()`);
 
           // Si es PayPal, capturar la orden de forma asincrona
-          if (dto.provider === 'paypal' && webhookEvent.paymentId && provider.capturePayment) {
-            this.logger.log(`Triggering async capture for PayPal order ${webhookEvent.paymentId}`);
-
+          if (dto.provider === PaymentProviderEnum.PAYPAL && webhookEvent.paymentId && provider.capturePayment) {
             provider.capturePayment(webhookEvent.paymentId)
               .then((captureResult) => {
-                this.logger.log(`PayPal order ${webhookEvent.paymentId} captured:  ${captureResult.captureId}`);
               })
               .catch((err) => {
                 this.logger.error(`Failed to capture PayPal order ${webhookEvent.paymentId}`, err);
@@ -606,17 +587,13 @@ export class PaymentsService {
         updateValues.push(payment.id);
 
         const updateQuery = `UPDATE payments SET ${updateFields.join(', ')} WHERE id = $${paramIndex}`;
-        this.logger.log(`Executing update:  ${updateQuery}`);
 
         await client.query(updateQuery, updateValues);
-
-        this.logger.log(`Payment ${payment.id} updated to ${newStatus}`);
 
         // ========================================
         // 9. CONFIRMAR BOOKING SI PAID
         // ========================================
         if (newStatus === 'paid') {
-          this.logger.log(`Confirming booking ${payment.booking_id}`);
           await this.confirmBookingPayment(client, payment.booking_id);
         }
       } else {
@@ -631,15 +608,15 @@ export class PaymentsService {
         ['processed', internalWebhookId]
       );
 
-      this.logger.log(`Webhook ${internalWebhookId} processed successfully`);
+      this.logger.log(`Webhook processed successfully`);
     });
   }
 
   // Helper para mapear status en dev (funciona para ambos proveedores)
-  private mapProviderStatusLocal(provider: string, providerStatus: string): 'pending' | 'authorized' | 'paid' | 'failed' | 'expired' {
+  private mapProviderStatusLocal(provider: string, providerStatus: string): PaymentStatus {
     const status = providerStatus?.toUpperCase();
 
-    if (provider === 'paypal') {
+    if (provider === PaymentProviderEnum.PAYPAL) {
       switch (status) {
         case 'CREATED':
         case 'SAVED':
@@ -656,7 +633,7 @@ export class PaymentsService {
         default:
           return 'pending';
       }
-    } else if (provider === 'wompi') {
+    } else if (provider === PaymentProviderEnum.WOMPI) {
       switch (status) {
         case 'PENDING':
           return 'pending';
@@ -924,7 +901,7 @@ export class PaymentsService {
 
       // 3. Intentar cancelar con el proveedor (si existe provider_payment_id)
       if (payment.provider_payment_id) {
-        const provider = this.paymentProviderFactory.getProvider(payment.provider as PaymentProviderType);
+        const provider = this.paymentProviderFactory.getProvider(payment.provider as PaymentProviderEnum);
 
         if (provider.cancelPayment) {
           try {
@@ -1143,7 +1120,7 @@ export class PaymentsService {
   ): Promise<Refund> {
 
     // 1. Validaciones comunes
-    if (payment.provider === 'paypal' && !payment.provider_capture_id) {
+    if (payment.provider === PaymentProviderEnum.PAYPAL && !payment.provider_capture_id) {
       throw new BadRequestException(
         'Payment does not have a capture ID. Cannot process refund. Please contact support.'
       );
@@ -1185,9 +1162,9 @@ export class PaymentsService {
     );
 
     // 4. Procesar con el proveedor
-    const provider = this.paymentProviderFactory.getProvider(payment.provider as PaymentProviderType);
+    const provider = this.paymentProviderFactory.getProvider(payment.provider as PaymentProviderEnum);
 
-    const providerPaymentId = payment.provider === 'paypal'
+    const providerPaymentId = payment.provider === PaymentProviderEnum.PAYPAL
       ? (payment.provider_capture_id || payment.provider_payment_id || '')
       : (payment.provider_payment_id || '');
 

@@ -8,7 +8,8 @@ import {
   RefundResult,
   WebhookEvent
 } from '../interfaces/payment-provider.interface';
-import { PaymentStrategyFactory, WompiPaymentMethod } from '../strategies/payment-strategy.factory';
+import { PaymentStrategyFactory } from '../strategies/payment-strategy.factory';
+import { WompiPaymentMethod } from '../interfaces/payment-metadata.interfaces';
 
 interface WompiConfig {
   publicKey: string;
@@ -201,7 +202,7 @@ export class WompiProvider implements PaymentProvider {
     userRedirectUrl?: string
   ): Promise<string | null> {
     // 1) Intento directo (POST de creación)
-    let url = this.extractCheckoutUrl(response, paymentMethod, userRedirectUrl);
+    let url = this.extractCheckoutUrl(response, userRedirectUrl);
     if (url) {
       this.logger.log(`Checkout URL found in POST response: ${url}`);
       return url;
@@ -225,9 +226,8 @@ export class WompiProvider implements PaymentProvider {
             `/v1/transactions/${response.data.id}`
           );
 
-          this.logger.log(`Polling response: ${JSON.stringify(tx.data.payment_method?.extra, null, 2)}`);
 
-          url = this.extractCheckoutUrl(tx, paymentMethod, userRedirectUrl);
+          url = this.extractCheckoutUrl(tx, userRedirectUrl);
           if (url) {
             this.logger.log(`Checkout URL recovered via polling (attempt ${attempt}): ${url}`);
             return url;
@@ -254,7 +254,6 @@ export class WompiProvider implements PaymentProvider {
    */
   private extractCheckoutUrl(
     response: WompiPaymentResponse,
-    paymentMethod: string,
     userRedirectUrl?: string
   ): string | null {
     const data = response.data;

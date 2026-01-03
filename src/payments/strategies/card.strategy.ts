@@ -1,15 +1,17 @@
 
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PaymentMethodStrategy } from '../interfaces/strategies/payment-method-strategy.interface';
+import { CardMetadata, WompiMetadata, WompiPaymentMethod } from '../interfaces/payment-metadata.interfaces';
 
 @Injectable()
 export class CardStrategy implements PaymentMethodStrategy {
-    readonly methodType = 'CARD';
+    readonly methodType: WompiPaymentMethod = 'CARD';
 
-    validatePaymentData(metadata?: Record<string, any>): void {
+    validatePaymentData(metadata?: WompiMetadata): void {
+        const cardData = metadata as CardMetadata;
         // Para Card, Wompi puede usar tokenización o un flujo hosted
         // Si requieres token, valídalo aquí
-        if (metadata?.paymentSourceId && typeof metadata.paymentSourceId !== 'string') {
+        if (cardData?.paymentSourceId && typeof cardData.paymentSourceId !== 'string') {
             throw new BadRequestException('Invalid payment source ID for card payment');
         }
     }
@@ -22,9 +24,11 @@ export class CardStrategy implements PaymentMethodStrategy {
         redirectUrl?: string;
         expiresAt?: Date;
         acceptanceToken: string;
-        metadata?: Record<string, any>;
+        metadata?: WompiMetadata;
     }): Promise<any> {
         this.validatePaymentData(data.metadata);
+
+        const cardData = data.metadata as CardMetadata;
 
         return {
             amount_in_cents: data.amountCents,
@@ -32,10 +36,10 @@ export class CardStrategy implements PaymentMethodStrategy {
             customer_email: data.customerEmail,
             payment_method: {
                 type: 'CARD',
-                installments: data.metadata?.installments || 1,
+                installments: cardData?.installments || 1,
             },
             reference: data.reference,
-            payment_source_id: data.metadata?.paymentSourceId || null,
+            payment_source_id: cardData?.paymentSourceId || null,
             redirect_url: data.redirectUrl,
             expires_at: data.expiresAt?.toISOString(),
             acceptance_token: data.acceptanceToken,

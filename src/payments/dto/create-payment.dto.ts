@@ -1,12 +1,13 @@
 import { IsUUID, IsEnum, IsOptional, IsString, IsUrl, IsEmail, IsArray, IsObject } from 'class-validator';
-import type { PaymentProviderType } from '../providers/payment-provider.factory';
+import { PaymentProviderEnum } from '../providers/payment-provider.factory';
+import type { WompiMetadata } from '../interfaces/payment-metadata.interfaces';
 
 export class CreatePaymentDto {
   @IsUUID()
   bookingId: string;
 
-  @IsEnum(['wompi', 'epayco', 'stripe', 'paypal'])
-  provider: PaymentProviderType;
+  @IsEnum(PaymentProviderEnum)
+  provider: PaymentProviderEnum;
 
   @IsOptional()
   @IsString()
@@ -36,19 +37,5 @@ export class CreatePaymentDto {
   // Metadata específica para Wompi
   @IsOptional()
   @IsObject()
-  wompiMetadata?: {
-    // Para NEQUI
-    phoneNumber?: string;
-
-    // Para PSE
-    userType?: 'PERSON' | 'BUSINESS' | '0' | '1';
-    userLegalId?: string;
-    userLegalIdType?: 'CC' | 'CE' | 'NIT' | 'PP' | 'TI' | 'DNI';
-    financialInstitutionCode?: string;
-    paymentDescription?: string;
-
-    // Para CARD
-    paymentSourceId?: string;
-    installments?: number;
-  };
+  wompiMetadata?: WompiMetadata;
 }

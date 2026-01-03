@@ -43,6 +43,8 @@ export interface WebhookEvent {
   rawPayload: any;
 }
 
+export type PaymentStatus = 'pending' | 'authorized' | 'paid' | 'failed' | 'expired' | 'cancelled';
+
 export interface PaymentProvider {
   readonly name: string;
   readonly supportedCurrencies: string[];
