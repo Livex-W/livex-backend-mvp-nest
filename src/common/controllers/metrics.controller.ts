@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+ 
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { Controller, Get, Header, HttpCode, HttpStatus } from '@nestjs/common';
 import { MetricsService } from '../services/metrics.service';

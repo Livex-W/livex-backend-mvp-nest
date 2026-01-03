@@ -38,6 +38,7 @@ export interface Experience {
 
 export interface ExperienceWithImages extends Experience {
   images?: ExperienceImage[];
+  locations?: ExperienceLocation[];
 }
 
 export interface ExperienceImage {
@@ -46,6 +47,17 @@ export interface ExperienceImage {
   url: string;
   sort_order: number;
   image_type?: 'hero' | 'gallery';
+  created_at: Date;
+}
+
+export interface ExperienceLocation {
+  id: string;
+  experience_id: string;
+  name?: string;
+  address_line?: string;
+  latitude?: number;
+  longitude?: number;
+  meeting_instructions?: string;
   created_at: Date;
 }
 
@@ -60,3 +72,4 @@ export interface Review {
   user_full_name?: string; // Projected from join
   user_avatar?: string;    // Projected from join
 }
+

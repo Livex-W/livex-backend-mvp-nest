@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+ 
 import { Injectable, OnModuleInit, InternalServerErrorException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as admin from 'firebase-admin';
@@ -59,7 +59,7 @@ export class FirebaseAdminService implements OnModuleInit {
                 displayName,
             });
         } catch (error: any) {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+             
             if (error.code === 'auth/email-already-exists') {
                 // Try to get the user
                 return this.app.auth().getUserByEmail(email);

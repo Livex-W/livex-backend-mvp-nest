@@ -92,7 +92,7 @@ export class CategoriesService {
       );
       if (searchClause.clause) {
         conditions.push(searchClause.clause.replace('AND ', ''));
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+         
         params.push(...searchClause.params);
         paramIndex = searchClause.nextParamIndex;
       }

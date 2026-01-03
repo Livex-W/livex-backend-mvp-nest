@@ -4,7 +4,7 @@ import { DATABASE_CLIENT } from '../database/database.module';
 import { PaginationService } from '../common/services/pagination.service';
 import { CustomLoggerService } from '../common/services/logger.service';
 import { PaginatedResult, PaginationOptions } from '../common/interfaces/pagination.interface';
-import { Experience, ExperienceWithImages, ExperienceImage } from './entities/experience.entity';
+import { Experience, ExperienceWithImages, ExperienceImage, ExperienceLocation } from './entities/experience.entity';
 import {
   CreateExperienceDto,
   UpdateExperienceDto,
@@ -235,19 +235,30 @@ export class ExperiencesService {
       options,
     );
 
-    // Include images if requested
-    if (queryDto.include_images && result.data.length > 0) {
+    // Always include locations (needed for proximity filtering)
+    // and optionally include images
+    if (result.data.length > 0) {
       const experienceIds = result.data.map(exp => exp.id);
-      const images = await this.getExperienceImages(experienceIds);
 
-      const experiencesWithImages: ExperienceWithImages[] = result.data.map(experience => ({
+      // Always fetch locations for proximity filtering
+      const locations = await this.getExperienceLocations(experienceIds);
+
+      // Optionally fetch images
+      const images = queryDto.include_images
+        ? await this.getExperienceImages(experienceIds)
+        : [];
+
+      const experiencesWithData: ExperienceWithImages[] = result.data.map(experience => ({
         ...experience,
-        images: images.filter(img => img.experience_id === experience.id),
+        locations: locations.filter(loc => loc.experience_id === experience.id),
+        images: queryDto.include_images
+          ? images.filter(img => img.experience_id === experience.id)
+          : undefined,
       }));
 
       return {
         ...result,
-        data: experiencesWithImages,
+        data: experiencesWithData,
       };
     }
 
@@ -266,15 +277,17 @@ export class ExperiencesService {
 
     const experience = result.rows[0];
 
-    if (includeImages) {
-      const images = await this.getExperienceImages([id]);
-      return {
-        ...experience,
-        images,
-      };
-    }
+    // Always fetch locations for consistency
+    const locations = await this.getExperienceLocations([id]);
 
-    return experience;
+    // Optionally fetch images
+    const images = includeImages ? await this.getExperienceImages([id]) : undefined;
+
+    return {
+      ...experience,
+      locations,
+      images,
+    };
   }
 
   async findBySlug(resortId: string, slug: string, includeImages = false): Promise<ExperienceWithImages> {
@@ -289,15 +302,17 @@ export class ExperiencesService {
 
     const experience = result.rows[0];
 
-    if (includeImages) {
-      const images = await this.getExperienceImages([experience.id]);
-      return {
-        ...experience,
-        images,
-      };
-    }
+    // Always fetch locations for consistency
+    const locations = await this.getExperienceLocations([experience.id]);
 
-    return experience;
+    // Optionally fetch images
+    const images = includeImages ? await this.getExperienceImages([experience.id]) : undefined;
+
+    return {
+      ...experience,
+      locations,
+      images,
+    };
   }
 
   /**
@@ -319,6 +334,44 @@ export class ExperiencesService {
 
     return result;
   }
+
+  /**
+   * Get top recommended experiences (highest rated)
+   * Returns top 5 experiences ordered by rating_avg DESC
+   */
+  async findRecommended(limit = 5, userId?: string): Promise<ExperienceWithImages[]> {
+    const result = await this.db.query<Experience>(
+      `SELECT * FROM experiences 
+       WHERE status = 'active' 
+       ORDER BY rating_avg DESC, rating_count DESC 
+       LIMIT $1`,
+      [limit],
+    );
+
+    if (result.rows.length === 0) {
+      return [];
+    }
+
+    const experienceIds = result.rows.map(exp => exp.id);
+
+    // Fetch locations and images
+    const locations = await this.getExperienceLocations(experienceIds);
+    const images = await this.getExperienceImages(experienceIds);
+
+    let experiencesWithData: ExperienceWithImages[] = result.rows.map(experience => ({
+      ...experience,
+      locations: locations.filter(loc => loc.experience_id === experience.id),
+      images: images.filter(img => img.experience_id === experience.id),
+    }));
+
+    // Add display prices if user ID is provided
+    if (userId) {
+      experiencesWithData = await this.addDisplayPrices(experiencesWithData, userId) as ExperienceWithImages[];
+    }
+
+    return experiencesWithData;
+  }
+
 
   /**
    * Find one experience with display prices converted to user's currency
@@ -505,6 +558,22 @@ export class ExperiencesService {
 
     return result.rows;
   }
+
+  private async getExperienceLocations(experienceIds: string[]): Promise<ExperienceLocation[]> {
+    if (experienceIds.length === 0) return [];
+
+    const placeholders = experienceIds.map((_, index) => `$${index + 1}`).join(', ');
+
+    const result = await this.db.query<ExperienceLocation>(
+      `SELECT * FROM experience_locations 
+       WHERE experience_id IN (${placeholders}) 
+       ORDER BY experience_id, created_at ASC`,
+      experienceIds,
+    );
+
+    return result.rows;
+  }
+
 
   /**
  * Add display prices to experience(s) based on user preferences

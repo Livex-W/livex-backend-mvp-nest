@@ -591,7 +591,7 @@ export class PayPalProvider implements PaymentProvider {
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+   
   private async validateWebhookSignature(payload: any, headers: any): Promise<boolean> {
     if (!this.config.webhookId) {
       this.logger.warn('PAYPAL_WEBHOOK_ID not configured. Skipping signature validation.');

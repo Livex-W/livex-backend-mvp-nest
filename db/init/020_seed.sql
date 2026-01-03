@@ -176,7 +176,6 @@ e AS (
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
       
     -- 2. Full Day Islas del Rosario - SOL Y PAPAYA CLASSIC
-    -- precio_adulto = $320.000 COP, niño = $280.000 COP
     ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
       'Sol y Papaya Classic', 'Día de playa en Islas del Rosario, traslado ida y vuelta', 'islands',
       32000000, 28000000,  -- price_per_adult, price_per_child
@@ -206,7 +205,7 @@ e AS (
       'https://images.unsplash.com/photo-1520116468816-95b69f847357?w=800', 'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
-    -- 5. Street Food Tour - TIERRA BOMBA PALMARITO
+    -- 5. Palmarito Beach Day
     ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
       'Palmarito Beach Day', 'Día de playa en Tierra Bomba con almuerzo incluido', 'islands',
       23000000, 18000000, -- Adult ($230k), Niño ($180k)
@@ -216,7 +215,7 @@ e AS (
       'https://images.unsplash.com/photo-1573046738959-1e35593f0b24?w=800', 'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
-    -- 6. Isla Bela - ISLAS DEL ROSARIO
+    -- 6. Isla Bela Deluxe
     ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
       'Isla Bela Deluxe', 'Experiencia exclusiva en Isla Bela', 'islands',
       39000000, 30000000, -- Adult ($390k), Child ($300k)
@@ -226,7 +225,7 @@ e AS (
       'https://images.unsplash.com/photo-1540206351-d6465b3ac5c1?w=800', 'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
-    -- 7. Lizamar - ISLAS DEL ROSARIO
+    -- 7. Lizamar Island Escape
     ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
       'Lizamar Island Escape', 'Escapada relajante a Lizamar', 'islands',
       40000000, 0,        -- Adult ($400k)
@@ -234,10 +233,141 @@ e AS (
       false, NULL, NULL,  -- Solo adultos por ahora en este ejemplo
       'COP', 'Transporte, almuerzo buffet, piscina', 'Snorkel',
       'https://images.unsplash.com/photo-1590523741831-ab7e8b8f9c7f?w=800', 'active'::experience_status,
+      (SELECT id FROM u WHERE email='admin@livex.app'), now()),
+
+    -- 8. Tour Murallas y Castillo
+    ((SELECT id FROM r WHERE name='Mar y Sol Cartagena'),
+      'Tour Murallas y Castillo', 'Recorrido por las murallas y el Castillo San Felipe', 'city_tour',
+      22000000, 18000000,
+      4000000, 3000000,
+      true, 5, 12,
+      'COP', 'Guía especializado, entrada al castillo', 'Propinas',
+      'https://images.unsplash.com/photo-1578632292335-df3abbb0d586?w=800', 'active'::experience_status,
+      (SELECT id FROM u WHERE email='admin@livex.app'), now()),
+
+    -- 9. Playa Blanca Express
+    ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
+      'Playa Blanca Express', 'Escapada rápida a Playa Blanca con lancha', 'islands',
+      28000000, 22000000,
+      5000000, 4000000,
+      true, 3, 10,
+      'COP', 'Transporte lancha rápida, carpa, silla', 'Almuerzo, bebidas',
+      'https://images.unsplash.com/photo-1519046904884-53103b34b206?w=800', 'active'::experience_status,
+      (SELECT id FROM u WHERE email='admin@livex.app'), now()),
+
+    -- 10. Kayak Mangrove Tour
+    ((SELECT id FROM r WHERE name='Náutica Bahía Club'),
+      'Kayak Mangrove Tour', 'Aventura en kayak por los manglares de la bahía', 'nautical',
+      15000000, 12000000,
+      2500000, 2000000,
+      true, 8, 16,
+      'COP', 'Kayak doble, chaleco, instructor', 'Refrigerio',
+      'https://images.unsplash.com/photo-1544551763-46a42a4571da?w=800', 'active'::experience_status,
+      (SELECT id FROM u WHERE email='admin@livex.app'), now()),
+
+    -- 11. Catamaran Premium
+    ((SELECT id FROM r WHERE name='Náutica Bahía Club'),
+      'Catamaran Premium', 'Navegación en catamarán con barra libre', 'nautical',
+      55000000, 0,
+      12000000, 0,
+      false, NULL, NULL,
+      'COP', 'Barra libre, DJ, snacks gourmet', 'Transporte al muelle',
+      'https://images.unsplash.com/photo-1566412435010-b747372c0506?w=800', 'active'::experience_status,
+      (SELECT id FROM u WHERE email='admin@livex.app'), now()),
+
+    -- 12. Tour Nocturno Getsemaní
+    ((SELECT id FROM r WHERE name='Mar y Sol Cartagena'),
+      'Tour Nocturno Getsemaní', 'Descubre el barrio más bohemio de noche', 'city_tour',
+      16000000, 0,
+      3000000, 0,
+      false, NULL, NULL,
+      'COP', 'Guía, coctel de bienvenida', 'Cena',
+      'https://images.unsplash.com/photo-1583531172005-893e7e366d3f?w=800', 'active'::experience_status,
+      (SELECT id FROM u WHERE email='admin@livex.app'), now()),
+
+    -- 13. Snorkel en Barú
+    ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
+      'Snorkel en Barú', 'Explora los arrecifes de coral en Barú', 'islands',
+      35000000, 28000000,
+      6000000, 5000000,
+      true, 6, 14,
+      'COP', 'Equipo snorkel, instructor, almuerzo', 'Fotos submarinas',
+      'https://images.unsplash.com/photo-1544551763-77ef2d0cfc6c?w=800', 'active'::experience_status,
+      (SELECT id FROM u WHERE email='admin@livex.app'), now()),
+
+    -- 14. Jet Ski Adventure
+    ((SELECT id FROM r WHERE name='Náutica Bahía Club'),
+      'Jet Ski Adventure', 'Adrenalina pura en moto acuática', 'nautical',
+      25000000, 0,
+      5000000, 0,
+      false, NULL, NULL,
+      'COP', 'Jet ski, chaleco, instructor', 'Seguro adicional',
+      'https://images.unsplash.com/photo-1596436889106-be35e843f974?w=800', 'active'::experience_status,
+      (SELECT id FROM u WHERE email='admin@livex.app'), now()),
+
+    -- 15. Pesca Deportiva
+    ((SELECT id FROM r WHERE name='Náutica Bahía Club'),
+      'Pesca Deportiva', 'Jornada de pesca en alta mar', 'nautical',
+      48000000, 0,
+      10000000, 0,
+      false, NULL, NULL,
+      'COP', 'Embarcación, equipos, carnada', 'Licencia de pesca',
+      'https://images.unsplash.com/photo-1540946485063-a40da27545f8?w=800', 'active'::experience_status,
+      (SELECT id FROM u WHERE email='admin@livex.app'), now()),
+
+    -- 16. Tour del Café
+    ((SELECT id FROM r WHERE name='Mar y Sol Cartagena'),
+      'Tour del Café', 'Degustación y cultura del café colombiano', 'city_tour',
+      12000000, 10000000,
+      2000000, 1500000,
+      true, 6, 15,
+      'COP', 'Degustación, souvenirs', 'Almuerzo',
+      'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=800', 'active'::experience_status,
+      (SELECT id FROM u WHERE email='admin@livex.app'), now()),
+
+    -- 17. Oceanario y Acuario
+    ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
+      'Oceanario y Acuario', 'Visita al oceanario de las Islas del Rosario', 'islands',
+      27000000, 20000000,
+      4500000, 3500000,
+      true, 2, 12,
+      'COP', 'Transporte, entrada, guía', 'Snorkel',
+      'https://images.unsplash.com/photo-1559825481-12a05cc00344?w=800', 'active'::experience_status,
+      (SELECT id FROM u WHERE email='admin@livex.app'), now()),
+
+    -- 18. Paddleboard Sunset
+    ((SELECT id FROM r WHERE name='Náutica Bahía Club'),
+      'Paddleboard Sunset', 'Paddleboard al atardecer en la bahía', 'nautical',
+      13000000, 10000000,
+      2000000, 1500000,
+      true, 10, 17,
+      'COP', 'Tabla, remo, instructor', 'Fotos',
+      'https://images.unsplash.com/photo-1530053969600-caed2596d242?w=800', 'active'::experience_status,
+      (SELECT id FROM u WHERE email='admin@livex.app'), now()),
+
+    -- 19. Tour Gastronomico
+    ((SELECT id FROM r WHERE name='Mar y Sol Cartagena'),
+      'Tour Gastronómico', 'Prueba los sabores auténticos de Cartagena', 'city_tour',
+      18000000, 14000000,
+      3000000, 2500000,
+      true, 5, 14,
+      'COP', 'Degustaciones en 5 paradas, guía local', 'Bebidas alcohólicas',
+      'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800', 'active'::experience_status,
+      (SELECT id FROM u WHERE email='admin@livex.app'), now()),
+
+    -- 20. Avistamiento de Delfines
+    ((SELECT id FROM r WHERE name='Náutica Bahía Club'),
+      'Avistamiento de Delfines', 'Navega en busca de delfines en su hábitat', 'nautical',
+      38000000, 30000000,
+      7000000, 5500000,
+      true, 4, 12,
+      'COP', 'Embarcación, guía biólogo, snacks', 'Garantía de avistamiento',
+      'https://images.unsplash.com/photo-1607153333879-c174d265f1d2?w=800', 'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now())
 
   RETURNING id, title, category, resort_id
 ),
+
 
 -- 7) Relación M:N (Categorías - Automático)
 ec AS (
@@ -327,11 +457,32 @@ FROM
       ('Sol y Papaya Classic', '08:00:00'::time, '16:00:00'::time, 40),
       ('Sunset Sailing', '17:30:00'::time, '19:30:00'::time, 10),
       
-      -- Datos de disponibilidad para las NUEVAS experiencias
+      -- Experiencias 4-7
       ('Fiesta en Bote Deportivo Cholón', '10:00:00'::time, '16:00:00'::time, 12),
       ('Palmarito Beach Day', '09:00:00'::time, '17:00:00'::time, 30),
       ('Isla Bela Deluxe', '08:30:00'::time, '15:30:00'::time, 25),
-      ('Lizamar Island Escape', '08:00:00'::time, '16:00:00'::time, 30)
+      ('Lizamar Island Escape', '08:00:00'::time, '16:00:00'::time, 30),
+      
+      -- Nuevas experiencias 8-20
+      ('Tour Murallas y Castillo', '09:00:00'::time, '12:30:00'::time, 25),
+      ('Tour Murallas y Castillo', '14:00:00'::time, '17:30:00'::time, 25),
+      ('Playa Blanca Express', '08:00:00'::time, '16:00:00'::time, 35),
+      ('Kayak Mangrove Tour', '07:00:00'::time, '10:00:00'::time, 12),
+      ('Kayak Mangrove Tour', '15:00:00'::time, '18:00:00'::time, 12),
+      ('Catamaran Premium', '11:00:00'::time, '17:00:00'::time, 20),
+      ('Tour Nocturno Getsemaní', '19:00:00'::time, '22:00:00'::time, 15),
+      ('Snorkel en Barú', '08:00:00'::time, '15:00:00'::time, 20),
+      ('Jet Ski Adventure', '09:00:00'::time, '10:00:00'::time, 6),
+      ('Jet Ski Adventure', '11:00:00'::time, '12:00:00'::time, 6),
+      ('Jet Ski Adventure', '14:00:00'::time, '15:00:00'::time, 6),
+      ('Pesca Deportiva', '05:00:00'::time, '13:00:00'::time, 8),
+      ('Tour del Café', '10:00:00'::time, '13:00:00'::time, 15),
+      ('Tour del Café', '15:00:00'::time, '18:00:00'::time, 15),
+      ('Oceanario y Acuario', '09:00:00'::time, '15:00:00'::time, 30),
+      ('Paddleboard Sunset', '16:30:00'::time, '18:30:00'::time, 10),
+      ('Tour Gastronómico', '11:00:00'::time, '14:00:00'::time, 12),
+      ('Tour Gastronómico', '18:00:00'::time, '21:00:00'::time, 12),
+      ('Avistamiento de Delfines', '06:30:00'::time, '10:30:00'::time, 18)
   ) AS t(title, start_time, end_time, capacity) ON e.title = t.title;
 
 

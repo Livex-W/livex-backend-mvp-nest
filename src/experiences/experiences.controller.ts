@@ -72,6 +72,15 @@ export class ExperiencesController {
     return this.experiencesService.findAllWithPrices(queryDto, user?.sub);
   }
 
+  @Get('recommended')
+  async findRecommended(
+    @Query('limit') limit?: number,
+    @CurrentUser() user?: JwtPayload,
+  ): Promise<ExperienceWithImages[]> {
+    return this.experiencesService.findRecommended(limit || 5, user?.sub);
+  }
+
+
   @Get(':id')
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,

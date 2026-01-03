@@ -29,7 +29,7 @@ export class AdminService {
     const offset = (page - 1) * limit;
 
     let whereClause = "WHERE status = 'under_review'";
-    let orderClause = 'ORDER BY created_at ASC'; // Oldest first for review queue
+    const orderClause = 'ORDER BY created_at ASC'; // Oldest first for review queue
     const queryParams: unknown[] = [];
 
     // Search functionality
@@ -450,7 +450,7 @@ export class AdminService {
     const offset = (page - 1) * limit;
 
     let whereClause = '';
-    let orderClause = 'ORDER BY a.created_at DESC';
+    const orderClause = 'ORDER BY a.created_at DESC';
     const queryParams: unknown[] = [];
 
     // Search functionality
