@@ -13,7 +13,8 @@ export interface FavoriteExperienceDto {
         slug: string;
         main_image_url: string | null;
         category: string;
-        price_cents: number;
+        price_per_adult_cents: number;
+        commission_per_adult_cents: number;
         currency: string;
         rating_avg: number;
         rating_count: number;
@@ -53,7 +54,8 @@ export class FavoritesService {
           'slug', e.slug,
           'main_image_url', e.main_image_url,
           'category', e.category,
-          'price_cents', e.price_cents,
+          'price_per_adult_cents', e.price_per_adult_cents,
+          'commission_per_adult_cents', e.commission_per_adult_cents,
           'currency', e.currency,
           'rating_avg', e.rating_avg,
           'rating_count', e.rating_count
