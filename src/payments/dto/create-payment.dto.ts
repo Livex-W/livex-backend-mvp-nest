@@ -1,12 +1,13 @@
-import { IsUUID, IsEnum, IsOptional, IsString, IsUrl, IsEmail, IsArray } from 'class-validator';
-import type { PaymentProviderType } from '../providers/payment-provider.factory';
+import { IsUUID, IsEnum, IsOptional, IsString, IsUrl, IsEmail, IsArray, IsObject } from 'class-validator';
+import { PaymentProviderEnum } from '../providers/payment-provider.factory';
+import type { WompiMetadata } from '../interfaces/payment-metadata.interfaces';
 
 export class CreatePaymentDto {
   @IsUUID()
   bookingId: string;
 
-  @IsEnum(['wompi', 'epayco', 'stripe', 'paypal'])
-  provider: PaymentProviderType;
+  @IsEnum(PaymentProviderEnum)
+  provider: PaymentProviderEnum;
 
   @IsOptional()
   @IsString()
@@ -32,4 +33,9 @@ export class CreatePaymentDto {
   @IsOptional()
   @IsString()
   referralCode?: string;
+
+  // Metadata específica para Wompi
+  @IsOptional()
+  @IsObject()
+  wompiMetadata?: WompiMetadata;
 }

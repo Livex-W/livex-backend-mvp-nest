@@ -3,11 +3,14 @@ import { PaymentProvider } from '../interfaces/payment-provider.interface';
 import { WompiProvider } from './wompi.provider';
 import { PayPalProvider } from './paypal.provider';
 
-export type PaymentProviderType = 'wompi' | 'epayco' | 'stripe' | 'paypal';
+export enum PaymentProviderEnum {
+  WOMPI = 'wompi',
+  PAYPAL = 'paypal',
+}
 
 @Injectable()
 export class PaymentProviderFactory {
-  private readonly providers = new Map<PaymentProviderType, PaymentProvider>();
+  private readonly providers = new Map<PaymentProviderEnum, PaymentProvider>();
 
   constructor(
     private readonly wompiProvider: WompiProvider,
@@ -16,17 +19,17 @@ export class PaymentProviderFactory {
     // private readonly ePaycoProvider: EPaycoProvider,
     // private readonly stripeProvider: StripeProvider,
   ) {
-    this.registerProvider('wompi', this.wompiProvider);
-    this.registerProvider('paypal', this.paypalProvider);
-    // this.registerProvider('epayco', this.ePaycoProvider);
-    // this.registerProvider('stripe', this.stripeProvider);
+    this.registerProvider(PaymentProviderEnum.WOMPI, this.wompiProvider);
+    this.registerProvider(PaymentProviderEnum.PAYPAL, this.paypalProvider);
+    // this.registerProvider(PaymentProviderEnum.EPAYCO, this.ePaycoProvider);
+    // this.registerProvider(PaymentProviderEnum.STRIPE, this.stripeProvider);
   }
 
-  private registerProvider(type: PaymentProviderType, provider: PaymentProvider): void {
+  private registerProvider(type: PaymentProviderEnum, provider: PaymentProvider): void {
     this.providers.set(type, provider);
   }
 
-  getProvider(type: PaymentProviderType): PaymentProvider {
+  getProvider(type: PaymentProviderEnum): PaymentProvider {
     const provider = this.providers.get(type);
     if (!provider) {
       throw new Error(`Payment provider '${type}' is not registered`);
@@ -34,11 +37,11 @@ export class PaymentProviderFactory {
     return provider;
   }
 
-  getAvailableProviders(): PaymentProviderType[] {
+  getAvailableProviders(): PaymentProviderEnum[] {
     return Array.from(this.providers.keys());
   }
 
-  getSupportedCurrencies(type: PaymentProviderType): string[] {
+  getSupportedCurrencies(type: PaymentProviderEnum): string[] {
     return this.getProvider(type).supportedCurrencies;
   }
 }
