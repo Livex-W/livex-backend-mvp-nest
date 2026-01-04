@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Análisis de Mercado Turismo: App vs Web</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        
+        .chart-container {
+            position: relative;
+            height: 250px;
+            width: 100%;
+        }
+        
+        /* Animaciones para las barras */
+        @keyframes growBar {
+            from { height: 0; }
+            to { height: var(--h); }
+        }
+        .bar-animate {
+            animation: growBar 1s ease-out forwards;
+        }
+
+        /* Animaciones para los círculos (Pie Chart) */
+        @keyframes fillCircle {
+            from { stroke-dasharray: 0 100; }
+            to { stroke-dasharray: var(--p) 100; }
+        }
+        .pie-animate {
+            animation: fillCircle 1.2s ease-out forwards;
+        }
+
+        .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+    <!-- Header -->
+    <header class="bg-blue-900 text-white shadow-lg sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <i class="fa-solid fa-plane-departure text-2xl text-blue-300"></i>
+                <h1 class="text-xl md:text-2xl font-bold tracking-tight">Turismo Digital 2025</h1>
+            </div>
+            <div class="text-sm md:text-base font-light opacity-90">
+                Reporte de Mercado
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+        
+        <!-- Executive Summary -->
+        <section class="mb-12">
+            <div class="bg-white rounded-2xl p-6 md:p-8 shadow-sm border border-slate-100">
+                <h2 class="text-2xl font-bold text-slate-900 mb-4">Resumen Ejecutivo: ¿App o Web?</h2>
+                <p class="text-lg text-slate-600 leading-relaxed">
+                    La respuesta corta es: <strong>Depende de la etapa del viaje.</strong>
+                </p>
+                <div class="mt-6 grid md:grid-cols-2 gap-6">
+                    <div class="bg-blue-50 p-4 rounded-xl border border-blue-100 flex items-start gap-4">
+                        <div class="bg-blue-100 p-3 rounded-full text-blue-600">
+                            <i class="fa-solid fa-mobile-screen text-xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-blue-900">Dominio Móvil (Inspiración)</h3>
+                            <p class="text-sm text-blue-800 mt-1">El <strong>73%</strong> del tráfico total en turismo proviene de dispositivos móviles. Los usuarios usan apps y web móvil para descubrir destinos y comparar precios rápidos.</p>
+                        </div>
+                    </div>
+                    <div class="bg-emerald-50 p-4 rounded-xl border border-emerald-100 flex items-start gap-4">
+                        <div class="bg-emerald-100 p-3 rounded-full text-emerald-600">
+                            <i class="fa-solid fa-desktop text-xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-emerald-900">Dominio Web (Conversión)</h3>
+                            <p class="text-sm text-emerald-800 mt-1">La web de escritorio mantiene una tasa de conversión <strong>2x más alta</strong> que la web móvil. Para pagos complejos y paquetes vacacionales caros, el usuario prefiere la PC.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Charts Grid -->
+        <div class="grid lg:grid-cols-2 gap-8 mb-12">
+            
+            <!-- Chart 1: Traffic Sources -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 card-hover transition-all duration-300">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-lg font-bold text-slate-800">Origen del Tráfico (Visitas)</h3>
+                    <span class="text-xs font-semibold bg-gray-100 text-gray-500 py-1 px-2 rounded">Global 2024-25</span>
+                </div>
+                
+                <div class="flex items-center justify-center h-64 relative">
+                    <!-- SVG Pie Chart -->
+                    <svg viewBox="0 0 36 36" class="w-48 h-48 block transform -rotate-90">
+                        <!-- Background Circle -->
+                        <path class="text-gray-200" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3.8" />
+                        <!-- Desktop Slice (27%) -->
+                        <path class="text-emerald-400 pie-animate" style="--p: 27;" stroke-dasharray="0 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3.8" />
+                        <!-- Mobile Slice (73%) starts after desktop -->
+                        <path class="text-blue-500 pie-animate" style="--p: 73;" stroke-dasharray="0 100" stroke-dashoffset="-27" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3.8" />
+                    </svg>
+                    
+                    <!-- Center Text -->
+                    <div class="absolute text-center transform rotate-90"> <!-- Counteract parent rotation -->
+                        <span class="block text-3xl font-bold text-slate-800">73%</span>
+                        <span class="text-xs text-gray-500 uppercase tracking-wide">Móvil</span>
+                    </div>
+                </div>
+
+                <div class="flex justify-center gap-6 mt-4">
+                    <div class="flex items-center gap-2">
+                        <span class="w-3 h-3 rounded-full bg-blue-500"></span>
+                        <span class="text-sm font-medium text-slate-600">Móvil (App + Web)</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="w-3 h-3 rounded-full bg-emerald-400"></span>
+                        <span class="text-sm font-medium text-slate-600">Escritorio (PC)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chart 2: Conversion Rates Comparison -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 card-hover transition-all duration-300">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-lg font-bold text-slate-800">Tasa de Conversión (Ventas)</h3>
+                    <div class="group relative">
+                        <i class="fa-regular fa-circle-question text-gray-400 cursor-help"></i>
+                        <div class="absolute right-0 w-48 bg-gray-800 text-white text-xs p-2 rounded hidden group-hover:block z-10">
+                            Porcentaje de visitas que terminan en una compra real.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="h-64 flex items-end justify-around pb-4 border-b border-gray-100 relative">
+                    <!-- Grid Lines -->
+                    <div class="absolute w-full h-full flex flex-col justify-between pointer-events-none">
+                        <div class="w-full border-t border-gray-100 border-dashed"></div>
+                        <div class="w-full border-t border-gray-100 border-dashed"></div>
+                        <div class="w-full border-t border-gray-100 border-dashed"></div>
+                        <div class="w-full border-t border-gray-100 border-dashed"></div>
+                    </div>
+
+                    <!-- Bar: Mobile Web -->
+                    <div class="flex flex-col items-center gap-2 w-1/4 z-10 group">
+                        <div class="text-sm font-bold text-gray-500 mb-1 opacity-0 group-hover:opacity-100 transition-opacity">0.7%</div>
+                        <div class="w-full bg-gray-200 rounded-t-lg relative overflow-hidden h-64 flex items-end">
+                            <div class="w-full bg-slate-400 bar-animate" style="--h: 12%;"></div>
+                        </div>
+                        <div class="text-center">
+                            <div class="font-semibold text-sm text-slate-700">Web Móvil</div>
+                            <div class="text-xs text-slate-400">Baja</div>
+                        </div>
+                    </div>
+
+                    <!-- Bar: App -->
+                    <div class="flex flex-col items-center gap-2 w-1/4 z-10 group">
+                        <div class="text-sm font-bold text-blue-600 mb-1 opacity-0 group-hover:opacity-100 transition-opacity">~3.5%</div>
+                        <div class="w-full bg-gray-200 rounded-t-lg relative overflow-hidden h-64 flex items-end">
+                            <div class="w-full bg-blue-500 bar-animate shadow-lg shadow-blue-500/30" style="--h: 60%;"></div>
+                        </div>
+                        <div class="text-center">
+                            <div class="font-semibold text-sm text-slate-700">App Nativa</div>
+                            <div class="text-xs text-slate-400">Alta</div>
+                        </div>
+                    </div>
+
+                    <!-- Bar: Desktop -->
+                    <div class="flex flex-col items-center gap-2 w-1/4 z-10 group">
+                        <div class="text-sm font-bold text-emerald-600 mb-1 opacity-0 group-hover:opacity-100 transition-opacity">~4.0%</div>
+                        <div class="w-full bg-gray-200 rounded-t-lg relative overflow-hidden h-64 flex items-end">
+                            <div class="w-full bg-emerald-500 bar-animate" style="--h: 70%;"></div>
+                        </div>
+                        <div class="text-center">
+                            <div class="font-semibold text-sm text-slate-700">PC / Laptop</div>
+                            <div class="text-xs text-slate-400">Máxima</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Comparative Table & Analysis -->
+        <div class="grid lg:grid-cols-3 gap-8">
+            
+            <!-- Key Differences List -->
+            <div class="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                <div class="bg-slate-50 px-6 py-4 border-b border-slate-100">
+                    <h3 class="font-bold text-slate-800">Diferencias Clave: ¿Cuándo usan qué?</h3>
+                </div>
+                <div class="p-6">
+                    <ul class="space-y-6">
+                        <li class="flex gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-600">
+                                <i class="fa-solid fa-magnifying-glass"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-slate-900">Investigación y "Soñar"</h4>
+                                <p class="text-sm text-slate-600">El <strong>Móvil</strong> es el rey. Los usuarios pasan horas en Instagram, TikTok y Apps de viajes buscando inspiración. La inmediatez es clave.</p>
+                            </div>
+                        </li>
+                        <li class="flex gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-600">
+                                <i class="fa-regular fa-credit-card"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-slate-900">El "Flip" de la Reserva</h4>
+                                <p class="text-sm text-slate-600">Ocurre un fenómeno llamado "Wishlist Flip". Los usuarios agregan al carrito en el móvil, pero cambian a la <strong>PC (Web)</strong> para poner la tarjeta de crédito, buscando seguridad y ver detalles en pantalla grande.</p>
+                            </div>
+                        </li>
+                        <li class="flex gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 rounded-full bg-cyan-100 flex items-center justify-center text-cyan-600">
+                                <i class="fa-solid fa-ticket"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-slate-900">Durante el Viaje (Post-Booking)</h4>
+                                <p class="text-sm text-slate-600">La <strong>App</strong> es indiscutible. Tarjetas de embarque, notificaciones de retrasos, llaves de hotel digitales y chat con soporte. Aquí la web móvil pierde por usabilidad.</p>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Stats Highlight Cards -->
+            <div class="flex flex-col gap-4">
+                <div class="bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl p-6 text-white shadow-lg">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <p class="text-blue-200 text-sm font-medium uppercase">Retención</p>
+                            <h3 class="text-3xl font-bold mt-1">3x</h3>
+                        </div>
+                        <i class="fa-solid fa-users-viewfinder text-blue-300 opacity-50 text-2xl"></i>
+                    </div>
+                    <p class="text-sm text-blue-100">Las Apps retienen 3 veces más usuarios que la web móvil gracias a las notificaciones push y programas de lealtad.</p>
+                </div>
+
+                <div class="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <p class="text-slate-400 text-sm font-medium uppercase">Tendencia 2025</p>
+                            <h3 class="text-3xl font-bold text-slate-800 mt-1">45%</h3>
+                        </div>
+                        <i class="fa-solid fa-arrow-trend-up text-emerald-500 text-2xl"></i>
+                    </div>
+                    <p class="text-sm text-slate-600">De las reservas totales online ya se cierran exclusivamente en móvil, un aumento del 10% vs 2021.</p>
+                </div>
+            </div>
+        </div>
+
+        <footer class="mt-12 text-center text-slate-400 text-sm pb-8">
+            <p>Datos basados en tendencias globales de la industria turística (2024-2025).</p>
+        </footer>
+
+    </main>
+</body>
+</html>

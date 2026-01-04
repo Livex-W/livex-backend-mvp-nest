@@ -92,9 +92,9 @@ export class WompiProvider implements PaymentProvider {
       integritySecret: this.configService.get<string>('WOMPI_INTEGRITY_SECRET') ?? "",
     };
 
-    if (this.configService.get('NODE_ENV') !== 'production') {
-      this.config.baseUrl = 'https://sandbox.wompi.co';
-    }
+    // if (this.configService.get('NODE_ENV') !== 'production') {
+    //   this.config.baseUrl = 'https://sandbox.wompi.co';
+    // }
   }
 
   async getAcceptanceToken(): Promise<string> {

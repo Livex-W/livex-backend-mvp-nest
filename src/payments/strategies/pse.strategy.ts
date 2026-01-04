@@ -69,6 +69,12 @@ export class PSEStrategy implements PaymentMethodStrategy {
             amount_in_cents: data.amountCents,
             currency: data.currency,
             customer_email: data.customerEmail,
+            customer_data: {
+                full_name: (data.metadata as any)?.payerFullName || 'Usuario Livex',
+                phone_number: (data.metadata as any)?.payerPhoneNumber || '+573000000000',
+                legal_id: pseData?.userLegalId,
+                legal_id_type: pseData?.userLegalIdType,
+            },
             payment_method: {
                 type: 'PSE',
                 user_type: this.getNormalizedUserType(pseData?.userType),

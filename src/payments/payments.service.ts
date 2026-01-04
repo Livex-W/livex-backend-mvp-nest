@@ -101,16 +101,18 @@ export class PaymentsService {
     // 0. Aplicar cupones y descuento VIP (siempre verificar VIP aunque no haya cupones)
     await this.couponsService.applyCouponsToBooking(dto.bookingId, dto.couponCodes ?? [], dto.referralCode ?? null, userId);
 
-    const payment = await this.db.transaction(async (client) => {
-
-      // Verificar booking
-      const bookingResult = await client.query<Booking>(
-        'SELECT * FROM bookings WHERE id = $1 AND user_id = $2 AND status = $3',
+    const transactionResult = await this.db.transaction(async (client) => {
+      // Verificar booking y obtener datos del usuario (payer)
+      const bookingResult = await client.query<Booking & { full_name: string; phone: string }>(
+        `SELECT b.*, u.full_name, u.phone 
+         FROM bookings b
+         JOIN users u ON u.id = b.user_id
+         WHERE b.id = $1 AND b.user_id = $2 AND b.status = $3`,
         [dto.bookingId, userId, 'pending']
       );
 
       if (bookingResult.rows.length === 0) {
-        throw new NotFoundException('Reserva no encontrada o no está en estado pendiente');
+        throw new NotFoundException('Reserva no encontrada, no pertenece al usuario o no está pendiente');
       }
 
       const booking = bookingResult.rows[0];
@@ -123,7 +125,12 @@ export class PaymentsService {
         );
 
         if (existingPayment.rows.length > 0) {
-          return existingPayment.rows[0];
+          return {
+            payment: existingPayment.rows[0],
+            payerFullName: booking.full_name,
+            payerPhoneNumber: booking.phone,
+            originalBooking: booking
+          };
         }
       }
 
@@ -134,7 +141,7 @@ export class PaymentsService {
       );
 
       if (existingSuccessfulPayment.rows.length > 0) {
-        throw new ConflictException('Ya existe un pago para esta reserva');
+        throw new ConflictException('Ya existe un pago exitoso para esta reserva');
       }
 
       // Crear registro de pago
@@ -190,19 +197,20 @@ export class PaymentsService {
         ]
       );
 
-      return insertResult.rows[0];
+      return {
+        payment: insertResult.rows[0],
+        payerFullName: booking.full_name,
+        payerPhoneNumber: booking.phone,
+        originalBooking: booking
+      };
     });
+
+    const { payment, payerFullName, payerPhoneNumber, originalBooking: booking } = transactionResult;
 
     const provider = this.paymentProviderFactory.getProvider(dto.provider);
 
     let paymentResult;
     try {
-      const bookingResult = await this.db.query<Booking>(
-        'SELECT * FROM bookings WHERE id = $1',
-        [dto.bookingId]
-      );
-      const booking = bookingResult.rows[0];
-
       paymentResult = await provider.createPayment({
         id: payment.id,
         amount: payment.amount_cents, // Use the (potentially converted) payment amount
@@ -213,6 +221,8 @@ export class PaymentsService {
           bookingId: booking.id,
           userId: booking.user_id,
           customerEmail: dto.customerEmail,
+          payerFullName: transactionResult.payerFullName, // Pass payer info
+          payerPhoneNumber: transactionResult.payerPhoneNumber, // Pass payer info
           redirectUrl: dto.redirectUrl,
           commissionCents: booking.commission_cents,
           resortNetCents: booking.resort_net_cents,

@@ -20,10 +20,25 @@ export class PSEBanksService implements OnModuleInit {
     };
 
     constructor(private configService: ConfigService) {
+        let baseUrl = this.configService.get<string>('WOMPI_BASE_URL');
+        const pubKey = this.configService.get<string>('WOMPI_PUBLIC_KEY') || '';
+
+        if (!baseUrl) {
+            if (pubKey.startsWith('pub_prod_')) {
+                baseUrl = 'https://production.wompi.co';
+                this.logger.log('Detected Wompi Production Key for PSE, using Production URL');
+            } else if (pubKey.startsWith('pub_test_')) {
+                baseUrl = 'https://sandbox.wompi.co';
+                this.logger.log('Detected Wompi Test Key for PSE, using Sandbox URL');
+            } else {
+                baseUrl = this.configService.get('NODE_ENV') === 'production'
+                    ? 'https://production.wompi.co'
+                    : 'https://sandbox.wompi.co';
+            }
+        }
+
         this.config = {
-            baseUrl: this.configService.get('NODE_ENV') === 'production'
-                ? 'https://production.wompi.co'
-                : 'https://sandbox.wompi.co',
+            baseUrl: baseUrl,
             privateKey: this.configService.get<string>('WOMPI_PRIVATE_KEY') || '',
         };
     }

@@ -1,4 +1,4 @@
-import { IsUUID, IsEnum, IsOptional, IsString, IsUrl, IsEmail, IsArray, IsObject } from 'class-validator';
+import { IsUUID, IsEnum, IsOptional, IsString, IsEmail, IsArray, IsObject } from 'class-validator';
 import { EPaymentProvider } from '../providers/payment-provider.factory';
 import type { WompiMetadata } from '../interfaces/payment-metadata.interfaces';
 
@@ -14,7 +14,7 @@ export class CreatePaymentDto {
   paymentMethod?: string;
 
   @IsOptional()
-  @IsUrl()
+  @IsString()
   redirectUrl?: string;
 
   @IsOptional()

@@ -384,6 +384,16 @@ e AS (
       true, 4, 12,
       'COP', 'Embarcación, guía biólogo, snacks', 'Garantía de avistamiento',
       'https://images.unsplash.com/photo-1607153333879-c174d265f1d2?w=800', 'active'::experience_status,
+      (SELECT id FROM u WHERE email='admin@livex.app'), now()),
+
+    -- 21. Experiencia Test 5k
+    ((SELECT id FROM r WHERE name='Mar y Sol Cartagena'),
+      'Experiencia Test 5k', 'Experiencia para probar pagos mínimos de 5000 pesos', 'city_tour',
+      500000, 500000,
+      500000, 500000,
+      true, 1, 99,
+      'COP', 'Incluye todo', 'No incluye nada',
+      'https://images.unsplash.com/photo-1621609764180-2ca554a9d6f2?w=800', 'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now())
 
   RETURNING id, title, category, resort_id
@@ -428,7 +438,10 @@ imgs AS (
 
     -- Lizamar
     ((SELECT id FROM e WHERE title='Lizamar Island Escape'), 'https://images.unsplash.com/photo-1590523741831-ab7e8b8f9c7f?w=800', 0),
-    ((SELECT id FROM e WHERE title='Lizamar Island Escape'), 'https://images.unsplash.com/photo-1544551763-46a42a4571da?w=800', 1)
+    ((SELECT id FROM e WHERE title='Lizamar Island Escape'), 'https://images.unsplash.com/photo-1544551763-46a42a4571da?w=800', 1),
+
+    -- Experiencia Test 5k
+    ((SELECT id FROM e WHERE title='Experiencia Test 5k'), 'https://images.unsplash.com/photo-1621609764180-2ca554a9d6f2?w=800', 0)
 
   RETURNING experience_id
 ),
@@ -446,7 +459,8 @@ loc AS (
     ((SELECT id FROM e WHERE title='Fiesta en Bote Deportivo Cholón'), 'Muelle de los Pegasos', 'Centro Histórico, muelle lateral', 10.420500, -75.546000, 'Preguntar por el bote "La Fantástica".'),
     ((SELECT id FROM e WHERE title='Palmarito Beach Day'), 'Muelle Hospital Bocagrande', 'Cra 1, Bocagrande', 10.398000, -75.556000, 'Lancha sale cada 30 minutos.'),
     ((SELECT id FROM e WHERE title='Isla Bela Deluxe'), 'Muelle La Bodeguita', 'Puerta 4', 10.421900, -75.548300, 'Hora de salida 8:30 AM puntual.'),
-    ((SELECT id FROM e WHERE title='Lizamar Island Escape'), 'Muelle La Bodeguita', 'Puerta 5', 10.421900, -75.548300, 'Presentar voucher impreso o digital.')
+    ((SELECT id FROM e WHERE title='Lizamar Island Escape'), 'Muelle La Bodeguita', 'Puerta 5', 10.421900, -75.548300, 'Presentar voucher impreso o digital.'),
+    ((SELECT id FROM e WHERE title='Experiencia Test 5k'), 'Oficina Livex', 'Centro', 10.42, -75.54, 'Preguntar por Dev')
 
   RETURNING experience_id
 )
@@ -503,7 +517,8 @@ FROM
       ('Paddleboard Sunset', '16:30:00'::time, '18:30:00'::time, 10),
       ('Tour Gastronómico', '11:00:00'::time, '14:00:00'::time, 12),
       ('Tour Gastronómico', '18:00:00'::time, '21:00:00'::time, 12),
-      ('Avistamiento de Delfines', '06:30:00'::time, '10:30:00'::time, 18)
+      ('Avistamiento de Delfines', '06:30:00'::time, '10:30:00'::time, 18),
+      ('Experiencia Test 5k', '08:00:00'::time, '18:00:00'::time, 100)
   ) AS t(title, start_time, end_time, capacity) ON e.title = t.title;
 
 
