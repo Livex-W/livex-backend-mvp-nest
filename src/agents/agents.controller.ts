@@ -17,16 +17,25 @@ import { UpdateAgentProfileDto } from './dto/update-agent-profile.dto';
 import { CreateReferralCodeDto } from './dto/create-referral-code.dto';
 import { AddCodeRestrictionDto } from './dto/add-code-restriction.dto';
 import { CreateCodeVariantDto } from './dto/create-code-variant.dto';
+import { CreateAgentDto } from './dto/create-agent.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayload } from '../common/interfaces/jwt-payload.interface';
 
 type User = JwtPayload & { id: string };
 
-@Controller('agents')
+@Controller('api/v1/agents')
 @UseGuards(JwtAuthGuard)
 export class AgentsController {
     constructor(private readonly agentsService: AgentsService) { }
+
+    @Post()
+    createAgent(
+        @Body() dto: CreateAgentDto,
+        @CurrentUser() user: User,
+    ) {
+        return this.agentsService.createAgent(dto, user.id);
+    }
 
     @Post('resorts/:resortId')
     createAgreement(

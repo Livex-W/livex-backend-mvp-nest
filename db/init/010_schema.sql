@@ -224,7 +224,7 @@ CREATE TRIGGER trg_resort_bank_info_updated_at BEFORE UPDATE ON resort_bank_info
 -- Relación Agentes <-> Resorts
 CREATE TABLE IF NOT EXISTS resort_agents (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    resort_id uuid NOT NULL REFERENCES resorts(id),
+    resort_id uuid REFERENCES resorts(id), -- Nullable for global agents/influencers
     user_id uuid NOT NULL REFERENCES users(id),
     commission_bps integer NOT NULL CHECK (commission_bps >= 0 AND commission_bps <= 10000), 
     is_active boolean DEFAULT true,

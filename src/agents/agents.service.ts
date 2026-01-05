@@ -13,12 +13,61 @@ import { UpdateAgentProfileDto } from './dto/update-agent-profile.dto';
 import { CreateReferralCodeDto } from './dto/create-referral-code.dto';
 import { AddCodeRestrictionDto } from './dto/add-code-restriction.dto';
 import { CreateCodeVariantDto } from './dto/create-code-variant.dto';
-
+import { CreateAgentDto } from './dto/create-agent.dto';
+import { UsersService } from '../users/users.service';
+import { PasswordHashService } from '../auth/services/password-hash.service';
 @Injectable()
 export class AgentsService {
     constructor(
         @Inject(DATABASE_CLIENT) private readonly db: DatabaseClient,
+        private readonly usersService: UsersService,
+        private readonly passwordHashService: PasswordHashService,
     ) { }
+
+    async createAgent(dto: CreateAgentDto, requesterId: string) {
+        // 1. Find Resort owned by requester (Resort Owner)
+        let resortId: string | null = null;
+
+        // Only if requester is provided. If admin creates? Assuming this flow is for Resort Owner.
+        // User feedback implies checking ownership.
+        const resortRes = await this.db.query(
+            'SELECT id FROM resorts WHERE owner_user_id = $1 LIMIT 1',
+            [requesterId]
+        );
+
+        if (resortRes.rows.length > 0) {
+            resortId = resortRes.rows[0].id as string;
+        }
+
+        // 2. Check if user exists
+        const existingUser = await this.usersService.findByEmail(dto.email);
+        if (existingUser) {
+            throw new ConflictException('User already exists with this email');
+        }
+
+        // 3. Create User
+        const passwordHash = this.passwordHashService.hashPassword(dto.password);
+        const newUser = await this.usersService.createUser({
+            email: dto.email,
+            passwordHash,
+            fullName: dto.fullName,
+            role: 'agent',
+            phone: dto.phone,
+        });
+
+        await this.db.query(
+            `INSERT INTO resort_agents (resort_id, user_id, commission_bps)
+                VALUES ($1, $2, $3)
+                ON CONFLICT (resort_id, user_id) DO NOTHING`,
+            [resortId, newUser.id, dto.commissionBps || 0],
+        );
+
+        return {
+            ...newUser,
+            resortId,
+            commissionBps: dto.commissionBps || 0,
+        };
+    }
 
     private async checkResortOwnership(resortId: string, userId: string) {
         const result = await this.db.query(

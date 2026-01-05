@@ -36,6 +36,6 @@ import { FirebaseAdminService } from './services/firebase-admin.service';
   ],
   controllers: [AuthController],
   providers: [AuthService, PasswordHashService, JwtAccessStrategy, FirebaseAdminService], // Added FirebaseAdminService
-  exports: [AuthService],
+  exports: [AuthService, PasswordHashService],
 })
 export class AuthModule { }

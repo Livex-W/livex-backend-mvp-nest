@@ -20,7 +20,7 @@ export class ResortsService {
   constructor(
     @Inject(DATABASE_CLIENT) private readonly db: DatabaseClient,
     private readonly logger: CustomLoggerService,
-  ) {}
+  ) { }
 
   async create(createResortDto: CreateResortDto, userId: string): Promise<Resort> {
     try {
@@ -52,7 +52,7 @@ export class ResortsService {
       );
 
       const resort = result.rows[0] as Resort;
-      
+
       this.logger.logBusinessEvent('resort_created', {
         userId,
         resortId: resort.id,
@@ -96,7 +96,7 @@ export class ResortsService {
         const [field, direction] = sortString.split(':');
         const validFields = ['name', 'city', 'status', 'created_at', 'updated_at'];
         const validDirections = ['asc', 'desc'];
-        
+
         if (validFields.includes(field) && validDirections.includes(direction)) {
           orderClause = `ORDER BY ${field} ${direction.toUpperCase()}`;
         }
@@ -115,7 +115,7 @@ export class ResortsService {
       ${orderClause} 
       LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}
     `;
-    
+
     const dataResult = await this.db.query(dataQuery, [...queryParams, limit, offset]);
 
     const meta: PaginationMeta = {
@@ -135,7 +135,7 @@ export class ResortsService {
 
   async findOne(id: string): Promise<Resort> {
     const result = await this.db.query('SELECT * FROM resorts WHERE id = $1', [id]);
-    
+
     if (result.rows.length === 0) {
       throw new NotFoundException('Resort not found');
     }
@@ -165,7 +165,7 @@ export class ResortsService {
         const [field, direction] = sortString.split(':');
         const validFields = ['name', 'city', 'status', 'created_at', 'updated_at'];
         const validDirections = ['asc', 'desc'];
-        
+
         if (validFields.includes(field) && validDirections.includes(direction)) {
           orderClause = `ORDER BY ${field} ${direction.toUpperCase()}`;
         }
@@ -184,7 +184,7 @@ export class ResortsService {
       ${orderClause} 
       LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}
     `;
-    
+
     const dataResult = await this.db.query(dataQuery, [...queryParams, limit, offset]);
 
     const meta: PaginationMeta = {

@@ -53,5 +53,9 @@ export class RegisterDto {
         message: `Role must be one of: ${USER_ROLES.join(', ')}`,
     })
     role?: UserRole;
+
+    @IsOptional()
+    @IsString()
+    resortId?: string;
 }
 
