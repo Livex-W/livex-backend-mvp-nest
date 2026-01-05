@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { OnEvent } from '@nestjs/event-emitter';
 import { NotificationService } from '../services/notification.service';
 import {
@@ -11,6 +12,7 @@ import {
   PasswordResetRequestedEvent,
   ResortApprovedEvent,
   ResortRejectedEvent,
+  ResortCreatedEvent,
   ExperienceApprovedEvent,
   ExperienceRejectedEvent,
   BookingReminderEvent,
@@ -20,7 +22,10 @@ import {
 export class NotificationListener {
   private readonly logger = new Logger(NotificationListener.name);
 
-  constructor(private readonly notificationService: NotificationService) { }
+  constructor(
+    private readonly notificationService: NotificationService,
+    private readonly configService: ConfigService,
+  ) { }
 
   @OnEvent('booking.confirmed')
   handleBookingConfirmed(event: BookingConfirmedEvent) {
@@ -183,6 +188,27 @@ export class NotificationListener {
       this.logger.log(`Resort rejection notification sent for resort ${event.resortId}`);
     } catch (error) {
       this.logger.error(`Failed to send resort rejection notification for ${event.resortId}:`, error);
+    }
+  }
+
+  @OnEvent('resort.created')
+  handleResortCreated(event: ResortCreatedEvent) {
+    try {
+      const adminEmail = this.configService.get<string>('ADMIN_EMAIL_FOR_RESORT_APPROVAL', 'admin@livex.com');
+
+      this.notificationService.sendResortCreatedAdmin(
+        adminEmail,
+        {
+          resortId: event.resortId,
+          resortName: event.resortName,
+          ownerEmail: event.ownerEmail,
+          ownerName: event.ownerName,
+        }
+      );
+
+      this.logger.log(`Resort created notification sent to admin for resort ${event.resortId}`);
+    } catch (error) {
+      this.logger.error(`Failed to send resort created notification for ${event.resortId}:`, error);
     }
   }
 

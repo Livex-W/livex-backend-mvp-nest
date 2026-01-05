@@ -10,6 +10,7 @@ import { UsersModule } from '../users/users.module';
 import { JwtAccessStrategy } from './strategies/jwt-access.strategy';
 import { DatabaseModule } from '../database/database.module';
 import { CommonModule } from '../common/common.module';
+import { ResortsModule } from '../resorts/resorts.module';
 
 import { FirebaseAdminService } from './services/firebase-admin.service';
 
@@ -19,6 +20,7 @@ import { FirebaseAdminService } from './services/firebase-admin.service';
     UsersModule,
     DatabaseModule,
     CommonModule,
+    ResortsModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],

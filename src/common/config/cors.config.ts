@@ -27,6 +27,8 @@ export class CorsConfig {
 
     // Staging origins
     const stagingOrigins = [
+      'https://bng.livex.com.co',
+      'https://livex.com.co',
       'https://staging.livex.com',
       'https://staging-admin.livex.com',
     ];
@@ -104,7 +106,7 @@ export class CorsConfig {
 
   static validateCorsConfig(): void {
     const isProduction = process.env.NODE_ENV === 'production';
-    
+
     if (isProduction && !process.env.CORS_ALLOWED_ORIGINS) {
       throw new Error('CORS_ALLOWED_ORIGINS environment variable is required in production');
     }
@@ -112,7 +114,7 @@ export class CorsConfig {
     if (isProduction) {
       const origins = process.env.CORS_ALLOWED_ORIGINS?.split(',') || [];
       const hasInsecureOrigins = origins.some(origin => origin.trim().startsWith('http://'));
-      
+
       if (hasInsecureOrigins) {
         this.logger.warn('Insecure HTTP origins detected in production CORS configuration', {
           origins,

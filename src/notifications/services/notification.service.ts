@@ -192,6 +192,26 @@ export class NotificationService implements OnModuleInit {
     );
   }
 
+  /**
+   * Notify admin when a new resort is created and needs approval
+   */
+  sendResortCreatedAdmin(
+    adminEmail: string,
+    resortData: {
+      resortId: string;
+      resortName: string;
+      ownerEmail: string;
+      ownerName: string;
+    }
+  ): string {
+    return this.sendEmailNotification(
+      adminEmail,
+      EmailTemplateType.RESORT_CREATED_ADMIN,
+      resortData,
+      { priority: 'high' }
+    );
+  }
+
   sendExperienceApproved(
     resortEmail: string,
     experienceData: {
@@ -329,6 +349,12 @@ export class NotificationService implements OnModuleInit {
       [EmailTemplateType.RESORT_REJECTED]: {
         resortName: 'Resort de Prueba',
         rejectionReason: 'Documentación incompleta'
+      },
+      [EmailTemplateType.RESORT_CREATED_ADMIN]: {
+        resortId: 'test-resort-id',
+        resortName: 'Resort de Prueba',
+        ownerEmail: 'owner@test.com',
+        ownerName: 'Owner de Prueba'
       },
       [EmailTemplateType.EXPERIENCE_APPROVED]: {
         resortName: 'Resort de Prueba',

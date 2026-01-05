@@ -11,7 +11,7 @@ export class BookingConfirmedEvent implements NotificationEvent {
     public readonly guestCount: number,
     public readonly totalAmount: number,
     public readonly bookingCode: string,
-  ) {}
+  ) { }
 }
 
 export class PaymentConfirmedEvent implements NotificationEvent {
@@ -22,7 +22,7 @@ export class PaymentConfirmedEvent implements NotificationEvent {
     public readonly customerName: string,
     public readonly amount: number,
     public readonly bookingCode: string,
-  ) {}
+  ) { }
 }
 
 export class PaymentFailedEvent implements NotificationEvent {
@@ -33,7 +33,7 @@ export class PaymentFailedEvent implements NotificationEvent {
     public readonly customerName: string,
     public readonly bookingCode: string,
     public readonly reason?: string,
-  ) {}
+  ) { }
 }
 
 export class BookingCancelledEvent implements NotificationEvent {
@@ -44,7 +44,7 @@ export class BookingCancelledEvent implements NotificationEvent {
     public readonly experienceName: string,
     public readonly bookingCode: string,
     public readonly refundAmount?: number,
-  ) {}
+  ) { }
 }
 
 export class RefundProcessedEvent implements NotificationEvent {
@@ -55,7 +55,7 @@ export class RefundProcessedEvent implements NotificationEvent {
     public readonly customerName: string,
     public readonly refundAmount: number,
     public readonly bookingCode: string,
-  ) {}
+  ) { }
 }
 
 export class UserRegisteredEvent implements NotificationEvent {
@@ -63,7 +63,7 @@ export class UserRegisteredEvent implements NotificationEvent {
     public readonly userId: string,
     public readonly userEmail: string,
     public readonly userName: string,
-  ) {}
+  ) { }
 }
 
 export class PasswordResetRequestedEvent implements NotificationEvent {
@@ -72,7 +72,7 @@ export class PasswordResetRequestedEvent implements NotificationEvent {
     public readonly userEmail: string,
     public readonly userName: string,
     public readonly resetToken: string,
-  ) {}
+  ) { }
 }
 
 export class ResortApprovedEvent implements NotificationEvent {
@@ -80,7 +80,7 @@ export class ResortApprovedEvent implements NotificationEvent {
     public readonly resortId: string,
     public readonly resortEmail: string,
     public readonly resortName: string,
-  ) {}
+  ) { }
 }
 
 export class ResortRejectedEvent implements NotificationEvent {
@@ -89,7 +89,17 @@ export class ResortRejectedEvent implements NotificationEvent {
     public readonly resortEmail: string,
     public readonly resortName: string,
     public readonly rejectionReason: string,
-  ) {}
+  ) { }
+}
+
+// Event to notify admin when a new resort is created and needs approval
+export class ResortCreatedEvent implements NotificationEvent {
+  constructor(
+    public readonly resortId: string,
+    public readonly resortName: string,
+    public readonly ownerEmail: string,
+    public readonly ownerName: string,
+  ) { }
 }
 
 export class ExperienceApprovedEvent implements NotificationEvent {
@@ -99,7 +109,7 @@ export class ExperienceApprovedEvent implements NotificationEvent {
     public readonly resortEmail: string,
     public readonly resortName: string,
     public readonly experienceName: string,
-  ) {}
+  ) { }
 }
 
 export class ExperienceRejectedEvent implements NotificationEvent {
@@ -110,7 +120,7 @@ export class ExperienceRejectedEvent implements NotificationEvent {
     public readonly resortName: string,
     public readonly experienceName: string,
     public readonly rejectionReason: string,
-  ) {}
+  ) { }
 }
 
 export class BookingReminderEvent implements NotificationEvent {
@@ -124,5 +134,5 @@ export class BookingReminderEvent implements NotificationEvent {
     public readonly location: string,
     public readonly bookingCode: string,
     public readonly reminderDate: Date,
-  ) {}
+  ) { }
 }

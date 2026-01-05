@@ -196,6 +196,7 @@ export class NotificationController {
       [EmailTemplateType.REFUND_PROCESSED]: 'Confirmación de reembolso procesado',
       [EmailTemplateType.RESORT_APPROVED]: 'Aprobación de prestador',
       [EmailTemplateType.RESORT_REJECTED]: 'Rechazo de prestador',
+      [EmailTemplateType.RESORT_CREATED_ADMIN]: 'Notificación al admin de nuevo prestador',
       [EmailTemplateType.EXPERIENCE_APPROVED]: 'Aprobación de experiencia',
       [EmailTemplateType.EXPERIENCE_REJECTED]: 'Rechazo de experiencia',
       [EmailTemplateType.WELCOME]: 'Email de bienvenida para nuevos usuarios',

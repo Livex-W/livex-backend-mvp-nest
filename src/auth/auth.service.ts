@@ -9,6 +9,7 @@ import { UsersService } from '../users/users.service';
 import { DATABASE_CLIENT } from '../database/database.module';
 import { DatabaseClient } from '../database/database.client';
 import { CustomLoggerService } from '../common/services/logger.service';
+import { ResortsService } from '../resorts/resorts.service';
 import type { UserEntity } from '../users/entities/user.entity';
 import type { JwtPayload } from '../common/interfaces/jwt-payload.interface';
 import {
@@ -49,7 +50,7 @@ interface PasswordResetTokenRow extends QueryResultRow {
 }
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { PasswordResetRequestedEvent } from '../notifications/events/notification.events';
+import { PasswordResetRequestedEvent, ResortCreatedEvent } from '../notifications/events/notification.events';
 
 @Injectable()
 export class AuthService {
@@ -62,6 +63,7 @@ export class AuthService {
         private readonly logger: CustomLoggerService,
         private readonly eventEmitter: EventEmitter2,
         private readonly firebaseAdminService: FirebaseAdminService,
+        private readonly resortsService: ResortsService,
     ) { }
 
     async register(dto: RegisterDto, context: TokenContext): Promise<AuthResult> {
@@ -102,6 +104,51 @@ export class AuthService {
             role: dto.role || 'tourist',
         });
 
+        // If role is 'resort', create an associated resort with minimal data
+        // The resort owner can complete the details later
+        let createdResort: Awaited<ReturnType<typeof this.resortsService.create>> | undefined;
+
+        if (user.role === 'resort') {
+            try {
+                const resortName = dto.fullName || 'My Resort';
+                createdResort = await this.resortsService.create(
+                    {
+                        name: resortName,
+                        contact_email: dto.email,
+                        contact_phone: dto.phone,
+                        // Other fields will remain null/default, to be completed later
+                    },
+                    user.id
+                );
+
+                this.logger.logBusinessEvent('resort_auto_created_on_registration', {
+                    userId: user.id,
+                    resortId: createdResort.id,
+                    resortName: createdResort.name,
+                });
+
+                // Emit event to notify admin about new resort needing approval
+                this.eventEmitter.emit(
+                    'resort.created',
+                    new ResortCreatedEvent(
+                        createdResort.id,
+                        createdResort.name,
+                        dto.email,
+                        dto.fullName || 'Unknown'
+                    )
+                );
+            } catch (error) {
+                // Log the error but don't fail the registration
+                // The user can create the resort manually later
+                this.logger.error('Failed to auto-create resort for user', (error as Error).stack);
+                this.logger.logSecurityEvent('resort_auto_creation_failed', {
+                    userId: user.id,
+                    email: user.email,
+                    error: (error as Error).message,
+                });
+            }
+        }
+
         // Log successful registration
         this.logger.logSecurityEvent('user_registered', {
             userId: user.id,
@@ -111,7 +158,14 @@ export class AuthService {
             userAgent: context.userAgent || undefined
         });
 
-        return this.issueAuthResult(user, context, { rotateFromJti: null });
+        const authResult = await this.issueAuthResult(user, context, { rotateFromJti: null });
+
+        // Include resort in response if created
+        if (createdResort) {
+            return { ...authResult, resort: createdResort };
+        }
+
+        return authResult;
     }
 
     async login(dto: LoginDto, context: TokenContext): Promise<AuthResult> {

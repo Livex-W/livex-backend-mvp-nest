@@ -345,6 +345,21 @@ export class EmailService {
         `,
         text: 'Tu código para restablecer contraseña es: {{token}}'
       },
+      [EmailTemplateType.RESORT_CREATED_ADMIN]: {
+        subject: '🏨 Nuevo Prestador Pendiente de Aprobación - LIVEX',
+        html: `
+          <h2>Nuevo prestador registrado</h2>
+          <p>Se ha registrado un nuevo prestador que requiere aprobación:</p>
+          <ul>
+            <li><strong>Nombre del Resort:</strong> {{resortName}}</li>
+            <li><strong>Propietario:</strong> {{ownerName}}</li>
+            <li><strong>Email del Propietario:</strong> {{ownerEmail}}</li>
+            <li><strong>ID del Resort:</strong> {{resortId}}</li>
+          </ul>
+          <p>Por favor, revisa la información y aprueba o rechaza el prestador en el panel de administración.</p>
+        `,
+        text: 'Nuevo prestador registrado: {{resortName}} por {{ownerName}} ({{ownerEmail}}). ID: {{resortId}}'
+      },
     };
 
     return templates[templateType];

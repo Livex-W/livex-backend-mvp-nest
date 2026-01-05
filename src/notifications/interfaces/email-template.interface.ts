@@ -17,6 +17,7 @@ export enum EmailTemplateType {
   REFUND_PROCESSED = 'refund_processed',
   RESORT_APPROVED = 'resort_approved',
   RESORT_REJECTED = 'resort_rejected',
+  RESORT_CREATED_ADMIN = 'resort_created_admin', // Notify admin when a new resort is created
   EXPERIENCE_APPROVED = 'experience_approved',
   EXPERIENCE_REJECTED = 'experience_rejected',
   WELCOME = 'welcome',
