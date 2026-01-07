@@ -137,6 +137,16 @@ export class ExperiencesService {
         // Foreign key constraint violation
         throw new BadRequestException('Resort not found');
       }
+
+      if (isPostgreSQLError(error) && error.code === '23505') {
+        // Unique constraint violation - duplicate slug
+        if (error.constraint === 'uq_experiences_resort_slug') {
+          throw new BadRequestException(
+            'Ya existe una experiencia con este nombre. Por favor elige un título diferente.'
+          );
+        }
+      }
+
       throw error;
     }
   }
