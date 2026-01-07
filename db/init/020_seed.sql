@@ -183,7 +183,7 @@ e AS (
     price_per_adult_cents, price_per_child_cents,
     commission_per_adult_cents, commission_per_child_cents,
     allows_children, child_min_age, child_max_age,
-    currency, includes, excludes, main_image_url, status, approved_by, approved_at
+    currency, includes, excludes, status, approved_by, approved_at
   )
   VALUES
     -- 1. City Tour Histórico
@@ -193,7 +193,7 @@ e AS (
       3500000, 2500000,   -- commission_per_adult ($35k), commission_per_child ($25k)
       true, 3, 9,          -- allows_children, min_age, max_age
       'COP', 'Guía certificado, hidratación', 'Almuerzo',
-      'https://images.unsplash.com/photo-1536308037887-165852797016?w=800', 'active'::experience_status,
+      'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
       
     -- 2. Full Day Islas del Rosario - SOL Y PAPAYA CLASSIC
@@ -203,7 +203,7 @@ e AS (
       9000000, 8000000,    -- commission_per_adult ($90k), commission_per_child ($80k)
       true, 3, 10,           -- allows_children, min_age=3, max_age=10
       'COP', 'Traslados, coctel de bienvenida, carpa', 'Impuesto de muelle',
-      'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800', 'active'::experience_status,
+      'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
       
     -- 3. Sunset Sailing
@@ -213,7 +213,7 @@ e AS (
       4000000, 0,          -- commission_per_adult ($40k), commission_per_child (no aplica)
       false, NULL, NULL,    -- allows_children=false, sin rango de edad
       'COP', 'Capitán, seguro, snacks', 'Traslados al muelle',
-      'https://images.unsplash.com/photo-1500514966906-fe245eea9344?w=800', 'active'::experience_status,
+      'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
     -- 4. Cholón Party - Solo adultos (18+)
@@ -223,7 +223,7 @@ e AS (
       8000000, 0,          -- Commission ($80k)
       false, NULL, NULL,    -- NO permite niños
       'COP', 'Bote deportivo, capitán, nevera con hielo', 'Bebidas alcohólicas, comida',
-      'https://images.unsplash.com/photo-1520116468816-95b69f847357?w=800', 'active'::experience_status,
+      'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
     -- 5. Palmarito Beach Day
@@ -233,7 +233,7 @@ e AS (
       3000000, 2500000,   -- Comm Adult ($30k), Comm Child ($25k)
       true, 4, 10,          -- Niños de 4-10 años
       'COP', 'Almuerzo típico, uso de instalaciones', 'Toallas',
-      'https://images.unsplash.com/photo-1573046738959-1e35593f0b24?w=800', 'active'::experience_status,
+      'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
     -- 6. Isla Bela Deluxe
@@ -243,7 +243,7 @@ e AS (
       7000000, 2000000,   -- Comm Adult ($70k), Comm Child ($20k)
       true, 3, 10,
       'COP', 'Transporte rápido, almuerzo gourmet', 'Bebidas premium',
-      'https://images.unsplash.com/photo-1540206351-d6465b3ac5c1?w=800', 'active'::experience_status,
+      'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
     -- 7. Lizamar Island Escape
@@ -253,7 +253,7 @@ e AS (
       8000000, 0,         -- Comm ($80k)
       false, NULL, NULL,  -- Solo adultos por ahora en este ejemplo
       'COP', 'Transporte, almuerzo buffet, piscina', 'Snorkel',
-      'https://images.unsplash.com/photo-1590523741831-ab7e8b8f9c7f?w=800', 'active'::experience_status,
+      'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
     -- 8. Tour Murallas y Castillo
@@ -263,7 +263,7 @@ e AS (
       4000000, 3000000,
       true, 5, 12,
       'COP', 'Guía especializado, entrada al castillo', 'Propinas',
-      'https://images.unsplash.com/photo-1578632292335-df3abbb0d586?w=800', 'active'::experience_status,
+      'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
     -- 9. Playa Blanca Express
@@ -273,7 +273,7 @@ e AS (
       5000000, 4000000,
       true, 3, 10,
       'COP', 'Transporte lancha rápida, carpa, silla', 'Almuerzo, bebidas',
-      'https://images.unsplash.com/photo-1519046904884-53103b34b206?w=800', 'active'::experience_status,
+      'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
     -- 10. Kayak Mangrove Tour
@@ -283,7 +283,7 @@ e AS (
       2500000, 2000000,
       true, 8, 16,
       'COP', 'Kayak doble, chaleco, instructor', 'Refrigerio',
-      'https://images.unsplash.com/photo-1544551763-46a42a4571da?w=800', 'active'::experience_status,
+      'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
     -- 11. Catamaran Premium
@@ -293,7 +293,7 @@ e AS (
       12000000, 0,
       false, NULL, NULL,
       'COP', 'Barra libre, DJ, snacks gourmet', 'Transporte al muelle',
-      'https://images.unsplash.com/photo-1566412435010-b747372c0506?w=800', 'active'::experience_status,
+      'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
     -- 12. Tour Nocturno Getsemaní
@@ -303,7 +303,7 @@ e AS (
       3000000, 0,
       false, NULL, NULL,
       'COP', 'Guía, coctel de bienvenida', 'Cena',
-      'https://images.unsplash.com/photo-1583531172005-893e7e366d3f?w=800', 'active'::experience_status,
+      'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
     -- 13. Snorkel en Barú
@@ -313,7 +313,7 @@ e AS (
       6000000, 5000000,
       true, 6, 14,
       'COP', 'Equipo snorkel, instructor, almuerzo', 'Fotos submarinas',
-      'https://images.unsplash.com/photo-1544551763-77ef2d0cfc6c?w=800', 'active'::experience_status,
+      'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
     -- 14. Jet Ski Adventure
@@ -323,7 +323,7 @@ e AS (
       5000000, 0,
       false, NULL, NULL,
       'COP', 'Jet ski, chaleco, instructor', 'Seguro adicional',
-      'https://images.unsplash.com/photo-1596436889106-be35e843f974?w=800', 'active'::experience_status,
+      'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
     -- 15. Pesca Deportiva
@@ -333,7 +333,7 @@ e AS (
       10000000, 0,
       false, NULL, NULL,
       'COP', 'Embarcación, equipos, carnada', 'Licencia de pesca',
-      'https://images.unsplash.com/photo-1540946485063-a40da27545f8?w=800', 'active'::experience_status,
+      'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
     -- 16. Tour del Café
@@ -343,7 +343,7 @@ e AS (
       2000000, 1500000,
       true, 6, 15,
       'COP', 'Degustación, souvenirs', 'Almuerzo',
-      'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=800', 'active'::experience_status,
+      'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
     -- 17. Oceanario y Acuario
@@ -353,7 +353,7 @@ e AS (
       4500000, 3500000,
       true, 2, 12,
       'COP', 'Transporte, entrada, guía', 'Snorkel',
-      'https://images.unsplash.com/photo-1559825481-12a05cc00344?w=800', 'active'::experience_status,
+      'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
     -- 18. Paddleboard Sunset
@@ -363,7 +363,7 @@ e AS (
       2000000, 1500000,
       true, 10, 17,
       'COP', 'Tabla, remo, instructor', 'Fotos',
-      'https://images.unsplash.com/photo-1530053969600-caed2596d242?w=800', 'active'::experience_status,
+      'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
     -- 19. Tour Gastronomico
@@ -373,7 +373,7 @@ e AS (
       3000000, 2500000,
       true, 5, 14,
       'COP', 'Degustaciones en 5 paradas, guía local', 'Bebidas alcohólicas',
-      'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800', 'active'::experience_status,
+      'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
     -- 20. Avistamiento de Delfines
@@ -383,7 +383,7 @@ e AS (
       7000000, 5500000,
       true, 4, 12,
       'COP', 'Embarcación, guía biólogo, snacks', 'Garantía de avistamiento',
-      'https://images.unsplash.com/photo-1607153333879-c174d265f1d2?w=800', 'active'::experience_status,
+      'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
     -- 21. Experiencia Test 5k
@@ -393,7 +393,7 @@ e AS (
       500000, 500000,
       true, 1, 99,
       'COP', 'Incluye todo', 'No incluye nada',
-      'https://images.unsplash.com/photo-1621609764180-2ca554a9d6f2?w=800', 'active'::experience_status,
+      'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now())
 
   RETURNING id, title, category, resort_id
@@ -499,6 +499,56 @@ FROM
       ('Lizamar Island Escape', '08:00:00'::time, '16:00:00'::time, 30),
       
       -- Nuevas experiencias 8-20
+      ('Tour Murallas y Castillo', '09:00:00'::time, '12:30:00'::time, 25),
+      ('Tour Murallas y Castillo', '14:00:00'::time, '17:30:00'::time, 25),
+      ('Playa Blanca Express', '08:00:00'::time, '16:00:00'::time, 35),
+      ('Kayak Mangrove Tour', '07:00:00'::time, '10:00:00'::time, 12),
+      ('Kayak Mangrove Tour', '15:00:00'::time, '18:00:00'::time, 12),
+      ('Catamaran Premium', '11:00:00'::time, '17:00:00'::time, 20),
+      ('Tour Nocturno Getsemaní', '19:00:00'::time, '22:00:00'::time, 15),
+      ('Snorkel en Barú', '08:00:00'::time, '15:00:00'::time, 20),
+      ('Jet Ski Adventure', '09:00:00'::time, '10:00:00'::time, 6),
+      ('Jet Ski Adventure', '11:00:00'::time, '12:00:00'::time, 6),
+      ('Jet Ski Adventure', '14:00:00'::time, '15:00:00'::time, 6),
+      ('Pesca Deportiva', '05:00:00'::time, '13:00:00'::time, 8),
+      ('Tour del Café', '10:00:00'::time, '13:00:00'::time, 15),
+      ('Tour del Café', '15:00:00'::time, '18:00:00'::time, 15),
+      ('Oceanario y Acuario', '09:00:00'::time, '15:00:00'::time, 30),
+      ('Paddleboard Sunset', '16:30:00'::time, '18:30:00'::time, 10),
+      ('Tour Gastronómico', '11:00:00'::time, '14:00:00'::time, 12),
+      ('Tour Gastronómico', '18:00:00'::time, '21:00:00'::time, 12),
+      ('Avistamiento de Delfines', '06:30:00'::time, '10:30:00'::time, 18),
+      ('Experiencia Test 5k', '08:00:00'::time, '18:00:00'::time, 100)
+  ) AS t(title, start_time, end_time, capacity) ON e.title = t.title;
+
+-- ===========================
+-- BLOQUE 2.1: DISPONIBILIDAD ENERO-FEBRERO 2026 (30 días desde 7 de enero)
+-- ===========================
+
+-- Generación masiva (30 días desde Enero 7, 2026)
+INSERT INTO availability_slots (experience_id, start_time, end_time, capacity)
+SELECT
+  e.id,
+  (to_char(d, 'YYYY-MM-DD') || 'T' || to_char(t.start_time, 'HH24:MI:SS') || '-05')::timestamptz,
+  (to_char(d, 'YYYY-MM-DD') || 'T' || to_char(t.end_time, 'HH24:MI:SS') || '-05')::timestamptz,
+  t.capacity
+FROM
+  experiences e
+  CROSS JOIN generate_series('2026-01-07'::date, '2026-02-05'::date, '1 day'::interval) AS d
+  JOIN (
+    VALUES
+      ('City Tour Histórico', '09:00:00'::time, '12:00:00'::time, 20),
+      ('City Tour Histórico', '15:00:00'::time, '18:00:00'::time, 20),
+      ('Sol y Papaya Classic', '08:00:00'::time, '16:00:00'::time, 40),
+      ('Sunset Sailing', '17:30:00'::time, '19:30:00'::time, 10),
+      
+      -- Experiencias 4-7
+      ('Fiesta en Bote Deportivo Cholón', '10:00:00'::time, '16:00:00'::time, 12),
+      ('Palmarito Beach Day', '09:00:00'::time, '17:00:00'::time, 30),
+      ('Isla Bela Deluxe', '08:30:00'::time, '15:30:00'::time, 25),
+      ('Lizamar Island Escape', '08:00:00'::time, '16:00:00'::time, 30),
+      
+      -- Experiencias 8-20
       ('Tour Murallas y Castillo', '09:00:00'::time, '12:30:00'::time, 25),
       ('Tour Murallas y Castillo', '14:00:00'::time, '17:30:00'::time, 25),
       ('Playa Blanca Express', '08:00:00'::time, '16:00:00'::time, 35),

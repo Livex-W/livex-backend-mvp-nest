@@ -5,12 +5,13 @@ import {
   IsUUID,
   IsEnum,
   IsPositive,
-  IsUrl,
   MaxLength,
   MinLength,
   IsInt,
-  Min
+  Min,
+  IsBoolean
 } from 'class-validator';
+
 import { Transform } from 'class-transformer';
 
 export enum ExperienceCategory {
@@ -80,7 +81,7 @@ export class CreateExperienceDto {
   child_max_age?: number = 9;
 
   @IsOptional()
-  @IsString()
+  @IsBoolean()
   allows_children?: boolean = true;
 
   @IsOptional()
@@ -102,11 +103,7 @@ export class CreateExperienceDto {
   excludes?: string;
 
   @IsOptional()
-  @IsUrl()
-  @MaxLength(500)
-  main_image_url?: string;
-
-  @IsOptional()
   @IsEnum(ExperienceStatus)
   status?: ExperienceStatus = ExperienceStatus.UNDER_REVIEW;
 }
+

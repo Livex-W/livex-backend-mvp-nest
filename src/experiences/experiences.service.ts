@@ -19,6 +19,8 @@ import { UploadService, PresignedUrlOptions } from '../upload/upload.service';
 import { UserPreferencesService } from '../user-preferences/user-preferences.service';
 import { ExchangeRatesService } from '../exchange-rates/exchange-rates.service';
 import { convertPrice } from '../common/utils/price-converter';
+import type { JwtPayload } from '../common/interfaces/jwt-payload.interface';
+
 
 // Interface for PostgreSQL error objects
 interface PostgreSQLError extends Error {
@@ -47,7 +49,21 @@ export class ExperiencesService {
     private readonly exchangeRatesService: ExchangeRatesService,
   ) { }
 
-  async create(createExperienceDto: CreateExperienceDto): Promise<Experience> {
+  async create(createExperienceDto: CreateExperienceDto, user?: JwtPayload): Promise<Experience> {
+    // Enforce resort ownership for 'resort' role
+    if (user && user.role === 'resort') {
+      const resortResult = await this.db.query<{ id: string }>(
+        'SELECT id FROM resorts WHERE owner_user_id = $1',
+        [user.sub],
+      );
+
+      if (resortResult.rows.length === 0) {
+        throw new BadRequestException('You do not have a resort created yet. Please create a resort first.');
+      }
+      // Override resort_id with the one owned by the user
+      createExperienceDto.resort_id = resortResult.rows[0].id;
+    }
+
     const {
       resort_id,
       title,
@@ -63,7 +79,6 @@ export class ExperiencesService {
       currency,
       includes,
       excludes,
-      main_image_url,
       status,
     } = createExperienceDto;
 
@@ -74,8 +89,8 @@ export class ExperiencesService {
           price_per_adult_cents, price_per_child_cents,
           commission_per_adult_cents, commission_per_child_cents,
           allows_children, child_min_age, child_max_age,
-          currency, includes, excludes, main_image_url, status
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) 
+          currency, includes, excludes, status
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) 
         RETURNING *`,
         [
           resort_id,
@@ -92,10 +107,10 @@ export class ExperiencesService {
           currency,
           includes,
           excludes,
-          main_image_url,
           status,
         ],
       );
+
 
       const experience = result.rows[0];
 
@@ -215,12 +230,18 @@ export class ExperiencesService {
       'e.created_at DESC',
     );
 
-    // Build base query
+    // Build base query - get main_image_url from experience_images where image_type = 'hero'
     const baseQuery = `
-      SELECT e.* FROM experiences e 
+      SELECT e.*,
+        (SELECT ei.url FROM experience_images ei 
+         WHERE ei.experience_id = e.id AND ei.image_type = 'hero'
+         ORDER BY ei.sort_order ASC, ei.created_at ASC 
+         LIMIT 1) as main_image_url
+      FROM experiences e 
       ${whereClause} 
       ${orderByClause}
     `;
+
 
     const countQuery = `
       SELECT COUNT(*) as count FROM experiences e 
@@ -398,6 +419,87 @@ export class ExperiencesService {
     return experiencesWithData;
   }
 
+  /**
+   * Find experiences managed by the current user (Resort Owner or Agent)
+   */
+  async findManaged(
+    queryDto: QueryExperiencesDto,
+    user: JwtPayload,
+  ): Promise<PaginatedResult<ExperienceWithImages>> {
+    let resortId: string | undefined;
+
+    if (user.role === 'resort') {
+      // Find resort owned by user
+      const resortResult = await this.db.query<{ id: string }>(
+        'SELECT id FROM resorts WHERE owner_user_id = $1',
+        [user.sub],
+      );
+
+      if (resortResult.rows.length === 0) {
+        // Return empty result if no resort associated
+        return {
+          data: [],
+          meta: {
+            total: 0,
+            page: queryDto.page ?? 1,
+            limit: queryDto.limit ?? 10,
+            totalPages: 0,
+            hasNextPage: false,
+            hasPreviousPage: false,
+          }
+        };
+      }
+      resortId = resortResult.rows[0].id;
+    } else if (user.role === 'agent') {
+      // Find resort associated with agent
+      const agentResult = await this.db.query<{ resort_id: string }>(
+        'SELECT resort_id FROM resort_agents WHERE user_id = $1 AND is_active = true',
+        [user.sub],
+      );
+
+      if (agentResult.rows.length === 0 || !agentResult.rows[0].resort_id) {
+        // Return empty result if no resort associated
+        return {
+          data: [],
+          meta: {
+            total: 0,
+            page: queryDto.page ?? 1,
+            limit: queryDto.limit ?? 10,
+            totalPages: 0,
+            hasNextPage: false,
+            hasPreviousPage: false,
+          }
+        };
+      }
+      resortId = agentResult.rows[0].resort_id;
+    } else if (user.role === 'admin') {
+      // Admin sees all, or filters by provided resort_id in query
+      // No forced resortId override needed
+    } else {
+      // Tourists or other roles shouldn't access management endpoint really, 
+      // but if they do, they see nothing or existing logic handles it.
+      // Let's safe guard:
+      return {
+        data: [],
+        meta: {
+          total: 0,
+          page: queryDto.page ?? 1,
+          limit: queryDto.limit ?? 10,
+          totalPages: 0,
+          hasNextPage: false,
+          hasPreviousPage: false
+        }
+      };
+    }
+
+    // Force the resort_id filter if resolved
+    if (resortId) {
+      queryDto.resort_id = resortId;
+    }
+
+    // Call standard findAll with the enforced filter
+    return this.findAllWithPrices(queryDto, user.sub);
+  }
 
   /**
    * Find one experience with display prices converted to user's currency
@@ -891,7 +993,8 @@ export class ExperiencesService {
 
     const resortSlug = this.uploadService.generateSlug(resortResult.rows[0].name);
     const experienceSlug = this.uploadService.generateSlug(experience.title);
-    const finalImageType = (imageType === 'hero' ? 'hero' : 'gallery');
+    // Valid image types
+    const finalImageType = (imageType === 'hero' || imageType === 'main' ? 'hero' : 'gallery');
 
     // Count existing gallery images for proper indexing
     let galleryIndex = 1;
@@ -901,7 +1004,7 @@ export class ExperiencesService {
          WHERE experience_id = $1 AND url LIKE '%/gallery/%'`,
         [experienceId],
       );
-      galleryIndex = parseInt(countResult.rows[0].count) + 1;
+      galleryIndex = parseInt(countResult.rows[0].count as string) + 1;
     }
 
     // Generate professional blob path
@@ -929,6 +1032,7 @@ export class ExperiencesService {
     );
 
     return { image_url: imageUrl };
+
   }
 
   async submitForReview(id: string, userId: string, userRole: string): Promise<Experience> {

@@ -52,7 +52,11 @@ export class FavoritesService {
           'id', e.id,
           'title', e.title,
           'slug', e.slug,
-          'main_image_url', e.main_image_url,
+          'main_image_url', (
+            SELECT ei.url FROM experience_images ei 
+            WHERE ei.experience_id = e.id AND ei.image_type = 'hero' 
+            ORDER BY ei.sort_order ASC LIMIT 1
+          ),
           'category', e.category,
           'price_per_adult_cents', e.price_per_adult_cents,
           'commission_per_adult_cents', e.commission_per_adult_cents,
@@ -60,6 +64,7 @@ export class FavoritesService {
           'rating_avg', e.rating_avg,
           'rating_count', e.rating_count
         ) as experience
+
       FROM user_favorites f
       JOIN experiences e ON e.id = f.experience_id
       WHERE f.user_id = $1

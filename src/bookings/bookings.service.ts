@@ -91,13 +91,19 @@ export class BookingsService {
           'id', e.id,
           'title', e.title,
           'slug', e.slug,
-          'main_image_url', COALESCE(e.main_image_url, ''),
+          'main_image_url', COALESCE(
+            (SELECT ei.url FROM experience_images ei 
+             WHERE ei.experience_id = e.id AND ei.image_type = 'hero' 
+             ORDER BY ei.sort_order ASC LIMIT 1),
+            ''
+          ),
           'category', e.category,
           'price_per_adult_cents', e.price_per_adult_cents,
           'price_per_child_cents', e.price_per_child_cents,
           'allows_children', e.allows_children,
           'currency', e.currency
         ) as experience,
+
         json_build_object(
           'id', s.id,
           'experience_id', s.experience_id,

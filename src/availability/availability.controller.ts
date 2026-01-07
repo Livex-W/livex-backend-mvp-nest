@@ -22,6 +22,7 @@ import {
   QueryAvailabilityDto,
   CreateAvailabilitySlotDto,
   BulkCreateAvailabilityDto,
+  BulkMultiBlockAvailabilityDto,
 } from './dto';
 import { SlotSummary, AvailabilitySlot } from './entities/availability-slot.entity';
 
@@ -173,6 +174,66 @@ export class AvailabilityController {
     this.logger.logResponse({
       method: 'POST',
       url: '/availability/bulk',
+      statusCode: 201,
+    });
+
+    return response;
+  }
+
+  /**
+   * Bulk create availability slots from multiple blocks
+   * POST /v1/experiences/:experienceId/availability/bulk-multi
+   */
+  @Post('bulk-multi')
+  @ThrottleUpload()
+  @HttpCode(HttpStatus.CREATED)
+  async bulkMultiCreateSlots(
+    @Param('experienceId') experienceId: string,
+    @Body() bulkMultiDto: BulkMultiBlockAvailabilityDto,
+  ): Promise<{
+    message: string;
+    results: {
+      total_created: number;
+      total_skipped: number;
+      blocks_processed: number;
+      block_results: Array<{
+        start_date: string;
+        end_date: string;
+        created_slots: number;
+        skipped_slots: number;
+        errors: string[];
+      }>;
+    };
+    experience_id: string;
+  }> {
+    this.logger.logRequest({
+      method: 'POST',
+      url: '/availability/bulk-multi',
+      experienceId,
+      body: {
+        blocks_count: bulkMultiDto.blocks?.length || 0,
+      },
+    });
+
+    // Validate experienceId is a valid UUID
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(experienceId)) {
+      throw new BadRequestException('Invalid experience ID format');
+    }
+
+    // Ensure the experience ID in the URL matches the DTO
+    bulkMultiDto.experience_id = experienceId;
+
+    const results = await this.availabilityService.bulkCreateMultiBlock(bulkMultiDto);
+
+    const response = {
+      message: 'Multi-block availability creation completed',
+      results,
+      experience_id: experienceId,
+    };
+
+    this.logger.logResponse({
+      method: 'POST',
+      url: '/availability/bulk-multi',
       statusCode: 201,
     });
 

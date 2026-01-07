@@ -11,6 +11,7 @@ import {
   QueryAvailabilityDto,
   CreateAvailabilitySlotDto,
   BulkCreateAvailabilityDto,
+  BulkMultiBlockAvailabilityDto,
   TimeSlotConfig
 } from './dto';
 
@@ -79,7 +80,7 @@ export class AvailabilityService {
       `;
 
       const conditions: string[] = [];
-      const params: any[] = [experienceId, fromDate, toDate];
+      const params: unknown[] = [experienceId, fromDate, toDate];
       let paramIndex = 4;
 
       // Filter out full slots if requested
@@ -282,6 +283,78 @@ export class AvailabilityService {
     });
 
     return results;
+  }
+
+  /**
+   * Bulk create availability slots from multiple blocks
+   */
+  async bulkCreateMultiBlock(bulkMultiDto: BulkMultiBlockAvailabilityDto): Promise<{
+    total_created: number;
+    total_skipped: number;
+    blocks_processed: number;
+    block_results: Array<{
+      start_date: string;
+      end_date: string;
+      created_slots: number;
+      skipped_slots: number;
+      errors: string[];
+    }>;
+  }> {
+    if (!bulkMultiDto.experience_id) {
+      throw new BadRequestException('Experience ID is required');
+    }
+
+    const experienceId = bulkMultiDto.experience_id;
+
+    this.logger.logBusinessEvent('multi_block_availability_creation_started', {
+      experienceId,
+      blocksCount: bulkMultiDto.blocks.length,
+    });
+
+    // Verify experience exists
+    await this.verifyExperienceExists(experienceId);
+
+    const aggregateResults = {
+      total_created: 0,
+      total_skipped: 0,
+      blocks_processed: 0,
+      block_results: [] as Array<{
+        start_date: string;
+        end_date: string;
+        created_slots: number;
+        skipped_slots: number;
+        errors: string[];
+      }>,
+    };
+
+    // Process each block
+    for (const block of bulkMultiDto.blocks) {
+      const blockResult = await this.bulkCreateSlots({
+        experience_id: experienceId,
+        start_date: block.start_date,
+        end_date: block.end_date,
+        capacity: block.capacity,
+        slots: block.slots,
+      });
+
+      aggregateResults.total_created += blockResult.created_slots;
+      aggregateResults.total_skipped += blockResult.skipped_slots;
+      aggregateResults.blocks_processed++;
+      aggregateResults.block_results.push({
+        start_date: block.start_date,
+        end_date: block.end_date,
+        created_slots: blockResult.created_slots,
+        skipped_slots: blockResult.skipped_slots,
+        errors: blockResult.errors,
+      });
+    }
+
+    this.logger.logBusinessEvent('multi_block_availability_creation_completed', {
+      experienceId,
+      results: aggregateResults,
+    });
+
+    return aggregateResults;
   }
 
   /**

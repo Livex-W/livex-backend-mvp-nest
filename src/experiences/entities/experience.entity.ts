@@ -19,8 +19,8 @@ export interface Experience {
   child_max_age?: number;
   includes?: string;
   excludes?: string;
-  main_image_url?: string;
   status: ExperienceStatus;
+
   rating_avg: number;
   rating_count: number;
   approved_by?: string;

@@ -72,3 +72,36 @@ export class TimeSlotConfig {
   @IsIn([0, 1, 2, 3, 4, 5, 6], { each: true, message: 'days_of_week must contain valid day numbers (0-6)' })
   days_of_week?: number[]; // 0=Sunday, 1=Monday, etc. If not provided, applies to all days
 }
+
+// Single block configuration for multi-block bulk creation
+export class AvailabilityBlockConfig {
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'start_date must be in YYYY-MM-DD format' })
+  start_date: string;
+
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'end_date must be in YYYY-MM-DD format' })
+  end_date: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  capacity?: number = 10;
+
+  @IsArray({ message: 'slots must be an array' })
+  @ValidateNested({ each: true })
+  @Type(() => TimeSlotConfig)
+  slots: TimeSlotConfig[];
+}
+
+// DTO for creating multiple availability blocks at once
+export class BulkMultiBlockAvailabilityDto {
+  // This will be set from URL parameter
+  @IsOptional()
+  @IsUUID()
+  experience_id?: string;
+
+  @IsArray({ message: 'blocks must be an array' })
+  @ValidateNested({ each: true })
+  @Type(() => AvailabilityBlockConfig)
+  blocks: AvailabilityBlockConfig[];
+}
+

@@ -36,12 +36,15 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { JwtPayload } from '../common/interfaces/jwt-payload.interface';
 import { CustomLoggerService } from '../common/services/logger.service';
 
+// When using attachFieldsToBody: 'keyValues', files come as this format
 interface FastifyMultipartFile {
-  toBuffer: () => Promise<Buffer>;
+  value: Buffer;
   filename: string;
   mimetype: string;
   encoding: string;
   fieldname: string;
+  // Legacy method (not available in keyValues mode)
+  toBuffer?: () => Promise<Buffer>;
 }
 
 interface ExperienceUploadBody {
@@ -60,8 +63,11 @@ export class ExperiencesController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  async create(@Body() createExperienceDto: CreateExperienceDto): Promise<ExperienceWithImages> {
-    return this.experiencesService.create(createExperienceDto);
+  async create(
+    @Body() createExperienceDto: CreateExperienceDto,
+    @CurrentUser() user: JwtPayload,
+  ): Promise<ExperienceWithImages> {
+    return this.experiencesService.create(createExperienceDto, user);
   }
 
   @Get()
@@ -78,6 +84,16 @@ export class ExperiencesController {
     @CurrentUser() user?: JwtPayload,
   ): Promise<ExperienceWithImages[]> {
     return this.experiencesService.findRecommended(limit || 5, user?.sub);
+  }
+
+  @Get('management')
+  @UseGuards(RolesGuard)
+  @Roles('resort', 'agent', 'admin')
+  async findManagement(
+    @Query() queryDto: QueryExperiencesDto,
+    @CurrentUser() user: JwtPayload,
+  ): Promise<PaginatedResult<ExperienceWithImages>> {
+    return this.experiencesService.findManaged(queryDto, user);
   }
 
 
@@ -158,15 +174,51 @@ export class ExperiencesController {
   ): Promise<{ image_url: string }> {
     const file = body.file;
     if (!file) {
+      this.logger.logError(new Error('File not found in request'), { action: 'uploadExperienceImage' });
       throw new Error('File not found in request');
     }
 
-    // Fastify multipart file object adaptation
-    const fileBuffer = await file.toBuffer();
+    // DEBUG: Log file structure keys to understand what we are receiving
+    console.log('DEBUG: uploadExperienceImage received file keys:', Object.keys(file as any));
+
+    let fileBuffer: Buffer | undefined;
+    let mimeType = 'image/jpeg'; // Default or need to extract
+    let originalName = 'upload.jpg'; // Default
+
+    // With attachFieldsToBody: 'keyValues':
+    // If it's a file, it might be a Buffer directly or an object depending on version/config details.
+    // Based on fastify-multipart docs for keyValues, it sets the field to the value. 
+    // For files, it should be the buffer.
+
+    if (Buffer.isBuffer(file)) {
+      fileBuffer = file;
+      console.log('DEBUG: file is a Buffer directly');
+    } else if ((file as any).value && Buffer.isBuffer((file as any).value)) {
+      fileBuffer = (file as any).value;
+      console.log('DEBUG: file has value property which is Buffer');
+      mimeType = (file as any).mimetype || mimeType;
+      originalName = (file as any).filename || originalName;
+    } else if ((file as any).data && Buffer.isBuffer((file as any).data)) {
+      fileBuffer = (file as any).data;
+      console.log('DEBUG: file has data property which is Buffer');
+    } else if ((file as any).toBuffer) {
+      // Handle legacy/standard multipart file object
+      console.log('DEBUG: file has toBuffer method');
+      fileBuffer = await (file as any).toBuffer();
+    }
+
+    if (!fileBuffer) {
+      this.logger.logError(new Error('Invalid file format received'), {
+        action: 'uploadExperienceImage',
+        fileType: typeof file
+      });
+      throw new Error('Invalid file format received');
+    }
+
     const adaptedFile = {
       buffer: fileBuffer,
-      originalname: file.filename,
-      mimetype: file.mimetype,
+      originalname: originalName,
+      mimetype: mimeType,
     };
 
     const sortOrder = body.sort_order ? Number(body.sort_order) : undefined;

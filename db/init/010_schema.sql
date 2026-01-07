@@ -266,7 +266,6 @@ CREATE TABLE IF NOT EXISTS experiences (
   
   includes        text,
   excludes        text,
-  main_image_url  text,
   
   -- Estado y Aprobación
   status          experience_status NOT NULL DEFAULT 'under_review',
