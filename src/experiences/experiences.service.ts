@@ -150,8 +150,8 @@ export class ExperiencesService {
       sort: queryDto.sort,
     };
 
-    // Build WHERE conditions
-    const conditions: string[] = [];
+    // Build WHERE conditions - always filter by is_active
+    const conditions: string[] = ['e.is_active = true'];
     const params: any[] = [];
     let paramIndex = 1;
 
@@ -296,7 +296,7 @@ export class ExperiencesService {
 
   async findOne(id: string, includeImages = false): Promise<ExperienceWithImages> {
     const result = await this.db.query<Experience>(
-      'SELECT * FROM experiences WHERE id = $1',
+      'SELECT * FROM experiences WHERE id = $1 AND is_active = true',
       [id],
     );
 
@@ -327,7 +327,7 @@ export class ExperiencesService {
 
   async findBySlug(resortId: string, slug: string, includeImages = false): Promise<ExperienceWithImages> {
     const result = await this.db.query<Experience>(
-      'SELECT * FROM experiences WHERE resort_id = $1 AND slug = $2',
+      'SELECT * FROM experiences WHERE resort_id = $1 AND slug = $2 AND is_active = true',
       [resortId, slug],
     );
 
@@ -383,7 +383,7 @@ export class ExperiencesService {
   async findRecommended(limit = 5, userId?: string): Promise<ExperienceWithImages[]> {
     const result = await this.db.query<Experience>(
       `SELECT * FROM experiences 
-       WHERE status = 'active' 
+       WHERE status = 'active' AND is_active = true
        ORDER BY rating_avg DESC, rating_count DESC 
        LIMIT $1`,
       [limit],
@@ -582,11 +582,12 @@ export class ExperiencesService {
   }
 
   async remove(id: string): Promise<void> {
-    // Get experience data before deletion for logging
+    // Get experience data before soft deletion for logging
     const experience = await this.findOne(id);
 
+    // Soft delete: set is_active to false
     const result = await this.db.query(
-      'DELETE FROM experiences WHERE id = $1',
+      'UPDATE experiences SET is_active = false WHERE id = $1 AND is_active = true',
       [id],
     );
 
@@ -599,7 +600,8 @@ export class ExperiencesService {
       experienceId: id,
       resortId: experience.resort_id,
       title: experience.title,
-      status: experience.status
+      status: experience.status,
+      softDelete: true
     });
   }
 

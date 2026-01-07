@@ -272,6 +272,7 @@ CREATE TABLE IF NOT EXISTS experiences (
   approved_by     uuid REFERENCES users(id) ON DELETE SET NULL,
   approved_at     timestamptz,
   rejection_reason text,
+  is_active       boolean NOT NULL DEFAULT true,
   
   -- Métricas
   rating_avg      numeric(3,2) NOT NULL DEFAULT 0.0,
