@@ -660,9 +660,9 @@ export class ExperiencesService {
       galleryIndex,
     );
 
-    // Generate presigned URL using Azure Blob Storage
+    // Generate presigned URL using AWS S3
     const options: PresignedUrlOptions = {
-      containerName: 'livex-media',
+      containerName: '',
       fileName: blobPath,
       contentType: presignDto.content_type,
       expiresInMinutes: 60,
@@ -953,11 +953,11 @@ export class ExperiencesService {
 
     const image = result.rows[0];
 
-    // Extract blob name from URL and delete from Azure
+    // Extract blob name from URL and delete from S3
     const blobName = this.uploadService.extractBlobNameFromUrl(image.url);
     if (blobName) {
       try {
-        await this.uploadService.deleteFile('livex-media', blobName);
+        await this.uploadService.deleteFile('', blobName);
       } catch (error) {
         // Log error but don't fail the operation if blob doesn't exist
         console.warn(`Failed to delete blob ${blobName}:`, error instanceof Error ? error.message : 'Unknown error');
@@ -1028,9 +1028,9 @@ export class ExperiencesService {
       galleryIndex,
     );
 
-    // Upload file directly to Azure
+    // Upload file directly to S3
     const imageUrl = await this.uploadService.uploadFile(
-      'livex-media',
+      '',
       blobPath,
       file.buffer,
       file.mimetype,
