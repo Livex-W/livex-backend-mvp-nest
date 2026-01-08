@@ -1,6 +1,6 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { S3Client, PutObjectCommand, DeleteObjectCommand, HeadObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, DeleteObjectCommand, HeadObjectCommand, ListObjectsV2Command, CreateBucketCommand, HeadBucketCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'crypto';
 import { AwsConfig } from '../config/aws.config';
@@ -39,11 +39,11 @@ export class UploadService {
     this.bucketName = awsConfig?.bucketName || this.configService.get<string>('AWS_S3_BUCKET_NAME') || '';
 
     if (!accessKeyId || !secretAccessKey) {
-      this.logger.warn('AWS credentials are missing. S3 uploads will fail.');
+      throw new Error('AWS credentials are missing. S3 uploads will fail.');
     }
 
     if (!this.bucketName) {
-      this.logger.warn('AWS_S3_BUCKET_NAME is missing. S3 uploads will fail.');
+      throw new Error('AWS_S3_BUCKET_NAME is missing. S3 uploads will fail.');
     }
 
     this.s3Client = new S3Client({
@@ -55,6 +55,11 @@ export class UploadService {
     });
 
     this.logger.log(`AWS S3 initialized for bucket: ${this.bucketName} in region: ${this.region}`);
+
+    // Initialize bucket check
+    this.ensureContainerExists(this.bucketName).catch(err => {
+      this.logger.error(`Failed to initialize bucket: ${err.message}`);
+    });
   }
 
   /**
@@ -68,8 +73,8 @@ export class UploadService {
     } = options;
 
     try {
-      // Use the provided fileName directly as the key
-      const key = fileName;
+      // Generate a unique key for the file
+      const key = this.generateName(fileName);
 
       const command = new PutObjectCommand({
         Bucket: this.bucketName,
@@ -294,8 +299,44 @@ export class UploadService {
    * Initial check for bucket existence (optional in S3 usage as buckets are static)
    */
   private async ensureContainerExists(containerName: string): Promise<void> {
-    // No-op for S3 as we assume bucket exists
-    return Promise.resolve();
+    try {
+      const command = new HeadBucketCommand({
+        Bucket: containerName,
+      });
+      await this.s3Client.send(command);
+      this.logger.debug(`Bucket ${containerName} exists.`);
+    } catch (error: any) {
+      if (error.name === 'NotFound' || error.$metadata?.httpStatusCode === 404) {
+        this.logger.warn(`Bucket ${containerName} not found. Attempting to create...`);
+        try {
+          const createCommand = new CreateBucketCommand({
+            Bucket: containerName,
+            CreateBucketConfiguration: {
+              LocationConstraint: this.region !== 'us-east-1' ? (this.region as any) : undefined,
+            },
+          });
+          await this.s3Client.send(createCommand);
+          this.logger.log(`Bucket ${containerName} created successfully.`);
+        } catch (createError: any) {
+          this.logger.error(`Failed to create bucket: ${createError.message}`);
+          throw new BadRequestException('Failed to create S3 bucket');
+        }
+      } else {
+        this.logger.error(`Error checking bucket existence: ${error.message}`);
+      }
+    }
+  }
+
+
+  /**
+ * Generate unique name with timestamp and UUID (legacy method)
+ */
+  private generateName(originalFileName: string): string {
+    const timestamp = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const uuid = randomUUID();
+    const extension = originalFileName.split('.').pop() || 'bin';
+
+    return `${timestamp}/${uuid}.${extension}`;
   }
 
   /**

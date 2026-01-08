@@ -17,13 +17,11 @@ export default registerAs('aws', (): AwsConfig => {
 
     // Validate required configuration
     if (!config.accessKeyId || !config.secretAccessKey) {
-        // We don't throw error here to allow app to start even if AWS is not fully configured yet
-        // but services might fail later
-        console.warn('AWS credentials are missing. S3 uploads will fail.');
+        throw new Error('AWS credentials are missing. S3 uploads will fail.');
     }
 
     if (!config.bucketName) {
-        console.warn('AWS_S3_BUCKET_NAME is missing. S3 uploads will fail.');
+        throw new Error('AWS_S3_BUCKET_NAME is missing. S3 uploads will fail.');
     }
 
     return config;
