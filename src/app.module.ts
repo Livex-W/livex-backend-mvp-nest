@@ -27,7 +27,7 @@ import { AgentsModule } from './agents/agents.module';
 import { FavoritesModule } from './favorites/favorites.module';
 import { CouponsModule } from './coupons/coupons.module';
 import bookingConfig from './common/config/booking.config';
-
+import awsConfig from './config/aws.config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ExchangeRatesModule } from './exchange-rates/exchange-rates.module';
 import { UserPreferencesModule } from './user-preferences/user-preferences.module';
@@ -39,7 +39,7 @@ import { UserPreferencesModule } from './user-preferences/user-preferences.modul
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env.development',
-      load: [bookingConfig],
+      load: [bookingConfig, awsConfig],
     }),
     CommonModule,
     AuthModule,

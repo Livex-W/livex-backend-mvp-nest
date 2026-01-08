@@ -1,13 +1,13 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { BlobServiceClient, ContainerClient, generateBlobSASQueryParameters, BlobSASPermissions, StorageSharedKeyCredential } from '@azure/storage-blob';
-import { DefaultAzureCredential } from '@azure/identity';
+import { S3Client, PutObjectCommand, DeleteObjectCommand, HeadObjectCommand, ListObjectsV2Command, CreateBucketCommand, HeadBucketCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'crypto';
-import { AzureConfig } from '../config/azure.config';
+import { AwsConfig } from '../config/aws.config';
 import { CustomLoggerService } from '../common/services/logger.service';
 
 export interface PresignedUrlOptions {
-  containerName: string;
+  containerName?: string; // Kept for compatibility, maps to folder prefix or ignored if bucket is global
   fileName: string;
   contentType: string;
   expiresInMinutes?: number;
@@ -22,93 +22,79 @@ export interface PresignedUrlResult {
 @Injectable()
 export class UploadService {
   private readonly logger = new Logger(UploadService.name);
-  private readonly blobServiceClient: BlobServiceClient;
-  private readonly accountName: string;
-  private readonly accountKey: string;
-  private readonly defaultContainer: string;
-  private readonly publicUrl: string;
+  private readonly s3Client: S3Client;
+  private readonly bucketName: string;
+  private readonly region: string;
 
   constructor(
     private readonly configService: ConfigService,
     private readonly customLogger: CustomLoggerService,
   ) {
-    const azureConfig = this.configService.get<AzureConfig>('azure');
-    this.accountName = azureConfig?.storageAccountName || this.configService.get<string>('AZURE_STORAGE_ACCOUNT_NAME') || '';
-    this.accountKey = azureConfig?.storageAccountKey || this.configService.get<string>('AZURE_STORAGE_ACCOUNT_KEY') || '';
-    this.defaultContainer = azureConfig?.storageContainer || this.configService.get<string>('AZURE_STORAGE_CONTAINER', 'livex-media');
-    this.publicUrl = this.configService.get<string>('AZURE_STORAGE_PUBLIC_URL') || this.configService.get<string>('AZURE_STORAGE_URL') || `https://${this.accountName}.blob.core.windows.net`;
+    const awsConfig = this.configService.get<AwsConfig>('aws');
 
-    if (!this.accountName) {
-      throw new Error('AZURE_STORAGE_ACCOUNT_NAME is required');
+    // Fallback to env vars if config object is not available (though it should be)
+    const accessKeyId = awsConfig?.accessKeyId || this.configService.get<string>('AWS_ACCESS_KEY_ID');
+    const secretAccessKey = awsConfig?.secretAccessKey || this.configService.get<string>('AWS_SECRET_ACCESS_KEY');
+    this.region = awsConfig?.region || this.configService.get<string>('AWS_REGION', 'us-east-2');
+    this.bucketName = awsConfig?.bucketName || this.configService.get<string>('AWS_S3_BUCKET_NAME') || '';
+
+    if (!accessKeyId || !secretAccessKey) {
+      throw new Error('AWS credentials are missing. S3 uploads will fail.');
     }
 
-    // Initialize BlobServiceClient
-    if (this.accountKey) {
-      // Use account key authentication (for development/Azurite)
-      const storageUrl = this.configService.get<string>('AZURE_STORAGE_URL') || 
-                        `https://${this.accountName}.blob.core.windows.net`;
-      
-      this.blobServiceClient = new BlobServiceClient(
-        storageUrl,
-        new StorageSharedKeyCredential(this.accountName, this.accountKey)
-      );
-    } else {
-      // Use DefaultAzureCredential for production (Managed Identity, etc.)
-      this.blobServiceClient = new BlobServiceClient(
-        `https://${this.accountName}.blob.core.windows.net`,
-        new DefaultAzureCredential()
-      );
+    if (!this.bucketName) {
+      throw new Error('AWS_S3_BUCKET_NAME is missing. S3 uploads will fail.');
     }
 
-    this.logger.log(`Azure Blob Storage initialized for account: ${this.accountName}`);
+    this.s3Client = new S3Client({
+      region: this.region,
+      credentials: {
+        accessKeyId: accessKeyId || '',
+        secretAccessKey: secretAccessKey || '',
+      },
+    });
+
+    this.logger.log(`AWS S3 initialized for bucket: ${this.bucketName} in region: ${this.region}`);
+
+    // Initialize bucket check
+    this.ensureContainerExists(this.bucketName).catch(err => {
+      this.logger.error(`Failed to initialize bucket: ${err.message}`);
+    });
   }
 
   /**
-   * Generate a presigned URL for uploading a file to Azure Blob Storage
+   * Generate a presigned URL for uploading a file to AWS S3
    */
   async generatePresignedUrl(options: PresignedUrlOptions): Promise<PresignedUrlResult> {
     const {
-      containerName = this.defaultContainer,
       fileName,
       contentType,
       expiresInMinutes = 60
     } = options;
 
     try {
-      // Ensure container exists
-      await this.ensureContainerExists(containerName);
+      // Generate a unique key for the file
+      const key = this.generateName(fileName);
 
-      // Generate unique blob name
-      const blobName = this.generateBlobName(fileName);
-      
-      // Get container client
-      const containerClient = this.blobServiceClient.getContainerClient(containerName);
-      const blockBlobClient = containerClient.getBlockBlobClient(blobName);
+      const command = new PutObjectCommand({
+        Bucket: this.bucketName,
+        Key: key,
+        ContentType: contentType,
+      });
 
-      let uploadUrl: string;
-      const blobUrl = blockBlobClient.url;
+      const uploadUrl = await getSignedUrl(this.s3Client, command, { expiresIn: expiresInMinutes * 60 });
 
-      if (this.accountKey) {
-        // Generate SAS token for upload
-        const expiresOn = new Date();
-        expiresOn.setMinutes(expiresOn.getMinutes() + expiresInMinutes);
+      const customDomain = this.configService.get<string>('AWS_S3_CUSTOM_DOMAIN');
+      let blobUrl = '';
 
-        const sasToken = generateBlobSASQueryParameters({
-          containerName,
-          blobName,
-          permissions: BlobSASPermissions.parse('w'), // Write permission
-          expiresOn,
-          contentType,
-        }, new StorageSharedKeyCredential(this.accountName, this.accountKey));
-
-        uploadUrl = `${blockBlobClient.url}?${sasToken.toString()}`;
+      if (customDomain) {
+        const domain = customDomain.replace(/\/$/, '');
+        blobUrl = `${domain}/${key}`;
       } else {
-        // For production with Managed Identity, you might need to implement
-        // a different approach or use Azure Functions for SAS generation
-        throw new BadRequestException('SAS token generation requires account key');
+        blobUrl = `https://${this.bucketName}.s3.${this.region}.amazonaws.com/${key}`;
       }
 
-      this.logger.debug(`Generated presigned URL for blob: ${blobName}`);
+      this.logger.debug(`Generated presigned URL for key: ${key}`);
 
       return {
         uploadUrl,
@@ -122,37 +108,44 @@ export class UploadService {
   }
 
   /**
-   * Upload a file directly to Azure Blob Storage
+   * Upload a file directly to AWS S3
    */
   async uploadFile(
-    containerName: string,
+    containerName: string, // Ignored in S3 implementation (or could be used as folder prefix if needed)
     fileName: string,
     fileBuffer: Buffer,
     contentType: string
   ): Promise<string> {
     try {
-      await this.ensureContainerExists(containerName);
+      const key = fileName;
 
-      // Use the provided fileName directly (it already contains the full path for professional structure)
-      const blobName = fileName;
-      const containerClient = this.blobServiceClient.getContainerClient(containerName);
-      const blockBlobClient = containerClient.getBlockBlobClient(blobName);
-
-      await blockBlobClient.uploadData(fileBuffer, {
-        blobHTTPHeaders: {
-          blobContentType: contentType,
-        },
+      const command = new PutObjectCommand({
+        Bucket: this.bucketName,
+        Key: key,
+        Body: fileBuffer,
+        ContentType: contentType,
       });
 
-      this.logger.debug(`Uploaded file: ${blobName}`);
-      
-      // Return public URL for browser access
-      const publicUrl = `${this.publicUrl}/${containerName}/${blobName}`;
+      await this.s3Client.send(command);
+
+      this.logger.debug(`Uploaded file: ${key}`);
+
+      // Return public URL using custom domain or standard S3 structure
+      const customDomain = this.configService.get<string>('AWS_S3_CUSTOM_DOMAIN');
+      let publicUrl = '';
+
+      if (customDomain) {
+        // Ensure no trailing slash
+        const domain = customDomain.replace(/\/$/, '');
+        publicUrl = `${domain}/${key}`;
+      } else {
+        publicUrl = `https://${this.bucketName}.s3.${this.region}.amazonaws.com/${key}`;
+      }
 
       // Log business event with structured logging
       this.customLogger.logBusinessEvent('file_uploaded', {
-        containerName,
-        fileName: blobName,
+        bucketName: this.bucketName,
+        fileName: key,
         contentType,
         fileSize: fileBuffer.length,
         publicUrl
@@ -162,7 +155,7 @@ export class UploadService {
     } catch (error) {
       // Log error with structured logging
       this.customLogger.logError(error as Error, {
-        containerName,
+        bucketName: this.bucketName,
         fileName,
         contentType,
         fileSize: fileBuffer.length,
@@ -175,25 +168,31 @@ export class UploadService {
   }
 
   /**
-   * Delete a blob from Azure Blob Storage
+   * Delete a file from AWS S3
    */
   async deleteFile(containerName: string, blobName: string): Promise<void> {
     try {
-      const containerClient = this.blobServiceClient.getContainerClient(containerName);
-      const blockBlobClient = containerClient.getBlockBlobClient(blobName);
+      // In Azure the blobName was passed directly. 
+      // If blobName is the full key (which it seems to be based on extractBlobNameFromUrl logic previously), use it.
+      const key = blobName;
 
-      await blockBlobClient.deleteIfExists();
-      this.logger.debug(`Deleted blob: ${blobName}`);
+      const command = new DeleteObjectCommand({
+        Bucket: this.bucketName,
+        Key: key,
+      });
+
+      await this.s3Client.send(command);
+      this.logger.debug(`Deleted file: ${key}`);
 
       // Log business event with structured logging
       this.customLogger.logBusinessEvent('file_deleted', {
-        containerName,
-        fileName: blobName
+        bucketName: this.bucketName,
+        fileName: key
       });
     } catch (error) {
       // Log error with structured logging
       this.customLogger.logError(error as Error, {
-        containerName,
+        bucketName: this.bucketName,
         fileName: blobName,
         action: 'delete_file'
       });
@@ -204,33 +203,36 @@ export class UploadService {
   }
 
   /**
-   * Check if a blob exists
+   * Check if a file exists
    */
   async fileExists(containerName: string, blobName: string): Promise<boolean> {
     try {
-      const containerClient = this.blobServiceClient.getContainerClient(containerName);
-      const blockBlobClient = containerClient.getBlockBlobClient(blobName);
+      const command = new HeadObjectCommand({
+        Bucket: this.bucketName,
+        Key: blobName,
+      });
 
-      return await blockBlobClient.exists();
+      await this.s3Client.send(command);
+      return true;
     } catch (error) {
+      // Method fails with 404 if object does not exist
       this.logger.error(`Failed to check file existence: ${error instanceof Error ? error.message : 'Unknown error'}`, error instanceof Error ? error.stack : undefined);
       return false;
     }
   }
 
   /**
-   * List blobs in a container with optional prefix
+   * List files in a bucket with optional prefix
    */
   async listFiles(containerName: string, prefix?: string): Promise<string[]> {
     try {
-      const containerClient = this.blobServiceClient.getContainerClient(containerName);
-      const blobs: string[] = [];
+      const command = new ListObjectsV2Command({
+        Bucket: this.bucketName,
+        Prefix: prefix,
+      });
 
-      for await (const blob of containerClient.listBlobsFlat({ prefix })) {
-        blobs.push(blob.name);
-      }
-
-      return blobs;
+      const response = await this.s3Client.send(command);
+      return response.Contents?.map(item => item.Key || '') || [];
     } catch (error) {
       this.logger.error(`Failed to list files: ${error instanceof Error ? error.message : 'Unknown error'}`, error instanceof Error ? error.stack : undefined);
       throw new BadRequestException('Failed to list files');
@@ -242,10 +244,10 @@ export class UploadService {
    */
   extractBlobNameFromUrl(url: string): string | null {
     try {
-      const urlParts = new URL(url);
-      const pathParts = urlParts.pathname.split('/');
-      // Remove empty first element and container name
-      return pathParts.slice(2).join('/');
+      const urlObj = new URL(url);
+      // AWS S3 URL format: https://bucket.s3.region.amazonaws.com/key
+      // Pathname starts with /, so we remove it.
+      return urlObj.pathname.substring(1);
     } catch {
       this.logger.warn(`Failed to extract blob name from URL: ${url}`);
       return null;
@@ -294,37 +296,51 @@ export class UploadService {
   }
 
   /**
-   * Ensure container exists, create if it doesn't
+   * Initial check for bucket existence (optional in S3 usage as buckets are static)
    */
-  private async ensureContainerExists(containerName: string): Promise<ContainerClient> {
+  private async ensureContainerExists(containerName: string): Promise<void> {
     try {
-      const containerClient = this.blobServiceClient.getContainerClient(containerName);
-      
-      // Create container if it doesn't exist
-      await containerClient.createIfNotExists({
-        access: 'blob', // Allow public read access to blobs
+      const command = new HeadBucketCommand({
+        Bucket: containerName,
       });
-
-      return containerClient;
-    } catch (error) {
-      this.logger.error(`Failed to ensure container exists: ${error instanceof Error ? error.message : 'Unknown error'}`, error instanceof Error ? error.stack : undefined);
-      throw new BadRequestException('Failed to access storage container');
+      await this.s3Client.send(command);
+      this.logger.debug(`Bucket ${containerName} exists.`);
+    } catch (error: any) {
+      if (error.name === 'NotFound' || error.$metadata?.httpStatusCode === 404) {
+        this.logger.warn(`Bucket ${containerName} not found. Attempting to create...`);
+        try {
+          const createCommand = new CreateBucketCommand({
+            Bucket: containerName,
+            CreateBucketConfiguration: {
+              LocationConstraint: this.region !== 'us-east-1' ? (this.region as any) : undefined,
+            },
+          });
+          await this.s3Client.send(createCommand);
+          this.logger.log(`Bucket ${containerName} created successfully.`);
+        } catch (createError: any) {
+          this.logger.error(`Failed to create bucket: ${createError.message}`);
+          throw new BadRequestException('Failed to create S3 bucket');
+        }
+      } else {
+        this.logger.error(`Error checking bucket existence: ${error.message}`);
+      }
     }
   }
 
+
   /**
-   * Generate unique blob name with timestamp and UUID (legacy method)
-   */
-  private generateBlobName(originalFileName: string): string {
+ * Generate unique name with timestamp and UUID (legacy method)
+ */
+  private generateName(originalFileName: string): string {
     const timestamp = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
     const uuid = randomUUID();
     const extension = originalFileName.split('.').pop() || 'bin';
-    
+
     return `${timestamp}/${uuid}.${extension}`;
   }
 
   /**
-   * Generate slug from text (for professional file naming)
+   * Generate slug from text
    */
   generateSlug(text: string): string {
     return text
@@ -347,7 +363,7 @@ export class UploadService {
   ): string {
     const extension = this.getFileExtensionFromName(fileName);
     const uuid = randomUUID();
-    
+
     if (imageType === 'hero') {
       return `experiences/${resortSlug}/${experienceSlug}/hero-${uuid}.${extension}`;
     } else {
