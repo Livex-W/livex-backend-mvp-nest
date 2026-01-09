@@ -160,10 +160,16 @@ export class ExperiencesService {
       sort: queryDto.sort,
     };
 
-    // Build WHERE conditions - always filter by is_active
+    // Build WHERE conditions - always filter by is_active and exclude under_review/draft for public listing
     const conditions: string[] = ['e.is_active = true'];
     const params: any[] = [];
     let paramIndex = 1;
+
+    // For public listing, only show active experiences (not under_review, draft, or rejected)
+    // Unless include_all_statuses is set (used by management endpoint)
+    if (!queryDto.status && !queryDto.include_all_statuses) {
+      conditions.push(`e.status = 'active'`);
+    }
 
     // Search functionality
     if (queryDto.search) {
@@ -244,7 +250,7 @@ export class ExperiencesService {
     const baseQuery = `
       SELECT e.*,
         (SELECT ei.url FROM experience_images ei 
-         WHERE ei.experience_id = e.id AND ei.image_type = 'hero'
+         WHERE ei.experience_id = e.id AND (ei.image_type = 'hero' OR ei.sort_order = 0)
          ORDER BY ei.sort_order ASC, ei.created_at ASC 
          LIMIT 1) as main_image_url
       FROM experiences e 
@@ -506,6 +512,10 @@ export class ExperiencesService {
     if (resortId) {
       queryDto.resort_id = resortId;
     }
+
+    // For management, allow all statuses (draft, under_review, active, rejected)
+    // Set a special status value to bypass the active-only filter
+    queryDto.include_all_statuses = true;
 
     // Call standard findAll with the enforced filter
     return this.findAllWithPrices(queryDto, user.sub);

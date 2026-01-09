@@ -60,4 +60,11 @@ export class QueryExperiencesDto extends PaginationDto {
     return value === 'true' || value === true;
   })
   include_images?: boolean;
+
+  /**
+   * Internal flag for management endpoint to show all statuses
+   * Not exposed via API, set programmatically
+   */
+  @IsOptional()
+  include_all_statuses?: boolean;
 }

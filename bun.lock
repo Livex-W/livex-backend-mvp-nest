@@ -5,8 +5,8 @@
     "": {
       "name": "livex-backend-mvp-nest",
       "dependencies": {
-        "@aws-sdk/client-s3": "^3.964.0",
-        "@aws-sdk/s3-request-presigner": "^3.964.0",
+        "@aws-sdk/client-s3": "^3.965.0",
+        "@aws-sdk/s3-request-presigner": "^3.965.0",
         "@fastify/cors": "^11.1.0",
         "@fastify/helmet": "^13.0.2",
         "@fastify/multipart": "^9.3.0",

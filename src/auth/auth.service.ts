@@ -69,7 +69,7 @@ export class AuthService {
     async register(dto: RegisterDto, context: TokenContext): Promise<AuthResult> {
         const existingUser = await this.usersService.findByEmail(dto.email);
         if (existingUser) {
-            throw new ConflictException('Email already registered');
+            throw new ConflictException('Este correo ya esta registradoready registered');
         }
 
         let firebaseUid = dto.firebaseUid;

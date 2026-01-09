@@ -273,7 +273,7 @@ export class UsersService {
         const existing = await this.findByEmail(email);
 
         if (existing && existing.id !== ownerId) {
-            throw new ConflictException('Email already registered');
+            throw new ConflictException('Este correo ya esta registradoready registered');
         }
     }
 
