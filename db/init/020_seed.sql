@@ -123,38 +123,28 @@ up AS (
 -- 2. Prestadores (Resorts)
 r AS (
   INSERT INTO resorts (
-    name, description, contact_email, contact_phone,
+    name, description, website, contact_email, contact_phone,
     address_line, city, country, latitude, longitude,
     owner_user_id, is_active, status, approved_by, approved_at
   )
   SELECT
-    'Mar y Sol Cartagena', 'Operador de actividades de playa y city tours', 'contacto@marysol.co', '+57 300 1111111',
+    'Mar y Sol Cartagena', 'Operador de actividades de playa y city tours', 'https://marysol.co', 'contacto@marysol.co', '+57 300 1111111',
     'Bocagrande Cra 1 #1-23', 'Cartagena', 'Colombia', 10.400000, -75.550000,
     (SELECT id FROM u WHERE email='operaciones@marysol.co'), true, 'approved'::resort_status,
     (SELECT id FROM u WHERE email='admin@livex.app'), now()
   UNION ALL
   SELECT
-    'Isla Brisa Resort', 'Resort boutique en Islas del Rosario', 'hola@islabrisa.co', '+57 300 2222222',
+    'Isla Brisa Resort', 'Resort boutique en Islas del Rosario', 'https://islabrisa.co', 'hola@islabrisa.co', '+57 300 2222222',
     'Muelle La Bodeguita', 'Cartagena', 'Colombia', 10.411100, -75.545000,
     (SELECT id FROM u WHERE email='coordinacion@islabrisa.co'), true, 'approved'::resort_status,
     (SELECT id FROM u WHERE email='admin@livex.app'), now()
   UNION ALL
   SELECT
-    'Náutica Bahía Club', 'Club náutico con experiencias de vela y atardecer', 'info@nauticabahia.co', '+57 300 3333333',
+    'Náutica Bahía Club', 'Club náutico con experiencias de vela y atardecer', 'https://nauticabahia.co', 'info@nauticabahia.co', '+57 300 3333333',
     'Marina Santa Cruz', 'Cartagena', 'Colombia', 10.420000, -75.530000,
     (SELECT id FROM u WHERE email='reservas@nauticabahia.co'), true, 'approved'::resort_status,
     (SELECT id FROM u WHERE email='admin@livex.app'), now()
   RETURNING id, name
-),
-
--- 3. KYC Financiero (Cuentas Bancarias)
-bank AS (
-  INSERT INTO resort_bank_info (resort_id, bank_name, account_holder, account_number, account_type, tax_id, is_primary)
-  VALUES
-    ((SELECT id FROM r WHERE name='Mar y Sol Cartagena'), 'Bancolombia', 'Mar y Sol SAS', '1234567890', 'checking', '900111222-3', true),
-    ((SELECT id FROM r WHERE name='Isla Brisa Resort'), 'Davivienda', 'Isla Brisa SAS', '2233445566', 'savings',  '901222333-4', true),
-    ((SELECT id FROM r WHERE name='Náutica Bahía Club'), 'BBVA', 'Nautica Bahia SAS', '3344556677', 'checking', '902333444-5', true)
-  RETURNING resort_id
 ),
 
 -- 4. Documentos Legales
@@ -197,14 +187,14 @@ e AS (
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
       
     -- 2. Full Day Islas del Rosario - SOL Y PAPAYA CLASSIC
-    ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
-      'Sol y Papaya Classic', 'Día de playa en Islas del Rosario, traslado ida y vuelta', 'islands',
-      32000000, 28000000,  -- price_per_adult, price_per_child
-      9000000, 8000000,    -- commission_per_adult ($90k), commission_per_child ($80k)
-      true, 3, 10,           -- allows_children, min_age=3, max_age=10
-      'COP', 'Traslados, coctel de bienvenida, carpa', 'Impuesto de muelle',
-      'active'::experience_status,
-      (SELECT id FROM u WHERE email='admin@livex.app'), now()),
+    -- ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
+    --   'Sol y Papaya Classic', 'Día de playa en Islas del Rosario, traslado ida y vuelta', 'islands',
+    --   32000000, 28000000,  -- price_per_adult, price_per_child
+    --   9000000, 8000000,    -- commission_per_adult ($90k), commission_per_child ($80k)
+    --   true, 3, 10,           -- allows_children, min_age=3, max_age=10
+    --   'COP', 'Traslados, coctel de bienvenida, carpa', 'Impuesto de muelle',
+    --   'active'::experience_status,
+    --   (SELECT id FROM u WHERE email='admin@livex.app'), now()),
       
     -- 3. Sunset Sailing
     ((SELECT id FROM r WHERE name='Náutica Bahía Club'),
@@ -226,35 +216,35 @@ e AS (
       'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
-    -- 5. Palmarito Beach Day
-    ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
-      'Palmarito Beach Day', 'Día de playa en Tierra Bomba con almuerzo incluido', 'islands',
-      23000000, 18000000, -- Adult ($230k), Niño ($180k)
-      3000000, 2500000,   -- Comm Adult ($30k), Comm Child ($25k)
-      true, 4, 10,          -- Niños de 4-10 años
-      'COP', 'Almuerzo típico, uso de instalaciones', 'Toallas',
-      'active'::experience_status,
-      (SELECT id FROM u WHERE email='admin@livex.app'), now()),
+    -- -- 5. Palmarito Beach Day
+    -- ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
+    --   'Palmarito Beach Day', 'Día de playa en Tierra Bomba con almuerzo incluido', 'islands',
+    --   23000000, 18000000, -- Adult ($230k), Niño ($180k)
+    --   3000000, 2500000,   -- Comm Adult ($30k), Comm Child ($25k)
+    --   true, 4, 10,          -- Niños de 4-10 años
+    --   'COP', 'Almuerzo típico, uso de instalaciones', 'Toallas',
+    --   'active'::experience_status,
+    --   (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
-    -- 6. Isla Bela Deluxe
-    ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
-      'Isla Bela Deluxe', 'Experiencia exclusiva en Isla Bela', 'islands',
-      39000000, 30000000, -- Adult ($390k), Child ($300k)
-      7000000, 2000000,   -- Comm Adult ($70k), Comm Child ($20k)
-      true, 3, 10,
-      'COP', 'Transporte rápido, almuerzo gourmet', 'Bebidas premium',
-      'active'::experience_status,
-      (SELECT id FROM u WHERE email='admin@livex.app'), now()),
+    -- -- 6. Isla Bela Deluxe
+    -- ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
+    --   'Isla Bela Deluxe', 'Experiencia exclusiva en Isla Bela', 'islands',
+    --   39000000, 30000000, -- Adult ($390k), Child ($300k)
+    --   7000000, 2000000,   -- Comm Adult ($70k), Comm Child ($20k)
+    --   true, 3, 10,
+    --   'COP', 'Transporte rápido, almuerzo gourmet', 'Bebidas premium',
+    --   'active'::experience_status,
+    --   (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
-    -- 7. Lizamar Island Escape
-    ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
-      'Lizamar Island Escape', 'Escapada relajante a Lizamar', 'islands',
-      40000000, 0,        -- Adult ($400k)
-      8000000, 0,         -- Comm ($80k)
-      false, NULL, NULL,  -- Solo adultos por ahora en este ejemplo
-      'COP', 'Transporte, almuerzo buffet, piscina', 'Snorkel',
-      'active'::experience_status,
-      (SELECT id FROM u WHERE email='admin@livex.app'), now()),
+    -- -- 7. Lizamar Island Escape
+    -- ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
+    --   'Lizamar Island Escape', 'Escapada relajante a Lizamar', 'islands',
+    --   40000000, 0,        -- Adult ($400k)
+    --   8000000, 0,         -- Comm ($80k)
+    --   false, NULL, NULL,  -- Solo adultos por ahora en este ejemplo
+    --   'COP', 'Transporte, almuerzo buffet, piscina', 'Snorkel',
+    --   'active'::experience_status,
+    --   (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
     -- 8. Tour Murallas y Castillo
     ((SELECT id FROM r WHERE name='Mar y Sol Cartagena'),
@@ -266,15 +256,15 @@ e AS (
       'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
-    -- 9. Playa Blanca Express
-    ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
-      'Playa Blanca Express', 'Escapada rápida a Playa Blanca con lancha', 'islands',
-      28000000, 22000000,
-      5000000, 4000000,
-      true, 3, 10,
-      'COP', 'Transporte lancha rápida, carpa, silla', 'Almuerzo, bebidas',
-      'active'::experience_status,
-      (SELECT id FROM u WHERE email='admin@livex.app'), now()),
+    -- -- 9. Playa Blanca Express
+    -- ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
+    --   'Playa Blanca Express', 'Escapada rápida a Playa Blanca con lancha', 'islands',
+    --   28000000, 22000000,
+    --   5000000, 4000000,
+    --   true, 3, 10,
+    --   'COP', 'Transporte lancha rápida, carpa, silla', 'Almuerzo, bebidas',
+    --   'active'::experience_status,
+    --   (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
     -- 10. Kayak Mangrove Tour
     ((SELECT id FROM r WHERE name='Náutica Bahía Club'),
@@ -306,15 +296,15 @@ e AS (
       'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
-    -- 13. Snorkel en Barú
-    ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
-      'Snorkel en Barú', 'Explora los arrecifes de coral en Barú', 'islands',
-      35000000, 28000000,
-      6000000, 5000000,
-      true, 6, 14,
-      'COP', 'Equipo snorkel, instructor, almuerzo', 'Fotos submarinas',
-      'active'::experience_status,
-      (SELECT id FROM u WHERE email='admin@livex.app'), now()),
+    -- -- 13. Snorkel en Barú
+    -- ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
+    --   'Snorkel en Barú', 'Explora los arrecifes de coral en Barú', 'islands',
+    --   35000000, 28000000,
+    --   6000000, 5000000,
+    --   true, 6, 14,
+    --   'COP', 'Equipo snorkel, instructor, almuerzo', 'Fotos submarinas',
+    --   'active'::experience_status,
+    --   (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
     -- 14. Jet Ski Adventure
     ((SELECT id FROM r WHERE name='Náutica Bahía Club'),
@@ -346,15 +336,15 @@ e AS (
       'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
-    -- 17. Oceanario y Acuario
-    ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
-      'Oceanario y Acuario', 'Visita al oceanario de las Islas del Rosario', 'islands',
-      27000000, 20000000,
-      4500000, 3500000,
-      true, 2, 12,
-      'COP', 'Transporte, entrada, guía', 'Snorkel',
-      'active'::experience_status,
-      (SELECT id FROM u WHERE email='admin@livex.app'), now()),
+    -- -- 17. Oceanario y Acuario
+    -- ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
+    --   'Oceanario y Acuario', 'Visita al oceanario de las Islas del Rosario', 'islands',
+    --   27000000, 20000000,
+    --   4500000, 3500000,
+    --   true, 2, 12,
+    --   'COP', 'Transporte, entrada, guía', 'Snorkel',
+    --   'active'::experience_status,
+    --   (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
     -- 18. Paddleboard Sunset
     ((SELECT id FROM r WHERE name='Náutica Bahía Club'),
@@ -394,8 +384,57 @@ e AS (
       true, 1, 99,
       'COP', 'Incluye todo', 'No incluye nada',
       'active'::experience_status,
-      (SELECT id FROM u WHERE email='admin@livex.app'), now())
+      (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
+     -- 22. Tours Islas + Playa Tranquila
+    ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
+      'Tours Islas + Playa Tranquila', 'tour por las paradisiacas islas del rosario y parada en Playa Tranquila Baru para disfrutar del mar azul', 'islands',
+      11000000, 11000000,  -- Adult ($110k), Child ($110k)
+      6000000, 6000000,    -- Comm Adult ($60k), Comm Child ($60k)
+      true, 3, 12,
+      'COP', 'Transporte maritimo ida y vuelta, Tour panoramico islas, Llegada al Oceanario, Llegada a playa tranquila, Almuerzo tipico', 'Boleto de entrada al Oceanario, Impuestos de zarpe',
+      'active'::experience_status,
+      (SELECT id FROM u WHERE email='admin@livex.app'), now()),
+
+    -- 23. Palmarito Beach
+    ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
+      'Palmarito Beach', 'Atencion y servicio que te haran querer volver', 'islands',
+      18000000, 14500000,  -- Adult ($180k), Child ($145k)
+      5000000, 3500000,    -- Comm Adult ($50k), Comm Child ($35k)
+      true, 3, 12,
+      'COP', 'Transporte maritimo ida y vuelta, Coctel de bienvenida, Almuerzo, Camas y Sillas asoleadoras, Piscina, canchas, zonas comunes', 'Cualquier producto o servicio no especificado',
+      'active'::experience_status,
+      (SELECT id FROM u WHERE email='admin@livex.app'), now()),
+
+    -- 24. Luxury Open Bar Area House
+    ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
+      'Luxury Open Bar Area House', 'Vive una experiencia junto al mar en uno de los lugares mas exclusivos de Islas del Rosario', 'islands',
+      32000000, 32000000,  -- Adult ($320k), Child ($320k)
+      10000000, 10000000,  -- Comm Adult ($100k), Comm Child ($100k)
+      true, 3, 12,
+      'COP', 'Transporte maritimo ida y vuelta, Barra abierta bebida nacional ilimitada, Traslado al oceanario (opcional), Kayak y paddle board, Careta para snorkel, Cama de playa, Almuerzo tipico', 'Boleto de entrada al Oceanario, Impuestos de zarpe',
+      'active'::experience_status,
+      (SELECT id FROM u WHERE email='admin@livex.app'), now()),
+
+    -- 25. BACHEROLETTE
+    ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
+      'BACHEROLETTE', 'Plan extra mejorado para un disfrute mas pleno en un lugar lleno de tranquilidad y excelente atencion', 'islands',
+      17000000, 17000000,  -- Adult ($170k), Child ($170k)
+      4000000, 4000000,    -- Comm Adult ($40k), Comm Child ($40k)
+      true, 3, 12,
+      'COP', 'Transporte maritimo ida y vuelta, 4 cocteles de la casa, Almuerzo y bebida, Cama Lounge y Silla asoleadora, Piscina, Playa semi privada, Postre shot, Mini ensalada de frutas', 'Cualquier producto o servicio no especificado',
+      'active'::experience_status,
+      (SELECT id FROM u WHERE email='admin@livex.app'), now()),
+
+    -- 26. Tamarindo Beach
+    ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
+      'Tamarindo Beach', 'A solo 10 minutos de cartagena un lugar lleno de tranquilidad y excelente atencion', 'islands',
+      13000000, 10000000,  -- Adult ($130k), Child ($100k)
+      5000000, 4000000,    -- Comm Adult ($50k), Comm Child ($40k)
+      true, 3, 12,
+      'COP', 'Transporte maritimo ida y vuelta, Coctel de bienvenida, Almuerzo, Cama Lounge y Silla asoleadora, Piscina, Playa semi privada', 'Cualquier producto o servicio no especificado',
+      'active'::experience_status,
+      (SELECT id FROM u WHERE email='admin@livex.app'), now())
   RETURNING id, title, category, resort_id
 ),
 
@@ -412,36 +451,90 @@ ec AS (
 -- 8) Imágenes de Experiencias (Ampliado)
 imgs AS (
   INSERT INTO experience_images (experience_id, url, sort_order) VALUES
-    -- City Tour Histórico
-    ((SELECT id FROM e WHERE title='City Tour Histórico'), 'https://images.unsplash.com/photo-1583531172005-893e7e366d3f?w=800', 0),
-    ((SELECT id FROM e WHERE title='City Tour Histórico'), 'https://images.unsplash.com/photo-1578632292335-df3abbb0d586?w=800', 1),
+    -- 1. City Tour Histórico (Keywords: Cartagena, colonial)
+    ((SELECT id FROM e WHERE title='City Tour Histórico'), 'https://loremflickr.com/800/600/cartagena,colonial?random=1', 0),
+    ((SELECT id FROM e WHERE title='City Tour Histórico'), 'https://loremflickr.com/800/600/architecture,old?random=2', 1),
     
-    -- Sol y Papaya (Classic)
-    ((SELECT id FROM e WHERE title='Sol y Papaya Classic'), 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800', 0),
-    ((SELECT id FROM e WHERE title='Sol y Papaya Classic'), 'https://images.unsplash.com/photo-1519046904884-53103b34b206?w=800', 1),
-    
-    -- Sunset Sailing
-    ((SELECT id FROM e WHERE title='Sunset Sailing'), 'https://images.unsplash.com/photo-1500514966906-fe245eea9344?w=800', 0),
-    ((SELECT id FROM e WHERE title='Sunset Sailing'), 'https://images.unsplash.com/photo-1540946485063-a40da27545f8?w=800', 1),
+    -- 3. Sunset Sailing (Keywords: Sailing, sunset)
+    ((SELECT id FROM e WHERE title='Sunset Sailing'), 'https://loremflickr.com/800/600/sailing,sunset?random=3', 0),
+    ((SELECT id FROM e WHERE title='Sunset Sailing'), 'https://loremflickr.com/800/600/boat,ocean?random=4', 1),
 
-    -- Cholón Party
-    ((SELECT id FROM e WHERE title='Fiesta en Bote Deportivo Cholón'), 'https://images.unsplash.com/photo-1566412435010-b747372c0506?w=800', 0),
-    ((SELECT id FROM e WHERE title='Fiesta en Bote Deportivo Cholón'), 'https://images.unsplash.com/photo-1544551763-46a42a4571da?w=800', 1),
-    
-    -- Palmarito (Tierra Bomba)
-    ((SELECT id FROM e WHERE title='Palmarito Beach Day'), 'https://images.unsplash.com/photo-1573046738959-1e35593f0b24?w=800', 0),
-    ((SELECT id FROM e WHERE title='Palmarito Beach Day'), 'https://images.unsplash.com/photo-1596436889106-be35e843f974?w=800', 1),
-    
-    -- Isla Bela
-    ((SELECT id FROM e WHERE title='Isla Bela Deluxe'), 'https://images.unsplash.com/photo-1540206351-d6465b3ac5c1?w=800', 0),
-    ((SELECT id FROM e WHERE title='Isla Bela Deluxe'), 'https://images.unsplash.com/photo-1626202162624-9b578c7c9800?w=800', 1),
+    -- 4. Cholón Party (Keywords: Yacht, party)
+    ((SELECT id FROM e WHERE title='Fiesta en Bote Deportivo Cholón'), 'https://loremflickr.com/800/600/yacht,party?random=5', 0),
+    ((SELECT id FROM e WHERE title='Fiesta en Bote Deportivo Cholón'), 'https://loremflickr.com/800/600/boat,people?random=6', 1),
 
-    -- Lizamar
-    ((SELECT id FROM e WHERE title='Lizamar Island Escape'), 'https://images.unsplash.com/photo-1590523741831-ab7e8b8f9c7f?w=800', 0),
-    ((SELECT id FROM e WHERE title='Lizamar Island Escape'), 'https://images.unsplash.com/photo-1544551763-46a42a4571da?w=800', 1),
+    -- 8. Tour Murallas y Castillo (Keywords: Fortress, stone)
+    ((SELECT id FROM e WHERE title='Tour Murallas y Castillo'), 'https://loremflickr.com/800/600/fortress,castle?random=7', 0),
+    ((SELECT id FROM e WHERE title='Tour Murallas y Castillo'), 'https://loremflickr.com/800/600/stone,wall?random=8', 1),
 
+    -- 10. Kayak Mangrove Tour (Keywords: Mangrove, kayak)
+    ((SELECT id FROM e WHERE title='Kayak Mangrove Tour'), 'https://loremflickr.com/800/600/kayak,nature?random=9', 0),
+    ((SELECT id FROM e WHERE title='Kayak Mangrove Tour'), 'https://loremflickr.com/800/600/mangrove,water?random=10', 1),
+
+    -- 11. Catamaran Premium (Keywords: Catamaran)
+    ((SELECT id FROM e WHERE title='Catamaran Premium'), 'https://loremflickr.com/800/600/catamaran,luxury?random=11', 0),
+    ((SELECT id FROM e WHERE title='Catamaran Premium'), 'https://loremflickr.com/800/600/sea,yacht?random=12', 1),
+
+    -- 12. Tour Nocturno Getsemaní (Keywords: Street, night)
+    ((SELECT id FROM e WHERE title='Tour Nocturno Getsemaní'), 'https://loremflickr.com/800/600/street,night?random=13', 0),
+    ((SELECT id FROM e WHERE title='Tour Nocturno Getsemaní'), 'https://loremflickr.com/800/600/neon,city?random=14', 1),
+
+    -- 14. Jet Ski Adventure
+    ((SELECT id FROM e WHERE title='Jet Ski Adventure'), 'https://loremflickr.com/800/600/jetski,water?random=15', 0),
+
+    -- 15. Pesca Deportiva
+    ((SELECT id FROM e WHERE title='Pesca Deportiva'), 'https://loremflickr.com/800/600/fishing,boat?random=16', 0),
+
+    -- 16. Tour del Café
+    ((SELECT id FROM e WHERE title='Tour del Café'), 'https://loremflickr.com/800/600/coffee,beans?random=17', 0),
+    ((SELECT id FROM e WHERE title='Tour del Café'), 'https://loremflickr.com/800/600/cafe,cup?random=18', 1),
+
+    -- 18. Paddleboard Sunset
+    ((SELECT id FROM e WHERE title='Paddleboard Sunset'), 'https://loremflickr.com/800/600/paddleboard,sea?random=19', 0),
+
+    -- 19. Tour Gastronómico
+    ((SELECT id FROM e WHERE title='Tour Gastronómico'), 'https://loremflickr.com/800/600/food,dinner?random=20', 0),
+    ((SELECT id FROM e WHERE title='Tour Gastronómico'), 'https://loremflickr.com/800/600/restaurant,dish?random=21', 1),
+
+    -- 20. Avistamiento de Delfines
+    ((SELECT id FROM e WHERE title='Avistamiento de Delfines'), 'https://loremflickr.com/800/600/dolphin,ocean?random=22', 0),
+    
     -- Experiencia Test 5k
-    ((SELECT id FROM e WHERE title='Experiencia Test 5k'), 'https://images.unsplash.com/photo-1621609764180-2ca554a9d6f2?w=800', 0)
+    ((SELECT id FROM e WHERE title='Experiencia Test 5k'), 'https://images.unsplash.com/photo-1621609764180-2ca554a9d6f2?w=800', 0),
+
+    -- 1. Tours Islas + Playa Tranquila
+    ((SELECT id FROM e WHERE title='Tours Islas + Playa Tranquila'), 'https://livex.com.co/images/1.Islas_Playa_Tranquila/bc.jpg', 0),
+    ((SELECT id FROM e WHERE title='Tours Islas + Playa Tranquila'), 'https://livex.com.co/images/1.Islas_Playa_Tranquila/Captura%20de%20pantalla%202026-01-07%20180916.png', 1),
+    ((SELECT id FROM e WHERE title='Tours Islas + Playa Tranquila'), 'https://livex.com.co/images/1.Islas_Playa_Tranquila/dsc07105-web_standard.jpg', 2),
+    ((SELECT id FROM e WHERE title='Tours Islas + Playa Tranquila'), 'https://livex.com.co/images/1.Islas_Playa_Tranquila/isla-del-pirata-islas-del-rosario-pasadia-islas-del-rosario-tours-islas-del-rosario-3-min-600x600.jpg', 3),
+    ((SELECT id FROM e WHERE title='Tours Islas + Playa Tranquila'), 'https://livex.com.co/images/1.Islas_Playa_Tranquila/Oceanario-islas-del-rosario.png', 4),
+
+    -- 2. Palmarito Beach
+    ((SELECT id FROM e WHERE title='Palmarito Beach'), 'https://livex.com.co/images/2.Palmarito/20210514_084346%20(1).jpg', 0),
+    ((SELECT id FROM e WHERE title='Palmarito Beach'), 'https://livex.com.co/images/2.Palmarito/DJI_0016.jpg', 1),
+    ((SELECT id FROM e WHERE title='Palmarito Beach'), 'https://livex.com.co/images/2.Palmarito/DJI_0301.jpg', 2),
+    ((SELECT id FROM e WHERE title='Palmarito Beach'), 'https://livex.com.co/images/2.Palmarito/DJI_0845.jpg', 3),
+    ((SELECT id FROM e WHERE title='Palmarito Beach'), 'https://livex.com.co/images/2.Palmarito/DJI_0866.jpg', 4),
+
+    -- 3. Luxury Open Bar Area House
+    ((SELECT id FROM e WHERE title='Luxury Open Bar Area House'), 'https://livex.com.co/images/3.Luxury/hotel-luxury-beach-islas-rosario04.jpg', 0),
+    ((SELECT id FROM e WHERE title='Luxury Open Bar Area House'), 'https://livex.com.co/images/3.Luxury/hotel-luxury-beach-islas-rosario05.jpg', 1),
+    ((SELECT id FROM e WHERE title='Luxury Open Bar Area House'), 'https://livex.com.co/images/3.Luxury/hotel-luxury-beach-islas-rosario06b.jpg', 2),
+    ((SELECT id FROM e WHERE title='Luxury Open Bar Area House'), 'https://livex.com.co/images/3.Luxury/hotel-luxury-beach-islas-rosario07.jpg', 3),
+    ((SELECT id FROM e WHERE title='Luxury Open Bar Area House'), 'https://livex.com.co/images/3.Luxury/hotel-luxury-beach-islas-rosario08.jpg', 4),
+
+    -- 4. BACHEROLETTE
+    ((SELECT id FROM e WHERE title='BACHEROLETTE'), 'https://livex.com.co/images/4.Bacherolete/Captura%20de%20pantalla%202026-01-08%20172229.png', 0),
+    ((SELECT id FROM e WHERE title='BACHEROLETTE'), 'https://livex.com.co/images/4.Bacherolete/Captura%20de%20pantalla%202026-01-08%20172251.png', 1),
+    ((SELECT id FROM e WHERE title='BACHEROLETTE'), 'https://livex.com.co/images/4.Bacherolete/Captura%20de%20pantalla%202026-01-08%20172311.png', 2),
+    ((SELECT id FROM e WHERE title='BACHEROLETTE'), 'https://livex.com.co/images/4.Bacherolete/Captura%20de%20pantalla%202026-01-08%20172332.png', 3),
+
+    -- 5. Tamarindo Beach
+    ((SELECT id FROM e WHERE title='Tamarindo Beach'), 'https://livex.com.co/images/5.Tamarindo/F1.jpg', 0),
+    ((SELECT id FROM e WHERE title='Tamarindo Beach'), 'https://livex.com.co/images/5.Tamarindo/F2.jpg', 1),
+    ((SELECT id FROM e WHERE title='Tamarindo Beach'), 'https://livex.com.co/images/5.Tamarindo/F3.jpg', 2),
+    ((SELECT id FROM e WHERE title='Tamarindo Beach'), 'https://livex.com.co/images/5.Tamarindo/F6%20(1).jpg', 3),
+    ((SELECT id FROM e WHERE title='Tamarindo Beach'), 'https://livex.com.co/images/5.Tamarindo/F6.jpg', 4)
 
   RETURNING experience_id
 ),
@@ -452,14 +545,14 @@ loc AS (
   VALUES
     -- Existentes
     ((SELECT id FROM e WHERE title='City Tour Histórico'), 'Monumento Camellón de los Mártires', 'Camellón de los Mártires, Centro', 10.422300, -75.545500, 'Llegar 10 min antes. Busca al guía con sombrero vueltiao.'),
-    ((SELECT id FROM e WHERE title='Sol y Papaya Classic'), 'Muelle La Bodeguita', 'Av. Blas de Lezo, Centro', 10.421900, -75.548300, 'Impuesto de muelle no incluido. Presentar documento.'),
+    -- ((SELECT id FROM e WHERE title='Sol y Papaya Classic'), 'Muelle La Bodeguita', 'Av. Blas de Lezo, Centro', 10.421900, -75.548300, 'Impuesto de muelle no incluido. Presentar documento.'),
     ((SELECT id FROM e WHERE title='Sunset Sailing'), 'Marina Santa Cruz', 'Manga, Cartagena', 10.409800, -75.535100, 'Ingresar por portería principal, muelle 3.'),
     
     -- Nuevas
     ((SELECT id FROM e WHERE title='Fiesta en Bote Deportivo Cholón'), 'Muelle de los Pegasos', 'Centro Histórico, muelle lateral', 10.420500, -75.546000, 'Preguntar por el bote "La Fantástica".'),
-    ((SELECT id FROM e WHERE title='Palmarito Beach Day'), 'Muelle Hospital Bocagrande', 'Cra 1, Bocagrande', 10.398000, -75.556000, 'Lancha sale cada 30 minutos.'),
-    ((SELECT id FROM e WHERE title='Isla Bela Deluxe'), 'Muelle La Bodeguita', 'Puerta 4', 10.421900, -75.548300, 'Hora de salida 8:30 AM puntual.'),
-    ((SELECT id FROM e WHERE title='Lizamar Island Escape'), 'Muelle La Bodeguita', 'Puerta 5', 10.421900, -75.548300, 'Presentar voucher impreso o digital.'),
+    -- ((SELECT id FROM e WHERE title='Palmarito Beach Day'), 'Muelle Hospital Bocagrande', 'Cra 1, Bocagrande', 10.398000, -75.556000, 'Lancha sale cada 30 minutos.'),
+    -- ((SELECT id FROM e WHERE title='Isla Bela Deluxe'), 'Muelle La Bodeguita', 'Puerta 4', 10.421900, -75.548300, 'Hora de salida 8:30 AM puntual.'),
+    -- ((SELECT id FROM e WHERE title='Lizamar Island Escape'), 'Muelle La Bodeguita', 'Puerta 5', 10.421900, -75.548300, 'Presentar voucher impreso o digital.'),
     ((SELECT id FROM e WHERE title='Experiencia Test 5k'), 'Oficina Livex', 'Centro', 10.42, -75.54, 'Preguntar por Dev')
 
   RETURNING experience_id
@@ -578,20 +671,15 @@ FROM
 
 INSERT INTO reviews (user_id, experience_id, rating, comment, created_at)
 VALUES
-  -- Existentes
+  -- 1. City Tour Histórico
   ((SELECT id FROM users WHERE email='sofia.turista@gmail.com'),
-   (SELECT id FROM experiences WHERE title='City Tour Histórico'), 5, '¡Increíble experiencia! El guía fue muy amable.', now() - INTERVAL '2 days'),
-  ((SELECT id FROM users WHERE email='sofia.turista@gmail.com'),
-   (SELECT id FROM experiences WHERE title='Sol y Papaya Classic'), 5, 'El paraíso en la tierra.', now() - INTERVAL '1 week'),
+   (SELECT id FROM experiences WHERE title='City Tour Histórico'), 
+   5, '¡Increíble experiencia! El guía fue muy amable.', now() - INTERVAL '2 days'),
   
-  -- Nuevas Reseñas
+  -- 2. Fiesta en Bote Deportivo Cholón
   ((SELECT id FROM users WHERE email='sofia.turista@gmail.com'),
-   (SELECT id FROM experiences WHERE title='Fiesta en Bote Deportivo Cholón'), 5, '¡La mejor fiesta de mi vida! Muy recomendado ir con amigos.', now() - INTERVAL '1 day'),
-  ((SELECT id FROM users WHERE email='sofia.turista@gmail.com'),
-   (SELECT id FROM experiences WHERE title='Isla Bela Deluxe'), 4, 'La comida deliciosa y el servicio excelente.', now() - INTERVAL '4 days'),
-  ((SELECT id FROM users WHERE email='sofia.turista@gmail.com'),
-   (SELECT id FROM experiences WHERE title='Palmarito Beach Day'), 5, 'Un lugar muy exclusivo y tranquilo. El almuerzo estuvo 10/10.', now() - INTERVAL '6 days');
-
+   (SELECT id FROM experiences WHERE title='Fiesta en Bote Deportivo Cholón'), 
+   5, '¡La mejor fiesta de mi vida! Muy recomendado ir con amigos.', now() - INTERVAL '1 day');
 -- ===========================
 -- BLOQUE 4: SISTEMA DE AGENTES
 -- Creación de usuario agente, acuerdo comercial y simulación de venta

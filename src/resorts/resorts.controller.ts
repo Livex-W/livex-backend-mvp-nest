@@ -1,5 +1,5 @@
- 
- 
+
+
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import {
   Controller,
@@ -19,6 +19,7 @@ import {
 import { ResortsService } from './resorts.service';
 import { CreateResortDto } from './dto/create-resort.dto';
 import { UpdateResortDto } from './dto/update-resort.dto';
+import { CreateResortDocumentDto } from './dto/resort-documents.dto';
 import { ApproveResortDto, RejectResortDto } from './dto/approve-resort.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -33,7 +34,7 @@ export class ResortsController {
   constructor(
     private readonly resortsService: ResortsService,
     private readonly logger: CustomLoggerService,
-  ) {}
+  ) { }
 
   @Post()
   @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 requests per minute
@@ -91,6 +92,31 @@ export class ResortsController {
     });
 
     return this.resortsService.findByOwner(req.user.id, paginationDto);
+  }
+
+  @Get('my-resort')
+  @Throttle({ default: { limit: 30, ttl: 60000 } }) // 30 requests per minute
+  @UseGuards(RolesGuard)
+  @Roles('resort', 'admin')
+  async findMyResort(@Request() req: any) {
+    this.logger.logRequest({
+      method: 'GET',
+      url: '/api/v1/resorts/my-resort',
+      userId: req.user.id,
+      role: req.user.role,
+    });
+
+    const profile = await this.resortsService.findProfileByOwner(req.user.id);
+
+    this.logger.logResponse({
+      method: 'GET',
+      url: '/api/v1/resorts/my-resort',
+      userId: req.user.id,
+      hasResort: !!profile,
+      status: 'success'
+    });
+
+    return profile;
   }
 
   @Get(':id')
@@ -254,6 +280,78 @@ export class ResortsController {
       url: '/api/v1/resorts/:id',
       userId: req.user.id,
       resortId: id,
+      status: 'success'
+    });
+  }
+
+  // ==================== Document Management ====================
+
+  @Post(':id/documents')
+  @HttpCode(HttpStatus.CREATED)
+  @Throttle({ default: { limit: 10, ttl: 60000 } }) // 10 requests per minute
+  @UseGuards(RolesGuard)
+  @Roles('resort', 'admin')
+  async createDocument(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() createDocumentDto: CreateResortDocumentDto,
+    @Request() req: any,
+  ) {
+    this.logger.logRequest({
+      method: 'POST',
+      url: '/api/v1/resorts/:id/documents',
+      userId: req.user.id,
+      role: req.user.role,
+      resortId: id,
+      docType: createDocumentDto.doc_type
+    });
+
+    const document = await this.resortsService.createDocument(
+      id,
+      createDocumentDto.doc_type,
+      createDocumentDto.file_url,
+      req.user.id,
+      req.user.role
+    );
+
+    this.logger.logResponse({
+      method: 'POST',
+      url: '/api/v1/resorts/:id/documents',
+      userId: req.user.id,
+      resortId: id,
+      documentId: document.id,
+      status: 'success'
+    });
+
+    return document;
+  }
+
+  @Delete(':id/documents/:docId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 requests per minute
+  @UseGuards(RolesGuard)
+  @Roles('resort', 'admin')
+  async deleteDocument(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('docId', ParseUUIDPipe) docId: string,
+    @Request() req: any,
+  ) {
+    this.logger.logRequest({
+      method: 'DELETE',
+      url: '/api/v1/resorts/:id/documents/:docId',
+      userId: req.user.id,
+      role: req.user.role,
+      resortId: id,
+      documentId: docId
+    });
+
+    await this.resortsService.deleteDocument(id, docId, req.user.id, req.user.role);
+
+    this.logger.logResponse({
+      method: 'DELETE',
+      url: '/api/v1/resorts/:id/documents/:docId',
+      userId: req.user.id,
+      resortId: id,
+      documentId: docId,
       status: 'success'
     });
   }
