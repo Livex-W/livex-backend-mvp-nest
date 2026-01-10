@@ -456,8 +456,7 @@ UPDATE experience_images SET image_type = 'gallery' WHERE image_type IS NULL;
 -- BLOQUE 2: DISPONIBILIDAD (Slots) - GENERACIÓN MASIVA
 -- ===========================
 
--- Generación masiva (15 días desde Diciembre 22, 2025)
--- Se han añadido los 3 nuevos títulos al generador
+-- TEMPORADA BAJA: 11-14 Enero 2026 (Precios Base)
 INSERT INTO availability_slots (
   experience_id, start_time, end_time, capacity,
   price_per_adult_cents, price_per_child_cents,
@@ -469,53 +468,40 @@ SELECT
   (to_char(d, 'YYYY-MM-DD') || 'T' || to_char(t.end_time, 'HH24:MI:SS') || '-05')::timestamptz,
   t.capacity,
   t.price_adult,
-  t.price_child, -- Allow 0 for nulls via default, but here we provide values
+  t.price_child,
   t.comm_adult,
   t.comm_child
 FROM
   experiences e
-  CROSS JOIN generate_series('2025-12-22'::date, '2026-01-05'::date, '1 day'::interval) AS d
+  CROSS JOIN generate_series('2026-01-11'::date, '2026-01-14'::date, '1 day'::interval) AS d
   JOIN (
     VALUES
-      -- Base Season Prices
+      -- TEMPORADA BAJA - Precios Base
       ('City Tour Histórico', '09:00:00'::time, '12:00:00'::time, 20, 19000000, 18000000, 3500000, 2500000),
       ('City Tour Histórico', '15:00:00'::time, '18:00:00'::time, 20, 19000000, 18000000, 3500000, 2500000),
-      ('Sol y Papaya Classic', '08:00:00'::time, '16:00:00'::time, 40, 18000000, 15000000, 3000000, 2000000),
       ('Sunset Sailing', '17:30:00'::time, '19:30:00'::time, 10, 17000000, 0, 4000000, 0),
-      
       ('Fiesta en Bote Deportivo Cholón', '10:00:00'::time, '16:00:00'::time, 12, 42000000, 0, 8000000, 0),
-      ('Palmarito Beach Day', '09:00:00'::time, '17:00:00'::time, 30, 25000000, 20000000, 5000000, 4000000),
-      ('Isla Bela Deluxe', '08:30:00'::time, '15:30:00'::time, 25, 30000000, 25000000, 6000000, 5000000),
-      ('Lizamar Island Escape', '08:00:00'::time, '16:00:00'::time, 30, 28000000, 22000000, 5000000, 4000000),
-      
+      ('Palmarito Beach', '09:00:00'::time, '17:00:00'::time, 30, 25000000, 20000000, 5000000, 4000000),
+      ('Tours Islas + Playa Tranquila', '08:30:00'::time, '16:00:00'::time, 30, 20000000, 16000000, 4000000, 3200000),
+      ('Luxury Open Bar Area House', '09:00:00'::time, '16:00:00'::time, 20, 38000000, 30000000, 7500000, 6000000),
+      ('BACHEROLETTE', '09:00:00'::time, '16:00:00'::time, 15, 42000000, 0, 8500000, 0),
+      ('Tamarindo Beach', '09:00:00'::time, '16:00:00'::time, 30, 23000000, 18000000, 4600000, 3600000),
       ('Tour Murallas y Castillo', '09:00:00'::time, '12:30:00'::time, 25, 22000000, 18000000, 4000000, 3000000),
-      ('Tour Murallas y Castillo', '14:00:00'::time, '17:30:00'::time, 25, 22000000, 18000000, 4000000, 3000000),
-      ('Playa Blanca Express', '08:00:00'::time, '16:00:00'::time, 35, 12000000, 10000000, 2000000, 1500000),
       ('Kayak Mangrove Tour', '07:00:00'::time, '10:00:00'::time, 12, 15000000, 12000000, 2500000, 2000000),
-      ('Kayak Mangrove Tour', '15:00:00'::time, '18:00:00'::time, 12, 15000000, 12000000, 2500000, 2000000),
       ('Catamaran Premium', '11:00:00'::time, '17:00:00'::time, 20, 55000000, 0, 12000000, 0),
       ('Tour Nocturno Getsemaní', '19:00:00'::time, '22:00:00'::time, 15, 16000000, 0, 3000000, 0),
-      ('Snorkel en Barú', '08:00:00'::time, '15:00:00'::time, 20, 15000000, 12000000, 2500000, 2000000),
       ('Jet Ski Adventure', '09:00:00'::time, '10:00:00'::time, 6, 25000000, 0, 5000000, 0),
-      ('Jet Ski Adventure', '11:00:00'::time, '12:00:00'::time, 6, 25000000, 0, 5000000, 0),
       ('Jet Ski Adventure', '14:00:00'::time, '15:00:00'::time, 6, 25000000, 0, 5000000, 0),
-      ('Pesca Deportiva', '05:00:00'::time, '13:00:00'::time, 8, 48000000, 0, 10000000, 0),
       ('Tour del Café', '10:00:00'::time, '13:00:00'::time, 15, 12000000, 10000000, 2000000, 1500000),
-      ('Tour del Café', '15:00:00'::time, '18:00:00'::time, 15, 12000000, 10000000, 2000000, 1500000),
-      ('Oceanario y Acuario', '09:00:00'::time, '15:00:00'::time, 30, 10000000, 8000000, 1500000, 1000000),
       ('Paddleboard Sunset', '16:30:00'::time, '18:30:00'::time, 10, 13000000, 10000000, 2000000, 1500000),
       ('Tour Gastronómico', '11:00:00'::time, '14:00:00'::time, 12, 18000000, 14000000, 3000000, 2500000),
-      ('Tour Gastronómico', '18:00:00'::time, '21:00:00'::time, 12, 18000000, 14000000, 3000000, 2500000),
       ('Avistamiento de Delfines', '06:30:00'::time, '10:30:00'::time, 18, 38000000, 30000000, 7000000, 5500000),
       ('Experiencia Test 5k', '08:00:00'::time, '18:00:00'::time, 100, 500000, 500000, 50000, 50000)
   ) AS t(title, start_time, end_time, capacity, price_adult, price_child, comm_adult, comm_child) ON e.title = t.title;
 
 -- ===========================
--- BLOQUE 2.1: DISPONIBILIDAD ENERO-FEBRERO 2026 (30 días desde 7 de enero)
--- INCLUYE PRECIOS DE TEMPORADA ALTA (+20-30%)
+-- TEMPORADA MEDIA: 15-31 Enero 2026 (Precios +15%)
 -- ===========================
-
--- Generación masiva (30 días desde Enero 7, 2026) - TEMPORADA ALTA con precios incrementados
 INSERT INTO availability_slots (
   experience_id, start_time, end_time, capacity,
   price_per_adult_cents, price_per_child_cents,
@@ -526,55 +512,81 @@ SELECT
   (to_char(d, 'YYYY-MM-DD') || 'T' || to_char(t.start_time, 'HH24:MI:SS') || '-05')::timestamptz,
   (to_char(d, 'YYYY-MM-DD') || 'T' || to_char(t.end_time, 'HH24:MI:SS') || '-05')::timestamptz,
   t.capacity,
-  COALESCE(t.price_adult, 0),
-  COALESCE(t.price_child, 0),
-  COALESCE(t.comm_adult, 0),
-  COALESCE(t.comm_child, 0)
+  t.price_adult,
+  t.price_child,
+  t.comm_adult,
+  t.comm_child
 FROM
   experiences e
-  CROSS JOIN generate_series('2026-01-07'::date, '2026-02-05'::date, '1 day'::interval) AS d
+  CROSS JOIN generate_series('2026-01-15'::date, '2026-01-31'::date, '1 day'::interval) AS d
   JOIN (
     VALUES
-      -- Experiencia, horario inicio, horario fin, capacidad, precio_adulto, precio_niño, com_adulto, com_niño
-      -- Temporada Alta: +20-30% sobre precios base
-      ('City Tour Histórico', '09:00:00'::time, '12:00:00'::time, 20, 22800000, 21600000, 4200000, 3000000),
-      ('City Tour Histórico', '15:00:00'::time, '18:00:00'::time, 20, 22800000, 21600000, 4200000, 3000000),
-      ('Sol y Papaya Classic', '08:00:00'::time, '16:00:00'::time, 40, 18000000, 15000000, 3000000, 2000000),
-      ('Sunset Sailing', '17:30:00'::time, '19:30:00'::time, 10, 20400000, 0, 4800000, 0),
-      
-      -- Experiencias 4-7 (Temporada Alta)
-      ('Fiesta en Bote Deportivo Cholón', '10:00:00'::time, '16:00:00'::time, 12, 50400000, 0, 9600000, 0),
-      ('Palmarito Beach', '09:00:00'::time, '17:00:00'::time, 30, 30000000, 24000000, 6000000, 4800000),
-      ('Isla Bela Deluxe', '08:30:00'::time, '15:30:00'::time, 25, 36000000, 30000000, 7200000, 6000000),
-      ('Lizamar Island Escape', '08:00:00'::time, '16:00:00'::time, 30, 33600000, 26400000, 6000000, 4800000),
-      
-      -- Nuevas (Agregadas para evitar NaN)
-      ('Tours Islas + Playa Tranquila', '08:30:00'::time, '16:00:00'::time, 30, 25000000, 20000000, 5000000, 4000000),
-      ('Luxury Open Bar Area House', '09:00:00'::time, '16:00:00'::time, 20, 45000000, 35000000, 9000000, 7000000),
-      ('BACHEROLETTE', '09:00:00'::time, '16:00:00'::time, 15, 50000000, 0, 10000000, 0),
-      ('Tamarindo Beach', '09:00:00'::time, '16:00:00'::time, 30, 28000000, 22000000, 5600000, 4400000),
-      
-      -- Experiencias 8-20 (Temporada Alta con precios incrementados)
-      ('Tour Murallas y Castillo', '09:00:00'::time, '12:30:00'::time, 25, 26400000, 21600000, 4800000, 3600000),
-      ('Tour Murallas y Castillo', '14:00:00'::time, '17:30:00'::time, 25, 26400000, 21600000, 4800000, 3600000),
-      ('Playa Blanca Express', '08:00:00'::time, '16:00:00'::time, 35, 14400000, 12000000, 2400000, 1800000),
-      ('Kayak Mangrove Tour', '07:00:00'::time, '10:00:00'::time, 12, 18000000, 14400000, 3000000, 2400000),
-      ('Kayak Mangrove Tour', '15:00:00'::time, '18:00:00'::time, 12, 18000000, 14400000, 3000000, 2400000),
-      ('Catamaran Premium', '11:00:00'::time, '17:00:00'::time, 20, 66000000, 0, 14400000, 0),
-      ('Tour Nocturno Getsemaní', '19:00:00'::time, '22:00:00'::time, 15, 19200000, 0, 3600000, 0),
-      ('Snorkel en Barú', '08:00:00'::time, '15:00:00'::time, 20, 18000000, 14400000, 3000000, 2400000),
-      ('Jet Ski Adventure', '09:00:00'::time, '10:00:00'::time, 6, 30000000, 0, 6000000, 0),
-      ('Jet Ski Adventure', '11:00:00'::time, '12:00:00'::time, 6, 30000000, 0, 6000000, 0),
-      ('Jet Ski Adventure', '14:00:00'::time, '15:00:00'::time, 6, 30000000, 0, 6000000, 0),
-      ('Pesca Deportiva', '05:00:00'::time, '13:00:00'::time, 8, 57600000, 0, 12000000, 0),
-      ('Tour del Café', '10:00:00'::time, '13:00:00'::time, 15, 14400000, 12000000, 2400000, 1800000),
-      ('Tour del Café', '15:00:00'::time, '18:00:00'::time, 15, 14400000, 12000000, 2400000, 1800000),
-      ('Oceanario y Acuario', '09:00:00'::time, '15:00:00'::time, 30, 12000000, 9600000, 1800000, 1200000),
-      ('Paddleboard Sunset', '16:30:00'::time, '18:30:00'::time, 10, 15600000, 12000000, 2400000, 1800000),
-      ('Tour Gastronómico', '11:00:00'::time, '14:00:00'::time, 12, 21600000, 16800000, 3600000, 3000000),
-      ('Tour Gastronómico', '18:00:00'::time, '21:00:00'::time, 12, 21600000, 16800000, 3600000, 3000000),
-      ('Avistamiento de Delfines', '06:30:00'::time, '10:30:00'::time, 18, 45600000, 36000000, 8400000, 6600000),
-      ('Experiencia Test 5k', '08:00:00'::time, '18:00:00'::time, 100, 600000, 600000, 600000, 600000)
+      -- TEMPORADA MEDIA - Precios +15%
+      ('City Tour Histórico', '09:00:00'::time, '12:00:00'::time, 20, 21850000, 20700000, 4025000, 2875000),
+      ('City Tour Histórico', '15:00:00'::time, '18:00:00'::time, 20, 21850000, 20700000, 4025000, 2875000),
+      ('Sunset Sailing', '17:30:00'::time, '19:30:00'::time, 10, 19550000, 0, 4600000, 0),
+      ('Fiesta en Bote Deportivo Cholón', '10:00:00'::time, '16:00:00'::time, 12, 48300000, 0, 9200000, 0),
+      ('Palmarito Beach', '09:00:00'::time, '17:00:00'::time, 30, 28750000, 23000000, 5750000, 4600000),
+      ('Tours Islas + Playa Tranquila', '08:30:00'::time, '16:00:00'::time, 30, 23000000, 18400000, 4600000, 3680000),
+      ('Luxury Open Bar Area House', '09:00:00'::time, '16:00:00'::time, 20, 43700000, 34500000, 8625000, 6900000),
+      ('BACHEROLETTE', '09:00:00'::time, '16:00:00'::time, 15, 48300000, 0, 9775000, 0),
+      ('Tamarindo Beach', '09:00:00'::time, '16:00:00'::time, 30, 26450000, 20700000, 5290000, 4140000),
+      ('Tour Murallas y Castillo', '09:00:00'::time, '12:30:00'::time, 25, 25300000, 20700000, 4600000, 3450000),
+      ('Kayak Mangrove Tour', '07:00:00'::time, '10:00:00'::time, 12, 17250000, 13800000, 2875000, 2300000),
+      ('Catamaran Premium', '11:00:00'::time, '17:00:00'::time, 20, 63250000, 0, 13800000, 0),
+      ('Tour Nocturno Getsemaní', '19:00:00'::time, '22:00:00'::time, 15, 18400000, 0, 3450000, 0),
+      ('Jet Ski Adventure', '09:00:00'::time, '10:00:00'::time, 6, 28750000, 0, 5750000, 0),
+      ('Jet Ski Adventure', '14:00:00'::time, '15:00:00'::time, 6, 28750000, 0, 5750000, 0),
+      ('Tour del Café', '10:00:00'::time, '13:00:00'::time, 15, 13800000, 11500000, 2300000, 1725000),
+      ('Paddleboard Sunset', '16:30:00'::time, '18:30:00'::time, 10, 14950000, 11500000, 2300000, 1725000),
+      ('Tour Gastronómico', '11:00:00'::time, '14:00:00'::time, 12, 20700000, 16100000, 3450000, 2875000),
+      ('Avistamiento de Delfines', '06:30:00'::time, '10:30:00'::time, 18, 43700000, 34500000, 8050000, 6325000),
+      ('Experiencia Test 5k', '08:00:00'::time, '18:00:00'::time, 100, 575000, 575000, 57500, 57500)
+  ) AS t(title, start_time, end_time, capacity, price_adult, price_child, comm_adult, comm_child) ON e.title = t.title;
+
+-- ===========================
+-- TEMPORADA ALTA: 1-28 Febrero 2026 (Precios +30%)
+-- ===========================
+INSERT INTO availability_slots (
+  experience_id, start_time, end_time, capacity,
+  price_per_adult_cents, price_per_child_cents,
+  commission_per_adult_cents, commission_per_child_cents
+)
+SELECT
+  e.id,
+  (to_char(d, 'YYYY-MM-DD') || 'T' || to_char(t.start_time, 'HH24:MI:SS') || '-05')::timestamptz,
+  (to_char(d, 'YYYY-MM-DD') || 'T' || to_char(t.end_time, 'HH24:MI:SS') || '-05')::timestamptz,
+  t.capacity,
+  t.price_adult,
+  t.price_child,
+  t.comm_adult,
+  t.comm_child
+FROM
+  experiences e
+  CROSS JOIN generate_series('2026-02-01'::date, '2026-02-28'::date, '1 day'::interval) AS d
+  JOIN (
+    VALUES
+      -- TEMPORADA ALTA - Precios +30%
+      ('City Tour Histórico', '09:00:00'::time, '12:00:00'::time, 20, 24700000, 23400000, 4550000, 3250000),
+      ('City Tour Histórico', '15:00:00'::time, '18:00:00'::time, 20, 24700000, 23400000, 4550000, 3250000),
+      ('Sunset Sailing', '17:30:00'::time, '19:30:00'::time, 10, 22100000, 0, 5200000, 0),
+      ('Fiesta en Bote Deportivo Cholón', '10:00:00'::time, '16:00:00'::time, 12, 54600000, 0, 10400000, 0),
+      ('Palmarito Beach', '09:00:00'::time, '17:00:00'::time, 30, 32500000, 26000000, 6500000, 5200000),
+      ('Tours Islas + Playa Tranquila', '08:30:00'::time, '16:00:00'::time, 30, 26000000, 20800000, 5200000, 4160000),
+      ('Luxury Open Bar Area House', '09:00:00'::time, '16:00:00'::time, 20, 49400000, 39000000, 9750000, 7800000),
+      ('BACHEROLETTE', '09:00:00'::time, '16:00:00'::time, 15, 54600000, 0, 11050000, 0),
+      ('Tamarindo Beach', '09:00:00'::time, '16:00:00'::time, 30, 29900000, 23400000, 5980000, 4680000),
+      ('Tour Murallas y Castillo', '09:00:00'::time, '12:30:00'::time, 25, 28600000, 23400000, 5200000, 3900000),
+      ('Kayak Mangrove Tour', '07:00:00'::time, '10:00:00'::time, 12, 19500000, 15600000, 3250000, 2600000),
+      ('Catamaran Premium', '11:00:00'::time, '17:00:00'::time, 20, 71500000, 0, 15600000, 0),
+      ('Tour Nocturno Getsemaní', '19:00:00'::time, '22:00:00'::time, 15, 20800000, 0, 3900000, 0),
+      ('Jet Ski Adventure', '09:00:00'::time, '10:00:00'::time, 6, 32500000, 0, 6500000, 0),
+      ('Jet Ski Adventure', '14:00:00'::time, '15:00:00'::time, 6, 32500000, 0, 6500000, 0),
+      ('Tour del Café', '10:00:00'::time, '13:00:00'::time, 15, 15600000, 13000000, 2600000, 1950000),
+      ('Paddleboard Sunset', '16:30:00'::time, '18:30:00'::time, 10, 16900000, 13000000, 2600000, 1950000),
+      ('Tour Gastronómico', '11:00:00'::time, '14:00:00'::time, 12, 23400000, 18200000, 3900000, 3250000),
+      ('Avistamiento de Delfines', '06:30:00'::time, '10:30:00'::time, 18, 49400000, 39000000, 9100000, 7150000),
+      ('Experiencia Test 5k', '08:00:00'::time, '18:00:00'::time, 100, 650000, 650000, 65000, 65000)
   ) AS t(title, start_time, end_time, capacity, price_adult, price_child, comm_adult, comm_child) ON e.title = t.title;
 
 

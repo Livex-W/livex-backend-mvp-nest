@@ -315,8 +315,8 @@ export class BookingsService {
       throw new BadRequestException('Capacidad insuficiente para el horario seleccionado');
     }
 
-    // Calculate costs (Backend forced calculation per person)
-    const experienceResult = await client.query<{
+    // Get prices from availability_slots (seasonal pricing) joined with experience info
+    const slotPricesResult = await client.query<{
       price_per_adult_cents: number;
       price_per_child_cents: number;
       commission_per_adult_cents: number;
@@ -326,15 +326,17 @@ export class BookingsService {
       child_max_age: number | null;
       currency: string;
     }>(
-      `SELECT price_per_adult_cents, price_per_child_cents, 
-              commission_per_adult_cents, commission_per_child_cents,
-              allows_children, child_min_age, child_max_age, currency 
-       FROM experiences WHERE id = $1`,
-      [dto.experienceId],
+      `SELECT s.price_per_adult_cents, s.price_per_child_cents, 
+              s.commission_per_adult_cents, s.commission_per_child_cents,
+              e.allows_children, e.child_min_age, e.child_max_age, e.currency 
+       FROM availability_slots s
+       JOIN experiences e ON e.id = s.experience_id
+       WHERE s.id = $1`,
+      [dto.slotId],
     );
-    if (experienceResult.rows.length === 0)
-      throw new NotFoundException('Experience not found');
-    const expr = experienceResult.rows[0];
+    if (slotPricesResult.rows.length === 0)
+      throw new NotFoundException('Slot not found');
+    const expr = slotPricesResult.rows[0];
 
     // Validate children are allowed
     if (!expr.allows_children && (dto.children || 0) > 0) {

@@ -69,6 +69,10 @@ export class AvailabilityService {
           s.start_time,
           s.end_time,
           s.capacity,
+          s.price_per_adult_cents,
+          s.price_per_child_cents,
+          s.commission_per_adult_cents,
+          s.commission_per_child_cents,
           s.created_at,
           s.updated_at,
           vsr.remaining
