@@ -14,6 +14,24 @@ export class CreateAvailabilitySlotDto {
   @IsInt()
   @Min(0)
   capacity: number;
+
+  // Precios de temporada (opcional)
+  // Precios de temporada (OBLIGATORIOS)
+  @IsInt()
+  @Min(0)
+  price_per_adult_cents: number;
+
+  @IsInt()
+  @Min(0)
+  price_per_child_cents: number;
+
+  @IsInt()
+  @Min(0)
+  commission_per_adult_cents: number;
+
+  @IsInt()
+  @Min(0)
+  commission_per_child_cents: number;
 }
 
 export class BulkCreateAvailabilityDto {
@@ -32,6 +50,24 @@ export class BulkCreateAvailabilityDto {
   @IsInt()
   @Min(0)
   capacity?: number = 10; // Default capacity per slot
+
+  // Precios de temporada (opcional - se aplican a todos los slots del bloque)
+  // Precios de temporada (OBLIGATORIOS)
+  @IsInt()
+  @Min(0)
+  price_per_adult_cents: number;
+
+  @IsInt()
+  @Min(0)
+  price_per_child_cents: number;
+
+  @IsInt()
+  @Min(0)
+  commission_per_adult_cents: number;
+
+  @IsInt()
+  @Min(0)
+  commission_per_child_cents: number;
 
   // Time slots configuration
   @IsArray({ message: 'slots must be an array' })
@@ -85,6 +121,24 @@ export class AvailabilityBlockConfig {
   @IsInt()
   @Min(0)
   capacity?: number = 10;
+
+  // Precios de temporada (opcional - se aplican a todos los slots del bloque)
+  // Precios de temporada (OBLIGATORIOS)
+  @IsInt()
+  @Min(0)
+  price_per_adult_cents: number;
+
+  @IsInt()
+  @Min(0)
+  price_per_child_cents: number;
+
+  @IsInt()
+  @Min(0)
+  commission_per_adult_cents: number;
+
+  @IsInt()
+  @Min(0)
+  commission_per_child_cents: number;
 
   @IsArray({ message: 'slots must be an array' })
   @ValidateNested({ each: true })

@@ -7,11 +7,7 @@ export interface Experience {
   slug: string;
   description?: string;
   category: 'islands' | 'nautical' | 'city_tour';
-  // Precios diferenciados
-  price_per_adult_cents: number;
-  price_per_child_cents: number;
-  commission_per_adult_cents: number;
-  commission_per_child_cents: number;
+  // Moneda (los precios van en availability_slots)
   currency: string;
   // Configuración de niños
   allows_children: boolean;
@@ -28,15 +24,16 @@ export interface Experience {
   rejection_reason?: string;
   created_at: Date;
   updated_at: Date;
-  // Display prices in user's preferred currency
+  // Display currency for user
+  display_currency?: string;
+  // Computed from availability_slots - now includes pricing info
+  duration_minutes?: number;
+  max_capacity?: number;
+  // Representative prices from first available slot (para mostrar en listados)
   display_price_per_adult?: number;
   display_price_per_child?: number;
   display_commission_per_adult?: number;
   display_commission_per_child?: number;
-  display_currency?: string;
-  // Computed from availability_slots
-  duration_minutes?: number;
-  max_capacity?: number;
 }
 
 export interface ExperienceWithImages extends Experience {

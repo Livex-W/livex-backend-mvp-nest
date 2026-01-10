@@ -1,10 +1,10 @@
 import { IsString, IsEnum, IsUrl, IsOptional, IsUUID } from 'class-validator';
 
 // Document types matching schema enum
-export type ResortDocType = 'national_id' | 'tax_id' | 'license' | 'insurance' | 'bank_cert' | 'other';
+export type ResortDocType = 'camara_comercio' | 'rut_nit' | 'rnt' | 'other';
 
 export class CreateResortDocumentDto {
-    @IsEnum(['national_id', 'tax_id', 'license', 'insurance', 'bank_cert', 'other'])
+    @IsEnum(['camara_comercio', 'rut_nit', 'rnt', 'other'])
     doc_type: ResortDocType;
 
     @IsUrl()

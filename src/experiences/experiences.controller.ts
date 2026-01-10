@@ -96,6 +96,16 @@ export class ExperiencesController {
     return this.experiencesService.findManaged(queryDto, user);
   }
 
+  @Get('management/:id')
+  @UseGuards(RolesGuard)
+  @Roles('resort', 'agent', 'admin')
+  async findManagedOne(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('include_images', new ParseBoolPipe({ optional: true })) includeImages = false,
+  ): Promise<ExperienceWithImages> {
+    return this.experiencesService.findManagedOne(id, includeImages);
+  }
+
 
   @Get(':id')
   async findOne(

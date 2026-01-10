@@ -4,6 +4,11 @@ export interface AvailabilitySlot {
   start_time: Date;
   end_time: Date;
   capacity: number;
+  // Precios de temporada (null/undefined = usar precio base de experiencia)
+  price_per_adult_cents?: number | null;
+  price_per_child_cents?: number | null;
+  commission_per_adult_cents?: number | null;
+  commission_per_child_cents?: number | null;
   created_at: Date;
   updated_at: Date;
 }

@@ -151,9 +151,9 @@ r AS (
 docs AS (
   INSERT INTO resort_documents (resort_id, doc_type, file_url, status, reviewed_by, reviewed_at)
   VALUES
-    ((SELECT id FROM r WHERE name='Mar y Sol Cartagena'), 'tax_id'::resort_doc_type, 'https://files.example.com/marysol-rut.pdf', 'approved'::document_status, (SELECT id FROM u WHERE email='admin@livex.app'), now()),
-    ((SELECT id FROM r WHERE name='Isla Brisa Resort'),   'license'::resort_doc_type, 'https://files.example.com/islabrisa-lic.pdf', 'approved'::document_status, (SELECT id FROM u WHERE email='admin@livex.app'), now()),
-    ((SELECT id FROM r WHERE name='Náutica Bahía Club'),  'insurance'::resort_doc_type,'https://files.example.com/nautica-pola.pdf', 'approved'::document_status, (SELECT id FROM u WHERE email='admin@livex.app'), now())
+    ((SELECT id FROM r WHERE name='Mar y Sol Cartagena'), 'rut_nit'::resort_doc_type, 'https://files.example.com/marysol-rut.pdf', 'approved'::document_status, (SELECT id FROM u WHERE email='admin@livex.app'), now()),
+    ((SELECT id FROM r WHERE name='Isla Brisa Resort'),   'rnt'::resort_doc_type, 'https://files.example.com/islabrisa-lic.pdf', 'approved'::document_status, (SELECT id FROM u WHERE email='admin@livex.app'), now()),
+    ((SELECT id FROM r WHERE name='Náutica Bahía Club'),  'camara_comercio'::resort_doc_type,'https://files.example.com/nautica-pola.pdf', 'approved'::document_status, (SELECT id FROM u WHERE email='admin@livex.app'), now())
   RETURNING resort_id
 ),
 
@@ -165,13 +165,10 @@ c AS (
     ('nautical','Náutica y Vela')
   RETURNING id, slug
 ),
-
--- 6. Experiencias
+-- 6. Experiencias (sin precios - ahora van en availability_slots)
 e AS (
   INSERT INTO experiences (
     resort_id, title, description, category,
-    price_per_adult_cents, price_per_child_cents,
-    commission_per_adult_cents, commission_per_child_cents,
     allows_children, child_min_age, child_max_age,
     currency, includes, excludes, status, approved_by, approved_at
   )
@@ -179,258 +176,150 @@ e AS (
     -- 1. City Tour Histórico
     ((SELECT id FROM r WHERE name='Mar y Sol Cartagena'),
       'City Tour Histórico', 'Recorrido por el Centro Histórico y Getsemaní', 'city_tour',
-      19000000, 18000000,  -- price_per_adult ($190k), price_per_child ($180k)
-      3500000, 2500000,   -- commission_per_adult ($35k), commission_per_child ($25k)
-      true, 3, 9,          -- allows_children, min_age, max_age
+      true, 3, 9,
       'COP', 'Guía certificado, hidratación', 'Almuerzo',
       'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
       
-    -- 2. Full Day Islas del Rosario - SOL Y PAPAYA CLASSIC
-    -- ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
-    --   'Sol y Papaya Classic', 'Día de playa en Islas del Rosario, traslado ida y vuelta', 'islands',
-    --   32000000, 28000000,  -- price_per_adult, price_per_child
-    --   9000000, 8000000,    -- commission_per_adult ($90k), commission_per_child ($80k)
-    --   true, 3, 10,           -- allows_children, min_age=3, max_age=10
-    --   'COP', 'Traslados, coctel de bienvenida, carpa', 'Impuesto de muelle',
-    --   'active'::experience_status,
-    --   (SELECT id FROM u WHERE email='admin@livex.app'), now()),
-      
-    -- 3. Sunset Sailing
+    -- 2. Sunset Sailing
     ((SELECT id FROM r WHERE name='Náutica Bahía Club'),
       'Sunset Sailing', 'Navegación a vela por la Bahía al atardecer', 'nautical',
-      17000000, 0,          -- price_per_adult ($170k), price_per_child (no aplica)
-      4000000, 0,          -- commission_per_adult ($40k), commission_per_child (no aplica)
-      false, NULL, NULL,    -- allows_children=false, sin rango de edad
+      false, NULL, NULL,
       'COP', 'Capitán, seguro, snacks', 'Traslados al muelle',
       'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
-    -- 4. Cholón Party - Solo adultos (18+)
+    -- 3. Cholón Party - Solo adultos (18+)
     ((SELECT id FROM r WHERE name='Náutica Bahía Club'),
       'Fiesta en Bote Deportivo Cholón', 'Experiencia de fiesta en el agua con música y amigos', 'nautical',
-      42000000, 0,         -- Luxury Beach Area ($420k)
-      8000000, 0,          -- Commission ($80k)
-      false, NULL, NULL,    -- NO permite niños
+      false, NULL, NULL,
       'COP', 'Bote deportivo, capitán, nevera con hielo', 'Bebidas alcohólicas, comida',
       'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
-    -- -- 5. Palmarito Beach Day
-    -- ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
-    --   'Palmarito Beach Day', 'Día de playa en Tierra Bomba con almuerzo incluido', 'islands',
-    --   23000000, 18000000, -- Adult ($230k), Niño ($180k)
-    --   3000000, 2500000,   -- Comm Adult ($30k), Comm Child ($25k)
-    --   true, 4, 10,          -- Niños de 4-10 años
-    --   'COP', 'Almuerzo típico, uso de instalaciones', 'Toallas',
-    --   'active'::experience_status,
-    --   (SELECT id FROM u WHERE email='admin@livex.app'), now()),
-
-    -- -- 6. Isla Bela Deluxe
-    -- ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
-    --   'Isla Bela Deluxe', 'Experiencia exclusiva en Isla Bela', 'islands',
-    --   39000000, 30000000, -- Adult ($390k), Child ($300k)
-    --   7000000, 2000000,   -- Comm Adult ($70k), Comm Child ($20k)
-    --   true, 3, 10,
-    --   'COP', 'Transporte rápido, almuerzo gourmet', 'Bebidas premium',
-    --   'active'::experience_status,
-    --   (SELECT id FROM u WHERE email='admin@livex.app'), now()),
-
-    -- -- 7. Lizamar Island Escape
-    -- ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
-    --   'Lizamar Island Escape', 'Escapada relajante a Lizamar', 'islands',
-    --   40000000, 0,        -- Adult ($400k)
-    --   8000000, 0,         -- Comm ($80k)
-    --   false, NULL, NULL,  -- Solo adultos por ahora en este ejemplo
-    --   'COP', 'Transporte, almuerzo buffet, piscina', 'Snorkel',
-    --   'active'::experience_status,
-    --   (SELECT id FROM u WHERE email='admin@livex.app'), now()),
-
-    -- 8. Tour Murallas y Castillo
+    -- 4. Tour Murallas y Castillo
     ((SELECT id FROM r WHERE name='Mar y Sol Cartagena'),
       'Tour Murallas y Castillo', 'Recorrido por las murallas y el Castillo San Felipe', 'city_tour',
-      22000000, 18000000,
-      4000000, 3000000,
       true, 5, 12,
       'COP', 'Guía especializado, entrada al castillo', 'Propinas',
       'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
-    -- -- 9. Playa Blanca Express
-    -- ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
-    --   'Playa Blanca Express', 'Escapada rápida a Playa Blanca con lancha', 'islands',
-    --   28000000, 22000000,
-    --   5000000, 4000000,
-    --   true, 3, 10,
-    --   'COP', 'Transporte lancha rápida, carpa, silla', 'Almuerzo, bebidas',
-    --   'active'::experience_status,
-    --   (SELECT id FROM u WHERE email='admin@livex.app'), now()),
-
-    -- 10. Kayak Mangrove Tour
+    -- 5. Kayak Mangrove Tour
     ((SELECT id FROM r WHERE name='Náutica Bahía Club'),
       'Kayak Mangrove Tour', 'Aventura en kayak por los manglares de la bahía', 'nautical',
-      15000000, 12000000,
-      2500000, 2000000,
       true, 8, 16,
       'COP', 'Kayak doble, chaleco, instructor', 'Refrigerio',
       'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
-    -- 11. Catamaran Premium
+    -- 6. Catamaran Premium
     ((SELECT id FROM r WHERE name='Náutica Bahía Club'),
       'Catamaran Premium', 'Navegación en catamarán con barra libre', 'nautical',
-      55000000, 0,
-      12000000, 0,
       false, NULL, NULL,
       'COP', 'Barra libre, DJ, snacks gourmet', 'Transporte al muelle',
       'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
-    -- 12. Tour Nocturno Getsemaní
+    -- 7. Tour Nocturno Getsemaní
     ((SELECT id FROM r WHERE name='Mar y Sol Cartagena'),
       'Tour Nocturno Getsemaní', 'Descubre el barrio más bohemio de noche', 'city_tour',
-      16000000, 0,
-      3000000, 0,
       false, NULL, NULL,
       'COP', 'Guía, coctel de bienvenida', 'Cena',
       'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
-    -- -- 13. Snorkel en Barú
-    -- ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
-    --   'Snorkel en Barú', 'Explora los arrecifes de coral en Barú', 'islands',
-    --   35000000, 28000000,
-    --   6000000, 5000000,
-    --   true, 6, 14,
-    --   'COP', 'Equipo snorkel, instructor, almuerzo', 'Fotos submarinas',
-    --   'active'::experience_status,
-    --   (SELECT id FROM u WHERE email='admin@livex.app'), now()),
-
-    -- 14. Jet Ski Adventure
+    -- 8. Jet Ski Adventure
     ((SELECT id FROM r WHERE name='Náutica Bahía Club'),
       'Jet Ski Adventure', 'Adrenalina pura en moto acuática', 'nautical',
-      25000000, 0,
-      5000000, 0,
       false, NULL, NULL,
       'COP', 'Jet ski, chaleco, instructor', 'Seguro adicional',
       'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
-    -- 15. Pesca Deportiva
+    -- 9. Pesca Deportiva
     ((SELECT id FROM r WHERE name='Náutica Bahía Club'),
       'Pesca Deportiva', 'Jornada de pesca en alta mar', 'nautical',
-      48000000, 0,
-      10000000, 0,
       false, NULL, NULL,
       'COP', 'Embarcación, equipos, carnada', 'Licencia de pesca',
       'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
-    -- 16. Tour del Café
+    -- 10. Tour del Café
     ((SELECT id FROM r WHERE name='Mar y Sol Cartagena'),
       'Tour del Café', 'Degustación y cultura del café colombiano', 'city_tour',
-      12000000, 10000000,
-      2000000, 1500000,
       true, 6, 15,
       'COP', 'Degustación, souvenirs', 'Almuerzo',
       'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
-    -- -- 17. Oceanario y Acuario
-    -- ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
-    --   'Oceanario y Acuario', 'Visita al oceanario de las Islas del Rosario', 'islands',
-    --   27000000, 20000000,
-    --   4500000, 3500000,
-    --   true, 2, 12,
-    --   'COP', 'Transporte, entrada, guía', 'Snorkel',
-    --   'active'::experience_status,
-    --   (SELECT id FROM u WHERE email='admin@livex.app'), now()),
-
-    -- 18. Paddleboard Sunset
+    -- 11. Paddleboard Sunset
     ((SELECT id FROM r WHERE name='Náutica Bahía Club'),
       'Paddleboard Sunset', 'Paddleboard al atardecer en la bahía', 'nautical',
-      13000000, 10000000,
-      2000000, 1500000,
       true, 10, 17,
       'COP', 'Tabla, remo, instructor', 'Fotos',
       'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
-    -- 19. Tour Gastronomico
+    -- 12. Tour Gastronómico
     ((SELECT id FROM r WHERE name='Mar y Sol Cartagena'),
       'Tour Gastronómico', 'Prueba los sabores auténticos de Cartagena', 'city_tour',
-      18000000, 14000000,
-      3000000, 2500000,
       true, 5, 14,
       'COP', 'Degustaciones en 5 paradas, guía local', 'Bebidas alcohólicas',
       'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
-    -- 20. Avistamiento de Delfines
+    -- 13. Avistamiento de Delfines
     ((SELECT id FROM r WHERE name='Náutica Bahía Club'),
       'Avistamiento de Delfines', 'Navega en busca de delfines en su hábitat', 'nautical',
-      38000000, 30000000,
-      7000000, 5500000,
       true, 4, 12,
       'COP', 'Embarcación, guía biólogo, snacks', 'Garantía de avistamiento',
       'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
-    -- 21. Experiencia Test 5k
+    -- 14. Experiencia Test 5k
     ((SELECT id FROM r WHERE name='Mar y Sol Cartagena'),
       'Experiencia Test 5k', 'Experiencia para probar pagos mínimos de 5000 pesos', 'city_tour',
-      500000, 500000,
-      500000, 500000,
       true, 1, 99,
       'COP', 'Incluye todo', 'No incluye nada',
       'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
-     -- 22. Tours Islas + Playa Tranquila
+    -- 15. Tours Islas + Playa Tranquila
     ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
       'Tours Islas + Playa Tranquila', 'tour por las paradisiacas islas del rosario y parada en Playa Tranquila Baru para disfrutar del mar azul', 'islands',
-      11000000, 11000000,  -- Adult ($110k), Child ($110k)
-      6000000, 6000000,    -- Comm Adult ($60k), Comm Child ($60k)
       true, 3, 12,
       'COP', 'Transporte maritimo ida y vuelta, Tour panoramico islas, Llegada al Oceanario, Llegada a playa tranquila, Almuerzo tipico', 'Boleto de entrada al Oceanario, Impuestos de zarpe',
       'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
-    -- 23. Palmarito Beach
+    -- 16. Palmarito Beach
     ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
       'Palmarito Beach', 'Atencion y servicio que te haran querer volver', 'islands',
-      18000000, 14500000,  -- Adult ($180k), Child ($145k)
-      5000000, 3500000,    -- Comm Adult ($50k), Comm Child ($35k)
       true, 3, 12,
       'COP', 'Transporte maritimo ida y vuelta, Coctel de bienvenida, Almuerzo, Camas y Sillas asoleadoras, Piscina, canchas, zonas comunes', 'Cualquier producto o servicio no especificado',
       'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
-    -- 24. Luxury Open Bar Area House
+    -- 17. Luxury Open Bar Area House
     ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
       'Luxury Open Bar Area House', 'Vive una experiencia junto al mar en uno de los lugares mas exclusivos de Islas del Rosario', 'islands',
-      32000000, 32000000,  -- Adult ($320k), Child ($320k)
-      10000000, 10000000,  -- Comm Adult ($100k), Comm Child ($100k)
       true, 3, 12,
       'COP', 'Transporte maritimo ida y vuelta, Barra abierta bebida nacional ilimitada, Traslado al oceanario (opcional), Kayak y paddle board, Careta para snorkel, Cama de playa, Almuerzo tipico', 'Boleto de entrada al Oceanario, Impuestos de zarpe',
       'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
-    -- 25. BACHEROLETTE
+    -- 18. BACHEROLETTE
     ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
       'BACHEROLETTE', 'Plan extra mejorado para un disfrute mas pleno en un lugar lleno de tranquilidad y excelente atencion', 'islands',
-      17000000, 17000000,  -- Adult ($170k), Child ($170k)
-      4000000, 4000000,    -- Comm Adult ($40k), Comm Child ($40k)
-      true, 3, 12,
+      false, 0, 0,
       'COP', 'Transporte maritimo ida y vuelta, 4 cocteles de la casa, Almuerzo y bebida, Cama Lounge y Silla asoleadora, Piscina, Playa semi privada, Postre shot, Mini ensalada de frutas', 'Cualquier producto o servicio no especificado',
       'active'::experience_status,
       (SELECT id FROM u WHERE email='admin@livex.app'), now()),
 
-    -- 26. Tamarindo Beach
+    -- 19. Tamarindo Beach
     ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
       'Tamarindo Beach', 'A solo 10 minutos de cartagena un lugar lleno de tranquilidad y excelente atencion', 'islands',
-      13000000, 10000000,  -- Adult ($130k), Child ($100k)
-      5000000, 4000000,    -- Comm Adult ($50k), Comm Child ($40k)
       true, 3, 12,
       'COP', 'Transporte maritimo ida y vuelta, Coctel de bienvenida, Almuerzo, Cama Lounge y Silla asoleadora, Piscina, Playa semi privada', 'Cualquier producto o servicio no especificado',
       'active'::experience_status,
@@ -569,100 +458,124 @@ UPDATE experience_images SET image_type = 'gallery' WHERE image_type IS NULL;
 
 -- Generación masiva (15 días desde Diciembre 22, 2025)
 -- Se han añadido los 3 nuevos títulos al generador
-INSERT INTO availability_slots (experience_id, start_time, end_time, capacity)
+INSERT INTO availability_slots (
+  experience_id, start_time, end_time, capacity,
+  price_per_adult_cents, price_per_child_cents,
+  commission_per_adult_cents, commission_per_child_cents
+)
 SELECT
   e.id,
   (to_char(d, 'YYYY-MM-DD') || 'T' || to_char(t.start_time, 'HH24:MI:SS') || '-05')::timestamptz,
   (to_char(d, 'YYYY-MM-DD') || 'T' || to_char(t.end_time, 'HH24:MI:SS') || '-05')::timestamptz,
-  t.capacity
+  t.capacity,
+  t.price_adult,
+  t.price_child, -- Allow 0 for nulls via default, but here we provide values
+  t.comm_adult,
+  t.comm_child
 FROM
   experiences e
   CROSS JOIN generate_series('2025-12-22'::date, '2026-01-05'::date, '1 day'::interval) AS d
   JOIN (
     VALUES
-      ('City Tour Histórico', '09:00:00'::time, '12:00:00'::time, 20),
-      ('City Tour Histórico', '15:00:00'::time, '18:00:00'::time, 20),
-      ('Sol y Papaya Classic', '08:00:00'::time, '16:00:00'::time, 40),
-      ('Sunset Sailing', '17:30:00'::time, '19:30:00'::time, 10),
+      -- Base Season Prices
+      ('City Tour Histórico', '09:00:00'::time, '12:00:00'::time, 20, 19000000, 18000000, 3500000, 2500000),
+      ('City Tour Histórico', '15:00:00'::time, '18:00:00'::time, 20, 19000000, 18000000, 3500000, 2500000),
+      ('Sol y Papaya Classic', '08:00:00'::time, '16:00:00'::time, 40, 18000000, 15000000, 3000000, 2000000),
+      ('Sunset Sailing', '17:30:00'::time, '19:30:00'::time, 10, 17000000, 0, 4000000, 0),
       
-      -- Experiencias 4-7
-      ('Fiesta en Bote Deportivo Cholón', '10:00:00'::time, '16:00:00'::time, 12),
-      ('Palmarito Beach Day', '09:00:00'::time, '17:00:00'::time, 30),
-      ('Isla Bela Deluxe', '08:30:00'::time, '15:30:00'::time, 25),
-      ('Lizamar Island Escape', '08:00:00'::time, '16:00:00'::time, 30),
+      ('Fiesta en Bote Deportivo Cholón', '10:00:00'::time, '16:00:00'::time, 12, 42000000, 0, 8000000, 0),
+      ('Palmarito Beach Day', '09:00:00'::time, '17:00:00'::time, 30, 25000000, 20000000, 5000000, 4000000),
+      ('Isla Bela Deluxe', '08:30:00'::time, '15:30:00'::time, 25, 30000000, 25000000, 6000000, 5000000),
+      ('Lizamar Island Escape', '08:00:00'::time, '16:00:00'::time, 30, 28000000, 22000000, 5000000, 4000000),
       
-      -- Nuevas experiencias 8-20
-      ('Tour Murallas y Castillo', '09:00:00'::time, '12:30:00'::time, 25),
-      ('Tour Murallas y Castillo', '14:00:00'::time, '17:30:00'::time, 25),
-      ('Playa Blanca Express', '08:00:00'::time, '16:00:00'::time, 35),
-      ('Kayak Mangrove Tour', '07:00:00'::time, '10:00:00'::time, 12),
-      ('Kayak Mangrove Tour', '15:00:00'::time, '18:00:00'::time, 12),
-      ('Catamaran Premium', '11:00:00'::time, '17:00:00'::time, 20),
-      ('Tour Nocturno Getsemaní', '19:00:00'::time, '22:00:00'::time, 15),
-      ('Snorkel en Barú', '08:00:00'::time, '15:00:00'::time, 20),
-      ('Jet Ski Adventure', '09:00:00'::time, '10:00:00'::time, 6),
-      ('Jet Ski Adventure', '11:00:00'::time, '12:00:00'::time, 6),
-      ('Jet Ski Adventure', '14:00:00'::time, '15:00:00'::time, 6),
-      ('Pesca Deportiva', '05:00:00'::time, '13:00:00'::time, 8),
-      ('Tour del Café', '10:00:00'::time, '13:00:00'::time, 15),
-      ('Tour del Café', '15:00:00'::time, '18:00:00'::time, 15),
-      ('Oceanario y Acuario', '09:00:00'::time, '15:00:00'::time, 30),
-      ('Paddleboard Sunset', '16:30:00'::time, '18:30:00'::time, 10),
-      ('Tour Gastronómico', '11:00:00'::time, '14:00:00'::time, 12),
-      ('Tour Gastronómico', '18:00:00'::time, '21:00:00'::time, 12),
-      ('Avistamiento de Delfines', '06:30:00'::time, '10:30:00'::time, 18),
-      ('Experiencia Test 5k', '08:00:00'::time, '18:00:00'::time, 100)
-  ) AS t(title, start_time, end_time, capacity) ON e.title = t.title;
+      ('Tour Murallas y Castillo', '09:00:00'::time, '12:30:00'::time, 25, 22000000, 18000000, 4000000, 3000000),
+      ('Tour Murallas y Castillo', '14:00:00'::time, '17:30:00'::time, 25, 22000000, 18000000, 4000000, 3000000),
+      ('Playa Blanca Express', '08:00:00'::time, '16:00:00'::time, 35, 12000000, 10000000, 2000000, 1500000),
+      ('Kayak Mangrove Tour', '07:00:00'::time, '10:00:00'::time, 12, 15000000, 12000000, 2500000, 2000000),
+      ('Kayak Mangrove Tour', '15:00:00'::time, '18:00:00'::time, 12, 15000000, 12000000, 2500000, 2000000),
+      ('Catamaran Premium', '11:00:00'::time, '17:00:00'::time, 20, 55000000, 0, 12000000, 0),
+      ('Tour Nocturno Getsemaní', '19:00:00'::time, '22:00:00'::time, 15, 16000000, 0, 3000000, 0),
+      ('Snorkel en Barú', '08:00:00'::time, '15:00:00'::time, 20, 15000000, 12000000, 2500000, 2000000),
+      ('Jet Ski Adventure', '09:00:00'::time, '10:00:00'::time, 6, 25000000, 0, 5000000, 0),
+      ('Jet Ski Adventure', '11:00:00'::time, '12:00:00'::time, 6, 25000000, 0, 5000000, 0),
+      ('Jet Ski Adventure', '14:00:00'::time, '15:00:00'::time, 6, 25000000, 0, 5000000, 0),
+      ('Pesca Deportiva', '05:00:00'::time, '13:00:00'::time, 8, 48000000, 0, 10000000, 0),
+      ('Tour del Café', '10:00:00'::time, '13:00:00'::time, 15, 12000000, 10000000, 2000000, 1500000),
+      ('Tour del Café', '15:00:00'::time, '18:00:00'::time, 15, 12000000, 10000000, 2000000, 1500000),
+      ('Oceanario y Acuario', '09:00:00'::time, '15:00:00'::time, 30, 10000000, 8000000, 1500000, 1000000),
+      ('Paddleboard Sunset', '16:30:00'::time, '18:30:00'::time, 10, 13000000, 10000000, 2000000, 1500000),
+      ('Tour Gastronómico', '11:00:00'::time, '14:00:00'::time, 12, 18000000, 14000000, 3000000, 2500000),
+      ('Tour Gastronómico', '18:00:00'::time, '21:00:00'::time, 12, 18000000, 14000000, 3000000, 2500000),
+      ('Avistamiento de Delfines', '06:30:00'::time, '10:30:00'::time, 18, 38000000, 30000000, 7000000, 5500000),
+      ('Experiencia Test 5k', '08:00:00'::time, '18:00:00'::time, 100, 500000, 500000, 50000, 50000)
+  ) AS t(title, start_time, end_time, capacity, price_adult, price_child, comm_adult, comm_child) ON e.title = t.title;
 
 -- ===========================
 -- BLOQUE 2.1: DISPONIBILIDAD ENERO-FEBRERO 2026 (30 días desde 7 de enero)
+-- INCLUYE PRECIOS DE TEMPORADA ALTA (+20-30%)
 -- ===========================
 
--- Generación masiva (30 días desde Enero 7, 2026)
-INSERT INTO availability_slots (experience_id, start_time, end_time, capacity)
+-- Generación masiva (30 días desde Enero 7, 2026) - TEMPORADA ALTA con precios incrementados
+INSERT INTO availability_slots (
+  experience_id, start_time, end_time, capacity,
+  price_per_adult_cents, price_per_child_cents,
+  commission_per_adult_cents, commission_per_child_cents
+)
 SELECT
   e.id,
   (to_char(d, 'YYYY-MM-DD') || 'T' || to_char(t.start_time, 'HH24:MI:SS') || '-05')::timestamptz,
   (to_char(d, 'YYYY-MM-DD') || 'T' || to_char(t.end_time, 'HH24:MI:SS') || '-05')::timestamptz,
-  t.capacity
+  t.capacity,
+  COALESCE(t.price_adult, 0),
+  COALESCE(t.price_child, 0),
+  COALESCE(t.comm_adult, 0),
+  COALESCE(t.comm_child, 0)
 FROM
   experiences e
   CROSS JOIN generate_series('2026-01-07'::date, '2026-02-05'::date, '1 day'::interval) AS d
   JOIN (
     VALUES
-      ('City Tour Histórico', '09:00:00'::time, '12:00:00'::time, 20),
-      ('City Tour Histórico', '15:00:00'::time, '18:00:00'::time, 20),
-      ('Sol y Papaya Classic', '08:00:00'::time, '16:00:00'::time, 40),
-      ('Sunset Sailing', '17:30:00'::time, '19:30:00'::time, 10),
+      -- Experiencia, horario inicio, horario fin, capacidad, precio_adulto, precio_niño, com_adulto, com_niño
+      -- Temporada Alta: +20-30% sobre precios base
+      ('City Tour Histórico', '09:00:00'::time, '12:00:00'::time, 20, 22800000, 21600000, 4200000, 3000000),
+      ('City Tour Histórico', '15:00:00'::time, '18:00:00'::time, 20, 22800000, 21600000, 4200000, 3000000),
+      ('Sol y Papaya Classic', '08:00:00'::time, '16:00:00'::time, 40, 18000000, 15000000, 3000000, 2000000),
+      ('Sunset Sailing', '17:30:00'::time, '19:30:00'::time, 10, 20400000, 0, 4800000, 0),
       
-      -- Experiencias 4-7
-      ('Fiesta en Bote Deportivo Cholón', '10:00:00'::time, '16:00:00'::time, 12),
-      ('Palmarito Beach Day', '09:00:00'::time, '17:00:00'::time, 30),
-      ('Isla Bela Deluxe', '08:30:00'::time, '15:30:00'::time, 25),
-      ('Lizamar Island Escape', '08:00:00'::time, '16:00:00'::time, 30),
+      -- Experiencias 4-7 (Temporada Alta)
+      ('Fiesta en Bote Deportivo Cholón', '10:00:00'::time, '16:00:00'::time, 12, 50400000, 0, 9600000, 0),
+      ('Palmarito Beach', '09:00:00'::time, '17:00:00'::time, 30, 30000000, 24000000, 6000000, 4800000),
+      ('Isla Bela Deluxe', '08:30:00'::time, '15:30:00'::time, 25, 36000000, 30000000, 7200000, 6000000),
+      ('Lizamar Island Escape', '08:00:00'::time, '16:00:00'::time, 30, 33600000, 26400000, 6000000, 4800000),
       
-      -- Experiencias 8-20
-      ('Tour Murallas y Castillo', '09:00:00'::time, '12:30:00'::time, 25),
-      ('Tour Murallas y Castillo', '14:00:00'::time, '17:30:00'::time, 25),
-      ('Playa Blanca Express', '08:00:00'::time, '16:00:00'::time, 35),
-      ('Kayak Mangrove Tour', '07:00:00'::time, '10:00:00'::time, 12),
-      ('Kayak Mangrove Tour', '15:00:00'::time, '18:00:00'::time, 12),
-      ('Catamaran Premium', '11:00:00'::time, '17:00:00'::time, 20),
-      ('Tour Nocturno Getsemaní', '19:00:00'::time, '22:00:00'::time, 15),
-      ('Snorkel en Barú', '08:00:00'::time, '15:00:00'::time, 20),
-      ('Jet Ski Adventure', '09:00:00'::time, '10:00:00'::time, 6),
-      ('Jet Ski Adventure', '11:00:00'::time, '12:00:00'::time, 6),
-      ('Jet Ski Adventure', '14:00:00'::time, '15:00:00'::time, 6),
-      ('Pesca Deportiva', '05:00:00'::time, '13:00:00'::time, 8),
-      ('Tour del Café', '10:00:00'::time, '13:00:00'::time, 15),
-      ('Tour del Café', '15:00:00'::time, '18:00:00'::time, 15),
-      ('Oceanario y Acuario', '09:00:00'::time, '15:00:00'::time, 30),
-      ('Paddleboard Sunset', '16:30:00'::time, '18:30:00'::time, 10),
-      ('Tour Gastronómico', '11:00:00'::time, '14:00:00'::time, 12),
-      ('Tour Gastronómico', '18:00:00'::time, '21:00:00'::time, 12),
-      ('Avistamiento de Delfines', '06:30:00'::time, '10:30:00'::time, 18),
-      ('Experiencia Test 5k', '08:00:00'::time, '18:00:00'::time, 100)
-  ) AS t(title, start_time, end_time, capacity) ON e.title = t.title;
+      -- Nuevas (Agregadas para evitar NaN)
+      ('Tours Islas + Playa Tranquila', '08:30:00'::time, '16:00:00'::time, 30, 25000000, 20000000, 5000000, 4000000),
+      ('Luxury Open Bar Area House', '09:00:00'::time, '16:00:00'::time, 20, 45000000, 35000000, 9000000, 7000000),
+      ('BACHEROLETTE', '09:00:00'::time, '16:00:00'::time, 15, 50000000, 0, 10000000, 0),
+      ('Tamarindo Beach', '09:00:00'::time, '16:00:00'::time, 30, 28000000, 22000000, 5600000, 4400000),
+      
+      -- Experiencias 8-20 (Temporada Alta con precios incrementados)
+      ('Tour Murallas y Castillo', '09:00:00'::time, '12:30:00'::time, 25, 26400000, 21600000, 4800000, 3600000),
+      ('Tour Murallas y Castillo', '14:00:00'::time, '17:30:00'::time, 25, 26400000, 21600000, 4800000, 3600000),
+      ('Playa Blanca Express', '08:00:00'::time, '16:00:00'::time, 35, 14400000, 12000000, 2400000, 1800000),
+      ('Kayak Mangrove Tour', '07:00:00'::time, '10:00:00'::time, 12, 18000000, 14400000, 3000000, 2400000),
+      ('Kayak Mangrove Tour', '15:00:00'::time, '18:00:00'::time, 12, 18000000, 14400000, 3000000, 2400000),
+      ('Catamaran Premium', '11:00:00'::time, '17:00:00'::time, 20, 66000000, 0, 14400000, 0),
+      ('Tour Nocturno Getsemaní', '19:00:00'::time, '22:00:00'::time, 15, 19200000, 0, 3600000, 0),
+      ('Snorkel en Barú', '08:00:00'::time, '15:00:00'::time, 20, 18000000, 14400000, 3000000, 2400000),
+      ('Jet Ski Adventure', '09:00:00'::time, '10:00:00'::time, 6, 30000000, 0, 6000000, 0),
+      ('Jet Ski Adventure', '11:00:00'::time, '12:00:00'::time, 6, 30000000, 0, 6000000, 0),
+      ('Jet Ski Adventure', '14:00:00'::time, '15:00:00'::time, 6, 30000000, 0, 6000000, 0),
+      ('Pesca Deportiva', '05:00:00'::time, '13:00:00'::time, 8, 57600000, 0, 12000000, 0),
+      ('Tour del Café', '10:00:00'::time, '13:00:00'::time, 15, 14400000, 12000000, 2400000, 1800000),
+      ('Tour del Café', '15:00:00'::time, '18:00:00'::time, 15, 14400000, 12000000, 2400000, 1800000),
+      ('Oceanario y Acuario', '09:00:00'::time, '15:00:00'::time, 30, 12000000, 9600000, 1800000, 1200000),
+      ('Paddleboard Sunset', '16:30:00'::time, '18:30:00'::time, 10, 15600000, 12000000, 2400000, 1800000),
+      ('Tour Gastronómico', '11:00:00'::time, '14:00:00'::time, 12, 21600000, 16800000, 3600000, 3000000),
+      ('Tour Gastronómico', '18:00:00'::time, '21:00:00'::time, 12, 21600000, 16800000, 3600000, 3000000),
+      ('Avistamiento de Delfines', '06:30:00'::time, '10:30:00'::time, 18, 45600000, 36000000, 8400000, 6600000),
+      ('Experiencia Test 5k', '08:00:00'::time, '18:00:00'::time, 100, 600000, 600000, 600000, 600000)
+  ) AS t(title, start_time, end_time, capacity, price_adult, price_child, comm_adult, comm_child) ON e.title = t.title;
 
 
 -- ===========================

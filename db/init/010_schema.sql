@@ -21,7 +21,7 @@ DO $$ BEGIN
         CREATE TYPE resort_status AS ENUM ('draft','under_review','approved','rejected');
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'resort_doc_type') THEN
-        CREATE TYPE resort_doc_type AS ENUM ('national_id','tax_id','license','insurance','bank_cert','other');
+        CREATE TYPE resort_doc_type AS ENUM ('camara_comercio','rut_nit','rnt','other');
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'document_status') THEN
         CREATE TYPE document_status AS ENUM ('uploaded','under_review','approved','rejected');
@@ -175,6 +175,8 @@ CREATE TABLE IF NOT EXISTS resorts (
   address_line   text,
   city           text,
   country        text,
+  nit            text,  -- Format: 800098813-6
+  rnt            text,  -- Format: 23412 (5 digits)
   latitude       numeric(9,6),
   longitude      numeric(9,6),
   owner_user_id  uuid REFERENCES users(id) ON DELETE SET NULL,
@@ -253,12 +255,8 @@ CREATE TABLE IF NOT EXISTS experiences (
   description     text,
   category        text NOT NULL CHECK (category IN ('islands','nautical','city_tour')),
   
-  -- Precios diferenciados por adultos y niños
-  price_per_adult_cents      integer NOT NULL CHECK (price_per_adult_cents >= 0),
-  price_per_child_cents      integer NOT NULL DEFAULT 0 CHECK (price_per_child_cents >= 0),
-  commission_per_adult_cents integer NOT NULL DEFAULT 0 CHECK (commission_per_adult_cents >= 0),
-  commission_per_child_cents integer NOT NULL DEFAULT 0 CHECK (commission_per_child_cents >= 0),
-  currency                   text NOT NULL DEFAULT 'USD',
+  -- Moneda para esta experiencia (los precios van en availability_slots)
+  currency        text NOT NULL DEFAULT 'COP',
   
   -- Configuración de niños
   allows_children boolean NOT NULL DEFAULT true,
@@ -283,11 +281,10 @@ CREATE TABLE IF NOT EXISTS experiences (
   updated_at      timestamptz NOT NULL DEFAULT now()
 );
 
--- Comentarios sobre columnas
-COMMENT ON COLUMN experiences.price_per_adult_cents IS 'Price per adult in cents. Customer pays this amount on-site.';
-COMMENT ON COLUMN experiences.price_per_child_cents IS 'Price per child in cents. Customer pays this amount on-site. 0 if children don''t pay.';
-COMMENT ON COLUMN experiences.commission_per_adult_cents IS 'LIVEX commission per adult charged online at booking time.';
-COMMENT ON COLUMN experiences.commission_per_child_cents IS 'LIVEX commission per child charged online at booking time.';
+COMMENT ON COLUMN experiences.currency IS 'Currency for this experience. Prices are defined per availability slot.';
+COMMENT ON COLUMN experiences.allows_children IS 'Whether children are allowed for this experience.';
+COMMENT ON COLUMN experiences.child_min_age IS 'Minimum age to be considered a child (for pricing).';
+COMMENT ON COLUMN experiences.child_max_age IS 'Maximum age to be considered a child (for pricing).';
 COMMENT ON COLUMN experiences.allows_children IS 'Whether this experience allows children. If false, children field must be 0.';
 COMMENT ON COLUMN experiences.child_min_age IS 'Minimum age to be considered a child (inclusive). Below this age, the person does not pay.';
 COMMENT ON COLUMN experiences.child_max_age IS 'Maximum age to be considered a child (inclusive). Above this age, the person is considered an adult.';
@@ -295,7 +292,7 @@ COMMENT ON COLUMN experiences.child_max_age IS 'Maximum age to be considered a c
 CREATE UNIQUE INDEX IF NOT EXISTS uq_experiences_resort_slug ON experiences(resort_id, slug);
 CREATE INDEX IF NOT EXISTS idx_experiences_category ON experiences(category);
 CREATE INDEX IF NOT EXISTS idx_experiences_status ON experiences(status);
-CREATE INDEX IF NOT EXISTS idx_experiences_price_currency ON experiences(price_per_adult_cents, currency);
+
 CREATE TRIGGER trg_experiences_updated_at BEFORE UPDATE ON experiences FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 CREATE TABLE IF NOT EXISTS experience_categories (
@@ -332,10 +329,20 @@ CREATE TABLE IF NOT EXISTS availability_slots (
   start_time     timestamptz NOT NULL,
   end_time       timestamptz NOT NULL,
   capacity       integer NOT NULL CHECK (capacity >= 0),
+  -- Precios por temporada (obligatorios)
+  price_per_adult_cents      integer NOT NULL DEFAULT 0 CHECK (price_per_adult_cents >= 0),
+  price_per_child_cents      integer NOT NULL DEFAULT 0 CHECK (price_per_child_cents >= 0),
+  commission_per_adult_cents integer NOT NULL DEFAULT 0 CHECK (commission_per_adult_cents >= 0),
+  commission_per_child_cents integer NOT NULL DEFAULT 0 CHECK (commission_per_child_cents >= 0),
   created_at     timestamptz NOT NULL DEFAULT now(),
   updated_at     timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT slot_time_range CHECK (start_time < end_time)
 );
+
+COMMENT ON COLUMN availability_slots.price_per_adult_cents IS 'Precio por adulto para esta temporada (obligatorio).';
+COMMENT ON COLUMN availability_slots.price_per_child_cents IS 'Precio por niño para esta temporada. 0 si niños no pagan.';
+COMMENT ON COLUMN availability_slots.commission_per_adult_cents IS 'Comisión LIVEX por adulto para esta temporada.';
+COMMENT ON COLUMN availability_slots.commission_per_child_cents IS 'Comisión LIVEX por niño para esta temporada.';
 CREATE INDEX IF NOT EXISTS idx_slots_experience ON availability_slots(experience_id);
 CREATE INDEX IF NOT EXISTS idx_slots_start ON availability_slots(start_time);
 CREATE TRIGGER trg_slots_updated_at BEFORE UPDATE ON availability_slots FOR EACH ROW EXECUTE FUNCTION set_updated_at();

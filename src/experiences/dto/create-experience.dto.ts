@@ -4,7 +4,7 @@ import {
   IsString,
   IsUUID,
   IsEnum,
-  IsPositive,
+
   MaxLength,
   MinLength,
   IsInt,
@@ -49,26 +49,7 @@ export class CreateExperienceDto {
   @IsEnum(ExperienceCategory)
   category: ExperienceCategory;
 
-  @IsNotEmpty()
-  @IsInt()
-  @IsPositive()
-  @Min(0)
-  price_per_adult_cents: number;
 
-  @IsOptional()
-  @IsInt()
-  @Min(0)
-  price_per_child_cents?: number = 0;
-
-  @IsOptional()
-  @IsInt()
-  @Min(0)
-  commission_per_adult_cents?: number = 0;
-
-  @IsOptional()
-  @IsInt()
-  @Min(0)
-  commission_per_child_cents?: number = 0;
 
   @IsOptional()
   @IsInt()

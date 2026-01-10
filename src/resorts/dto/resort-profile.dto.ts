@@ -2,7 +2,7 @@ import { IsString, IsBoolean, IsOptional, IsNumber, IsUUID, IsArray, ValidateNes
 import { Type } from 'class-transformer';
 
 // Document types matching schema enum
-export type ResortDocType = 'national_id' | 'tax_id' | 'license' | 'insurance' | 'bank_cert' | 'other';
+export type ResortDocType = 'camara_comercio' | 'rut_nit' | 'rnt' | 'other';
 export type DocumentStatus = 'uploaded' | 'under_review' | 'approved' | 'rejected';
 export type ResortStatus = 'draft' | 'under_review' | 'approved' | 'rejected';
 
@@ -113,6 +113,14 @@ export class ResortProfileDto {
     @IsOptional()
     @IsNumber()
     longitude?: number;
+
+    @IsOptional()
+    @IsString()
+    nit?: string;
+
+    @IsOptional()
+    @IsString()
+    rnt?: string;
 
     @IsUUID()
     owner_user_id: string;

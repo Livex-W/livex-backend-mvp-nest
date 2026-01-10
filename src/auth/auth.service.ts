@@ -116,6 +116,8 @@ export class AuthService {
                         name: resortName,
                         contact_email: dto.email,
                         contact_phone: dto.phone,
+                        nit: dto.nit,
+                        rnt: dto.rnt,
                         // Other fields will remain null/default, to be completed later
                     },
                     user.id

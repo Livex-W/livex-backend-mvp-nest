@@ -136,6 +136,7 @@ export class AvailabilityService {
       startTime: createSlotDto.start_time,
       endTime: createSlotDto.end_time,
       capacity: createSlotDto.capacity,
+      hasPricing: !!(createSlotDto.price_per_adult_cents || createSlotDto.price_per_child_cents),
     });
 
     // Verify experience exists
@@ -154,14 +155,20 @@ export class AvailabilityService {
     try {
       const result = await this.db.query<AvailabilitySlot>(
         `INSERT INTO availability_slots (
-          experience_id, start_time, end_time, capacity
-        ) VALUES ($1, $2, $3, $4) 
+          experience_id, start_time, end_time, capacity,
+          price_per_adult_cents, price_per_child_cents,
+          commission_per_adult_cents, commission_per_child_cents
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
         RETURNING *`,
         [
           createSlotDto.experience_id,
           createSlotDto.start_time,
           createSlotDto.end_time,
           createSlotDto.capacity,
+          createSlotDto.price_per_adult_cents ?? 0,
+          createSlotDto.price_per_child_cents ?? 0,
+          createSlotDto.commission_per_adult_cents ?? 0,
+          createSlotDto.commission_per_child_cents ?? 0,
         ],
       );
 
@@ -173,6 +180,8 @@ export class AvailabilityService {
         startTime: slot.start_time,
         endTime: slot.end_time,
         capacity: slot.capacity,
+        pricePerAdultCents: slot.price_per_adult_cents,
+        pricePerChildCents: slot.price_per_child_cents,
       });
 
       return slot;
@@ -261,12 +270,16 @@ export class AvailabilityService {
             continue;
           }
 
-          // Create the slot
+          // Create the slot with pricing from the bulk config
           await this.createSlot({
             experience_id: experienceId,
             start_time: startTime,
             end_time: endTime,
             capacity,
+            price_per_adult_cents: bulkCreateDto.price_per_adult_cents,
+            price_per_child_cents: bulkCreateDto.price_per_child_cents,
+            commission_per_adult_cents: bulkCreateDto.commission_per_adult_cents,
+            commission_per_child_cents: bulkCreateDto.commission_per_child_cents,
           });
 
           results.created_slots++;
@@ -335,6 +348,11 @@ export class AvailabilityService {
         end_date: block.end_date,
         capacity: block.capacity,
         slots: block.slots,
+        // Precios de temporada para este bloque
+        price_per_adult_cents: block.price_per_adult_cents,
+        price_per_child_cents: block.price_per_child_cents,
+        commission_per_adult_cents: block.commission_per_adult_cents,
+        commission_per_child_cents: block.commission_per_child_cents,
       });
 
       aggregateResults.total_created += blockResult.created_slots;

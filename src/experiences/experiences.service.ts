@@ -18,7 +18,7 @@ import { Review } from './entities/experience.entity';
 import { UploadService, PresignedUrlOptions } from '../upload/upload.service';
 import { UserPreferencesService } from '../user-preferences/user-preferences.service';
 import { ExchangeRatesService } from '../exchange-rates/exchange-rates.service';
-import { convertPrice } from '../common/utils/price-converter';
+// import { convertPrice } from '../common/utils/price-converter';
 import type { JwtPayload } from '../common/interfaces/jwt-payload.interface';
 
 
@@ -69,10 +69,6 @@ export class ExperiencesService {
       title,
       description,
       category,
-      price_per_adult_cents,
-      price_per_child_cents,
-      commission_per_adult_cents,
-      commission_per_child_cents,
       allows_children,
       child_min_age,
       child_max_age,
@@ -86,21 +82,15 @@ export class ExperiencesService {
       const result = await this.db.query<Experience>(
         `INSERT INTO experiences (
           resort_id, title, description, category,
-          price_per_adult_cents, price_per_child_cents,
-          commission_per_adult_cents, commission_per_child_cents,
           allows_children, child_min_age, child_max_age,
           currency, includes, excludes, status
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) 
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) 
         RETURNING *`,
         [
           resort_id,
           title,
           description,
           category,
-          price_per_adult_cents,
-          price_per_child_cents ?? 0,
-          commission_per_adult_cents ?? 0,
-          commission_per_child_cents ?? 0,
           allows_children ?? true,
           child_min_age,
           child_max_age,
@@ -120,7 +110,7 @@ export class ExperiencesService {
         resortId: experience.resort_id,
         title: experience.title,
         category: experience.category,
-        pricePerAdultUSD: experience.price_per_adult_cents / 100
+        // Price no longer in experience
       });
 
       return experience;
@@ -204,6 +194,8 @@ export class ExperiencesService {
       paramIndex++;
     }
 
+    // Price filtering disabled until implemented via availability_slots joins
+    /*
     if (queryDto.min_price !== undefined) {
       conditions.push(`e.price_per_adult_cents >= $${paramIndex}`);
       params.push(queryDto.min_price);
@@ -215,6 +207,7 @@ export class ExperiencesService {
       params.push(queryDto.max_price);
       paramIndex++;
     }
+    */
 
     if (queryDto.min_rating !== undefined) {
       conditions.push(`e.rating_avg >= $${paramIndex}`);
@@ -239,7 +232,7 @@ export class ExperiencesService {
     // Build sort options
     const sortOptions = this.paginationService.parseSortOptions(
       queryDto.sort,
-      ['title', 'category', 'price_per_adult_cents', 'rating_avg', 'rating_count', 'created_at', 'updated_at'],
+      ['title', 'category', 'rating_avg', 'rating_count', 'created_at', 'updated_at'],
     );
     const orderByClause = this.paginationService.buildOrderByClause(
       sortOptions,
@@ -252,8 +245,20 @@ export class ExperiencesService {
         (SELECT ei.url FROM experience_images ei 
          WHERE ei.experience_id = e.id AND (ei.image_type = 'hero' OR ei.sort_order = 0)
          ORDER BY ei.sort_order ASC, ei.created_at ASC 
-         LIMIT 1) as main_image_url
+         LIMIT 1) as main_image_url,
+        s.price_per_adult_cents as display_price_per_adult,
+        s.price_per_child_cents as display_price_per_child,
+        s.commission_per_adult_cents as display_commission_per_adult,
+        s.commission_per_child_cents as display_commission_per_child
       FROM experiences e 
+      LEFT JOIN LATERAL (
+        SELECT price_per_adult_cents, price_per_child_cents, commission_per_adult_cents, commission_per_child_cents
+        FROM availability_slots
+        WHERE experience_id = e.id
+          AND start_time >= NOW()
+        ORDER BY start_time ASC
+        LIMIT 1
+      ) s ON true
       ${whereClause} 
       ${orderByClause}
     `;
@@ -312,7 +317,21 @@ export class ExperiencesService {
 
   async findOne(id: string, includeImages = false): Promise<ExperienceWithImages> {
     const result = await this.db.query<Experience>(
-      'SELECT * FROM experiences WHERE id = $1 AND is_active = true',
+      `SELECT e.*,
+        s.price_per_adult_cents as display_price_per_adult,
+        s.price_per_child_cents as display_price_per_child,
+        s.commission_per_adult_cents as display_commission_per_adult,
+        s.commission_per_child_cents as display_commission_per_child
+       FROM experiences e
+       LEFT JOIN LATERAL (
+         SELECT price_per_adult_cents, price_per_child_cents, commission_per_adult_cents, commission_per_child_cents
+         FROM availability_slots
+         WHERE experience_id = e.id
+           AND start_time >= NOW()
+         ORDER BY start_time ASC
+         LIMIT 1
+       ) s ON true
+       WHERE e.id = $1 AND e.is_active = true`,
       [id],
     );
 
@@ -343,7 +362,21 @@ export class ExperiencesService {
 
   async findBySlug(resortId: string, slug: string, includeImages = false): Promise<ExperienceWithImages> {
     const result = await this.db.query<Experience>(
-      'SELECT * FROM experiences WHERE resort_id = $1 AND slug = $2 AND is_active = true',
+      `SELECT e.*,
+        s.price_per_adult_cents as display_price_per_adult,
+        s.price_per_child_cents as display_price_per_child,
+        s.commission_per_adult_cents as display_commission_per_adult,
+        s.commission_per_child_cents as display_commission_per_child
+       FROM experiences e
+       LEFT JOIN LATERAL (
+         SELECT price_per_adult_cents, price_per_child_cents, commission_per_adult_cents, commission_per_child_cents
+         FROM availability_slots
+         WHERE experience_id = e.id
+           AND start_time >= NOW()
+         ORDER BY start_time ASC
+         LIMIT 1
+       ) s ON true
+       WHERE e.resort_id = $1 AND e.slug = $2 AND e.is_active = true`,
       [resortId, slug],
     );
 
@@ -398,9 +431,22 @@ export class ExperiencesService {
    */
   async findRecommended(limit = 5, userId?: string): Promise<ExperienceWithImages[]> {
     const result = await this.db.query<Experience>(
-      `SELECT * FROM experiences 
-       WHERE status = 'active' AND is_active = true
-       ORDER BY rating_avg DESC, rating_count DESC 
+      `SELECT e.*,
+        s.price_per_adult_cents as display_price_per_adult,
+        s.price_per_child_cents as display_price_per_child,
+        s.commission_per_adult_cents as display_commission_per_adult,
+        s.commission_per_child_cents as display_commission_per_child
+       FROM experiences e
+       LEFT JOIN LATERAL (
+         SELECT price_per_adult_cents, price_per_child_cents, commission_per_adult_cents, commission_per_child_cents
+         FROM availability_slots
+         WHERE experience_id = e.id
+           AND start_time >= NOW()
+         ORDER BY start_time ASC
+         LIMIT 1
+       ) s ON true
+       WHERE e.status = 'active' AND e.is_active = true
+       ORDER BY e.rating_avg DESC, e.rating_count DESC 
        LIMIT $1`,
       [limit],
     );
@@ -517,8 +563,69 @@ export class ExperiencesService {
     // Set a special status value to bypass the active-only filter
     queryDto.include_all_statuses = true;
 
-    // Call standard findAll with the enforced filter
-    return this.findAllWithPrices(queryDto, user.sub);
+    // For management, use findAll directly WITHOUT currency conversion
+    // Prices stay in the original currency (COP)
+    const result = await this.findAll(queryDto);
+
+    // Set display_currency to match base currency for each experience
+    const dataWithCurrency = result.data.map(exp => ({
+      ...exp,
+      display_currency: exp.currency, // Always COP for management
+    }));
+
+    return {
+      ...result,
+      data: dataWithCurrency,
+    };
+  }
+
+  /**
+   * Find one experience for management (ignores is_active status and keeps base currency)
+   */
+  async findManagedOne(id: string, includeImages = false): Promise<ExperienceWithImages> {
+    const result = await this.db.query<Experience>(
+      `SELECT e.*,
+        s.price_per_adult_cents as display_price_per_adult,
+        s.price_per_child_cents as display_price_per_child,
+        s.commission_per_adult_cents as display_commission_per_adult,
+        s.commission_per_child_cents as display_commission_per_child
+       FROM experiences e
+       LEFT JOIN LATERAL (
+         SELECT price_per_adult_cents, price_per_child_cents, commission_per_adult_cents, commission_per_child_cents
+         FROM availability_slots
+         WHERE experience_id = e.id
+           AND start_time >= NOW()
+         ORDER BY start_time ASC
+         LIMIT 1
+       ) s ON true
+       WHERE e.id = $1`, // Removed is_active check for management
+      [id],
+    );
+
+    if (result.rows.length === 0) {
+      throw new NotFoundException('Experience not found');
+    }
+
+    const experience = result.rows[0];
+
+    // Always fetch locations for consistency
+    const locations = await this.getExperienceLocations([id]);
+
+    // Fetch slot info
+    const slotInfo = await this.getSlotInfo([id]);
+    const info = slotInfo.get(id);
+
+    // Optionally fetch images
+    const images = includeImages ? await this.getExperienceImages([id]) : undefined;
+
+    return {
+      ...experience,
+      locations,
+      images,
+      duration_minutes: info?.duration_minutes,
+      max_capacity: info?.max_capacity,
+      display_currency: experience.currency, // Force matching base currency
+    };
   }
 
   /**
@@ -566,6 +673,10 @@ export class ExperiencesService {
 
     // Build dynamic update query
     Object.entries(updateExperienceDto).forEach(([key, value]) => {
+      // Skip price fields if they slip through DTO
+      if (key.includes('price_per_') || key.includes('commission_per_')) {
+        return;
+      }
       if (value !== undefined) {
         updates.push(`${key} = $${paramIndex}`);
         params.push(value);
@@ -782,81 +893,39 @@ export class ExperiencesService {
 
       // Helper to convert a single experience
       const convertExperience = async (exp: T): Promise<T> => {
-        // Case 1: Experience currency matches user preference - no conversion needed
-        if (exp.currency === preferences.currency) {
+        // If no price info is available (e.g. no future slots), just set display currency
+        if (exp.display_price_per_adult === undefined || exp.display_price_per_adult === null) {
+          return { ...exp, display_currency: exp.currency };
+        }
+
+        const targetCurrency = preferences.currency;
+
+        // If matching currency, just set display currency
+        if (exp.currency === targetCurrency) {
           return {
             ...exp,
-            display_price_per_adult: exp.price_per_adult_cents,
-            display_price_per_child: exp.price_per_child_cents,
-            display_commission_per_adult: exp.commission_per_adult_cents ?? 0,
-            display_commission_per_child: exp.commission_per_child_cents ?? 0,
-            display_currency: exp.currency,
+            display_currency: targetCurrency
           };
         }
 
-        // Case 2: Get exchange rates for both currencies
-        const sourceRate = await this.exchangeRatesService.getRate(exp.currency);
-        const targetRate = await this.exchangeRatesService.getRate(preferences.currency);
-
-        if (!sourceRate || !targetRate) {
-          this.logger.log('Cannot convert - missing exchange rates', {
-            experienceCurrency: exp.currency,
-            userCurrency: preferences.currency,
-            experienceId: exp.id,
-            sourceRate,
-            targetRate,
-          });
-          return exp; // Return without display prices
-        }
-
-        // Case 3: Convert between any two currencies
-        const displayPricePerAdult = convertPrice({
-          sourceCurrency: exp.currency,
-          targetCurrency: preferences.currency,
-          priceCents: exp.price_per_adult_cents,
-          sourceRate: sourceRate,
-          targetRate: targetRate,
-        });
-
-        const displayPricePerChild = convertPrice({
-          sourceCurrency: exp.currency,
-          targetCurrency: preferences.currency,
-          priceCents: exp.price_per_child_cents,
-          sourceRate: sourceRate,
-          targetRate: targetRate,
-        });
-
-        const displayCommissionPerAdult = convertPrice({
-          sourceCurrency: exp.currency,
-          targetCurrency: preferences.currency,
-          priceCents: exp.commission_per_adult_cents ?? 0,
-          sourceRate: sourceRate,
-          targetRate: targetRate,
-        });
-
-        const displayCommissionPerChild = convertPrice({
-          sourceCurrency: exp.currency,
-          targetCurrency: preferences.currency,
-          priceCents: exp.commission_per_child_cents ?? 0,
-          sourceRate: sourceRate,
-          targetRate: targetRate,
-        });
-
-        this.logger.log('Price conversion applied', {
-          experienceId: exp.id,
-          from: exp.currency,
-          to: preferences.currency,
-          originalAdultPrice: exp.price_per_adult_cents,
-          displayAdultPrice: displayPricePerAdult,
-        });
+        // Convert all display price fields
+        // Use 0 as fallback for optional fields
+        const [
+          convAdult, convChild, convCommAdult, convCommChild
+        ] = await Promise.all([
+          this.exchangeRatesService.convertCents(exp.display_price_per_adult, exp.currency, targetCurrency),
+          this.exchangeRatesService.convertCents(exp.display_price_per_child || 0, exp.currency, targetCurrency),
+          this.exchangeRatesService.convertCents(exp.display_commission_per_adult || 0, exp.currency, targetCurrency),
+          this.exchangeRatesService.convertCents(exp.display_commission_per_child || 0, exp.currency, targetCurrency),
+        ]);
 
         return {
           ...exp,
-          display_price_per_adult: displayPricePerAdult,
-          display_price_per_child: displayPricePerChild,
-          display_commission_per_adult: displayCommissionPerAdult,
-          display_commission_per_child: displayCommissionPerChild,
-          display_currency: preferences.currency,
+          display_currency: targetCurrency,
+          display_price_per_adult: convAdult,
+          display_price_per_child: convChild,
+          display_commission_per_adult: convCommAdult,
+          display_commission_per_child: convCommChild,
         };
       };
 
