@@ -11,7 +11,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { UploadService, PresignedUrlOptions, PresignedUrlResult } from './upload.service';
-import { PresignImageDto, PresignedUrlResponse } from './dto/upload.dto';
+import { PresignImageDto, PresignDocumentDto, PresignedUrlResponse } from './dto/upload.dto';
 
 interface FastifyMultipartFile {
   toBuffer: () => Promise<Buffer>;
@@ -26,17 +26,27 @@ interface UploadBody {
   container?: string;
 }
 
+// Allowed types for documents (includes PDF)
+const DOCUMENT_ALLOWED_TYPES = [
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'application/pdf',
+];
+
 @Controller('api/v1/upload')
 export class UploadController {
   constructor(private readonly uploadService: UploadService) { }
 
   /**
-   * Generate presigned URL for file upload
+   * Generate presigned URL for image upload
    */
   @Post('presign')
   @HttpCode(HttpStatus.CREATED)
   async generatePresignedUrl(@Body() presignDto: PresignImageDto): Promise<PresignedUrlResponse> {
-    // Validate file type
+    // Validate file type (images only)
     if (!this.uploadService.validateFileType(presignDto.content_type)) {
       throw new BadRequestException('Invalid file type. Only images are allowed.');
     }
@@ -53,6 +63,33 @@ export class UploadController {
     return {
       upload_url: result.uploadUrl,
       image_url: result.blobUrl,
+      expires_in: result.expiresIn,
+    };
+  }
+
+  /**
+   * Generate presigned URL for document upload (includes PDF support)
+   */
+  @Post('presign-document')
+  @HttpCode(HttpStatus.CREATED)
+  async generateDocumentPresignedUrl(@Body() presignDto: PresignDocumentDto): Promise<PresignedUrlResponse> {
+    // Validate file type (images + PDF)
+    if (!this.uploadService.validateFileType(presignDto.content_type, DOCUMENT_ALLOWED_TYPES)) {
+      throw new BadRequestException('Invalid file type. Only images and PDF files are allowed.');
+    }
+
+    const options: PresignedUrlOptions = {
+      containerName: presignDto.container || 'resort-documents',
+      fileName: presignDto.filename,
+      contentType: presignDto.content_type,
+      expiresInMinutes: presignDto.expires_in_minutes || 60,
+    };
+
+    const result: PresignedUrlResult = await this.uploadService.generatePresignedUrl(options);
+
+    return {
+      upload_url: result.uploadUrl,
+      document_url: result.blobUrl,
       expires_in: result.expiresIn,
     };
   }

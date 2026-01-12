@@ -1,6 +1,6 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { S3Client, PutObjectCommand, DeleteObjectCommand, HeadObjectCommand, ListObjectsV2Command, CreateBucketCommand, HeadBucketCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, DeleteObjectCommand, HeadObjectCommand, ListObjectsV2Command, CreateBucketCommand, HeadBucketCommand, BucketLocationConstraint } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'crypto';
 import { AwsConfig } from '../config/aws.config';
@@ -312,7 +312,7 @@ export class UploadService {
           const createCommand = new CreateBucketCommand({
             Bucket: containerName,
             CreateBucketConfiguration: {
-              LocationConstraint: this.region !== 'us-east-1' ? (this.region as any) : undefined,
+              LocationConstraint: this.region !== 'us-east-1' ? (this.region as BucketLocationConstraint) : undefined,
             },
           });
           await this.s3Client.send(createCommand);
