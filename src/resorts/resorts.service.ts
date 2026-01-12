@@ -569,4 +569,80 @@ export class ResortsService {
 
     this.logger.logBusinessEvent('resort_document_deleted', { resortId, docId, userId });
   }
+
+  // ==================== Reviews Management ====================
+
+  async getReviewsByResort(resortId: string): Promise<{
+    reviews: {
+      id: string;
+      experience_id: string;
+      user_id: string | null;
+      booking_id: string | null;
+      rating: number;
+      comment: string | null;
+      created_at: string;
+      user_full_name: string | null;
+      user_avatar: string | null;
+      experience_title: string;
+    }[];
+    stats: {
+      average_rating: number;
+      total_reviews: number;
+      reviews_this_month: number;
+    };
+  }> {
+    // Verify resort exists
+    await this.findOne(resortId);
+
+    // Fetch reviews with user and experience info
+    const reviewsResult = await this.db.query(`
+      SELECT r.id, r.experience_id, r.user_id, r.booking_id, r.rating, r.comment, r.created_at,
+             u.full_name as user_full_name, 
+             u.avatar as user_avatar,
+             e.title as experience_title
+      FROM reviews r
+      INNER JOIN experiences e ON r.experience_id = e.id
+      LEFT JOIN users u ON r.user_id = u.id
+      WHERE e.resort_id = $1
+      ORDER BY r.created_at DESC
+    `, [resortId]);
+
+    // Get aggregate stats
+    const statsResult = await this.db.query(`
+      SELECT 
+        COALESCE(AVG(r.rating), 0) as average_rating,
+        COUNT(r.id) as total_reviews,
+        COUNT(CASE WHEN r.created_at >= date_trunc('month', CURRENT_DATE) THEN 1 END) as reviews_this_month
+      FROM reviews r
+      INNER JOIN experiences e ON r.experience_id = e.id
+      WHERE e.resort_id = $1
+    `, [resortId]);
+
+    const statsRow = statsResult.rows[0];
+
+    this.logger.logBusinessEvent('resort_reviews_fetched', {
+      resortId,
+      reviewsCount: reviewsResult.rows.length,
+    });
+
+    return {
+      reviews: reviewsResult.rows.map((row) => ({
+        id: row.id as string,
+        experience_id: row.experience_id as string,
+        user_id: row.user_id as string | null,
+        booking_id: row.booking_id as string | null,
+        rating: row.rating as number,
+        comment: row.comment as string | null,
+        created_at: (row.created_at as Date).toISOString(),
+        user_full_name: row.user_full_name as string | null,
+        user_avatar: row.user_avatar as string | null,
+        experience_title: row.experience_title as string,
+      })),
+      stats: {
+        average_rating: parseFloat(statsRow?.average_rating as string) || 0,
+        total_reviews: parseInt(statsRow?.total_reviews as string) || 0,
+        reviews_this_month: parseInt(statsRow?.reviews_this_month as string) || 0,
+      }
+    };
+  }
 }

@@ -604,7 +604,32 @@ VALUES
   -- 2. Fiesta en Bote Deportivo Cholón
   ((SELECT id FROM users WHERE email='sofia.turista@gmail.com'),
    (SELECT id FROM experiences WHERE title='Fiesta en Bote Deportivo Cholón'), 
-   5, '¡La mejor fiesta de mi vida! Muy recomendado ir con amigos.', now() - INTERVAL '1 day');
+   5, '¡La mejor fiesta de mi vida! Muy recomendado ir con amigos.', now() - INTERVAL '1 day'),
+
+  -- 3. Tours Islas + Playa Tranquila (Isla Brisa)
+  ((SELECT id FROM users WHERE email='sofia.turista@gmail.com'),
+   (SELECT id FROM experiences WHERE title='Tours Islas + Playa Tranquila'), 
+   5, 'Excelente tour, muy relajante. Vale la pena totalmente.', now() - INTERVAL '5 days'),
+
+  -- 4. Palmarito Beach (Isla Brisa)
+  ((SELECT id FROM users WHERE email='john.doe@usmail.com'),
+   (SELECT id FROM experiences WHERE title='Palmarito Beach'), 
+   4, 'Buena comida y playa limpia, aunque estaba un poco lleno.', now() - INTERVAL '1 week'),
+
+  -- 5. Luxury Open Bar Area House (Isla Brisa)
+  ((SELECT id FROM users WHERE email='sofia.turista@gmail.com'),
+   (SELECT id FROM experiences WHERE title='Luxury Open Bar Area House'), 
+   5, 'Increíble lugar, el bar abierto vale la pena. Muy exclusivo.', now() - INTERVAL '3 days'),
+
+  -- 6. Tamarindo Beach (Isla Brisa)
+  ((SELECT id FROM users WHERE email='john.doe@usmail.com'),
+   (SELECT id FROM experiences WHERE title='Tamarindo Beach'), 
+   3, 'El lugar es bonito pero el servicio en el restaurante demoró un poco.', now() - INTERVAL '2 weeks'),
+
+  -- 7. Tours Islas + Playa Tranquila (Isla Brisa) - Otro review
+  ((SELECT id FROM users WHERE email='john.doe@usmail.com'),
+   (SELECT id FROM experiences WHERE title='Tours Islas + Playa Tranquila'), 
+   4, 'Muy bonito todo, el oceanario es espectacular.', now() - INTERVAL '10 days');
 -- ===========================
 -- BLOQUE 4: SISTEMA DE AGENTES
 -- Creación de usuario agente, acuerdo comercial y simulación de venta

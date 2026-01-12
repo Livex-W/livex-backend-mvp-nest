@@ -284,6 +284,24 @@ export class ResortsController {
     });
   }
 
+  // ==================== Reviews Management ====================
+
+  @Get(':id/reviews')
+  @Throttle({ default: { limit: 30, ttl: 60000 } }) // 30 requests per minute
+  @UseGuards(RolesGuard)
+  @Roles('resort', 'admin')
+  async getResortReviews(@Param('id', ParseUUIDPipe) id: string, @Request() req: any) {
+    this.logger.logRequest({
+      method: 'GET',
+      url: '/api/v1/resorts/:id/reviews',
+      userId: req.user.id,
+      role: req.user.role,
+      resortId: id
+    });
+
+    return this.resortsService.getReviewsByResort(id);
+  }
+
   // ==================== Document Management ====================
 
   @Post(':id/documents')
