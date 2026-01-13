@@ -72,6 +72,14 @@ DO $$ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'outbox_status') THEN
         CREATE TYPE outbox_status AS ENUM ('pending','sent','failed');
     END IF;
+
+    -- Reservas BNG (Agentes)
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'booking_source') THEN
+        CREATE TYPE booking_source AS ENUM ('app','bng');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'agent_payment_type') THEN
+        CREATE TYPE agent_payment_type AS ENUM ('full_at_resort','deposit_to_agent','commission_to_agent');
+    END IF;
 END $$;
 
 -- Función global para updated_at
@@ -229,7 +237,8 @@ CREATE TABLE IF NOT EXISTS resort_agents (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     resort_id uuid REFERENCES resorts(id), -- Nullable for global agents/influencers
     user_id uuid NOT NULL REFERENCES users(id),
-    commission_bps integer NOT NULL CHECK (commission_bps >= 0 AND commission_bps <= 10000), 
+    commission_bps integer NOT NULL DEFAULT 0 CHECK (commission_bps >= 0 AND commission_bps <= 10000), 
+    commission_fixed_cents integer NOT NULL DEFAULT 0 CHECK (commission_fixed_cents >= 0),
     is_active boolean DEFAULT true,
     created_at timestamptz DEFAULT now(),
     updated_at timestamptz DEFAULT now(),
@@ -505,6 +514,9 @@ CREATE TABLE IF NOT EXISTS bookings (
   experience_id  uuid NOT NULL REFERENCES experiences(id) ON DELETE CASCADE,
   slot_id        uuid NOT NULL REFERENCES availability_slots(id) ON DELETE CASCADE,
   
+  -- Origen de la reserva
+  booking_source booking_source NOT NULL DEFAULT 'app',
+  
   -- Detalles
   adults         integer NOT NULL CHECK (adults >= 0),
   children       integer NOT NULL DEFAULT 0 CHECK (children >= 0),
@@ -514,10 +526,20 @@ CREATE TABLE IF NOT EXISTS bookings (
   subtotal_cents    integer NOT NULL DEFAULT 0,
   tax_cents         integer NOT NULL DEFAULT 0,
   
-  -- Nuevas Columnas Integradas
+  -- Comisión LIVEX (solo para booking_source = 'app')
   commission_cents  integer NOT NULL DEFAULT 0 CHECK (commission_cents >= 0),
   resort_net_cents  integer NOT NULL DEFAULT 0 CHECK (resort_net_cents >= 0),
   vip_discount_cents integer NOT NULL DEFAULT 0 CHECK (vip_discount_cents >= 0),
+  
+  -- Comisión Agente (solo para booking_source = 'bng' con agent_id)
+  agent_commission_per_adult_cents integer NOT NULL DEFAULT 0 CHECK (agent_commission_per_adult_cents >= 0),
+  agent_commission_per_child_cents integer NOT NULL DEFAULT 0 CHECK (agent_commission_per_child_cents >= 0),
+  agent_commission_cents integer NOT NULL DEFAULT 0 CHECK (agent_commission_cents >= 0),
+  
+  -- Distribución de pagos BNG
+  agent_payment_type agent_payment_type,
+  amount_paid_to_agent_cents integer NOT NULL DEFAULT 0 CHECK (amount_paid_to_agent_cents >= 0),
+  amount_paid_to_resort_cents integer NOT NULL DEFAULT 0 CHECK (amount_paid_to_resort_cents >= 0),
   
   total_cents       integer NOT NULL CHECK (total_cents >= 0),
   
@@ -539,8 +561,15 @@ CREATE TABLE IF NOT EXISTS bookings (
 );
 
 -- Comentarios sobre columnas integradas
-COMMENT ON COLUMN bookings.commission_cents IS 'LIVEX commission amount charged online at booking time';
-COMMENT ON COLUMN bookings.resort_net_cents IS 'Resort net amount to be paid on-site by the customer';
+COMMENT ON COLUMN bookings.booking_source IS 'Origin: app = mobile with online payment, bng = web panel without online payment';
+COMMENT ON COLUMN bookings.commission_cents IS 'LIVEX commission amount charged online (only for booking_source = app)';
+COMMENT ON COLUMN bookings.resort_net_cents IS 'Resort net amount (base price without commissions)';
+COMMENT ON COLUMN bookings.agent_commission_per_adult_cents IS 'Agent commission per adult (set by agent, only for BNG)';
+COMMENT ON COLUMN bookings.agent_commission_per_child_cents IS 'Agent commission per child (set by agent, only for BNG)';
+COMMENT ON COLUMN bookings.agent_commission_cents IS 'Total agent commission = (per_adult × adults) + (per_child × children)';
+COMMENT ON COLUMN bookings.agent_payment_type IS 'How BNG payment is distributed: full_at_resort, deposit_to_agent, commission_to_agent';
+COMMENT ON COLUMN bookings.amount_paid_to_agent_cents IS 'Amount client paid directly to agent (physical payment)';
+COMMENT ON COLUMN bookings.amount_paid_to_resort_cents IS 'Amount client paid/will pay at resort (physical payment)';
 
 CREATE INDEX IF NOT EXISTS idx_bookings_user ON bookings(user_id);
 CREATE INDEX IF NOT EXISTS idx_bookings_experience ON bookings(experience_id);

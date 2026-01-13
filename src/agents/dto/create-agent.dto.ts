@@ -1,4 +1,4 @@
-import { IsEmail, IsInt, IsOptional, IsString, IsUUID, Max, Min, MinLength } from 'class-validator';
+import { IsEmail, IsInt, IsOptional, IsString, IsUUID, Max, Min, MinLength, IsIn } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreateAgentDto {
@@ -13,9 +13,16 @@ export class CreateAgentDto {
     @MinLength(6)
     password!: string;
 
-    @IsOptional()
     @IsString()
-    phone?: string;
+    phone!: string;
+
+    @IsString()
+    @IsIn(['CC', 'NIT', 'CE', 'PASSPORT'])
+    documentType!: string;
+
+    @IsString()
+    @MinLength(5)
+    documentNumber!: string;
 
     @IsOptional()
     @IsUUID()
@@ -27,4 +34,10 @@ export class CreateAgentDto {
     @Min(0)
     @Max(10000)
     commissionBps?: number;
+
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(0)
+    commissionFixedCents?: number;
 }

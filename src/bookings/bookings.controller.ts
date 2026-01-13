@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import { BookingsService, type PendingBookingResult } from './bookings.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
+import { CreateAgentBookingDto } from './dto/create-agent-booking.dto';
 import { CancelBookingDto } from './dto/cancel-booking.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -33,6 +34,40 @@ export class BookingsController {
     private readonly logger: CustomLoggerService,
     private readonly paymentsService: PaymentsService,
   ) { }
+
+  @Post('agent')
+  @Roles(USER_ROLES[3])
+  @HttpCode(HttpStatus.CREATED)
+  async createAgentBooking(
+    @Body() dto: CreateAgentBookingDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    this.logger.logBusinessEvent('agent_booking_create_request', {
+      agentId: user.sub,
+      slotId: dto.slotId,
+    });
+
+    // TODO: Get resortId from agent profile or context.
+    // For now using a placeholder as it's only used for logging in the service.
+    const resortId = '00000000-0000-0000-0000-000000000000';
+
+    return await this.bookingsService.createAgentBooking(user.sub, resortId, dto);
+  }
+
+  @Get('agent')
+  @Roles(USER_ROLES[3])
+  async getAgentBookings(
+    @Query() paginationDto: PaginationDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    this.logger.logBusinessEvent('agent_bookings_list_request', {
+      agentId: user.sub,
+      page: paginationDto.page,
+      limit: paginationDto.limit,
+    });
+
+    return await this.bookingsService.getAgentBookings(user.sub, paginationDto);
+  }
 
   @Get()
   @Roles(USER_ROLES[0])

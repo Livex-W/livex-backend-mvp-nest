@@ -7,13 +7,30 @@ export interface Booking {
     user_id: string;
     experience_id: string;
     slot_id: string;
+
+    // Source of booking
+    booking_source: 'app' | 'bng';
+
     adults: number;
     children: number;
     subtotal_cents: number;
     tax_cents: number;
+
+    // LIVEX commission (only for app)
     commission_cents: number;
     resort_net_cents: number;
     vip_discount_cents: number;
+
+    // Agent commission (only for BNG)
+    agent_commission_per_adult_cents: number;
+    agent_commission_per_child_cents: number;
+    agent_commission_cents: number;
+
+    // BNG payment distribution
+    agent_payment_type?: 'full_at_resort' | 'deposit_to_agent' | 'commission_to_agent';
+    amount_paid_to_agent_cents: number;
+    amount_paid_to_resort_cents: number;
+
     total_cents: number;
     currency: string;
     status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'refunded' | 'expired';

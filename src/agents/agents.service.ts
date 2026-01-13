@@ -53,19 +53,22 @@ export class AgentsService {
             fullName: dto.fullName,
             role: 'agent',
             phone: dto.phone,
+            documentType: dto.documentType,
+            documentNumber: dto.documentNumber,
         });
 
         await this.db.query(
-            `INSERT INTO resort_agents (resort_id, user_id, commission_bps)
-                VALUES ($1, $2, $3)
+            `INSERT INTO resort_agents (resort_id, user_id, commission_bps, commission_fixed_cents)
+                VALUES ($1, $2, $3, $4)
                 ON CONFLICT (resort_id, user_id) DO NOTHING`,
-            [resortId, newUser.id, dto.commissionBps || 0],
+            [resortId, newUser.id, dto.commissionBps || 0, dto.commissionFixedCents || 0],
         );
 
         return {
             ...newUser,
             resortId,
             commissionBps: dto.commissionBps || 0,
+            commissionFixedCents: dto.commissionFixedCents || 0,
         };
     }
 

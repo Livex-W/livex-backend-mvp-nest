@@ -159,6 +159,99 @@ export class BookingsService {
     };
   }
 
+  /**
+   * Get bookings created by an agent
+   */
+  async getAgentBookings(
+    agentId: string,
+    paginationDto: PaginationDto,
+  ): Promise<PaginatedResult<BookingWithDetailsDto>> {
+    const { page = 1, limit = 20 } = paginationDto;
+    const offset = (page - 1) * limit;
+
+    // Count total bookings for agent
+    const countResult = await this.db.query<{ count: string }>(
+      'SELECT COUNT(*) as count FROM bookings WHERE agent_id = $1',
+      [agentId],
+    );
+    const total = parseInt(countResult.rows[0]?.count || '0', 10);
+
+    // Fetch bookings with experience, slot, and client details
+    const query = `
+      SELECT 
+        b.id,
+        b.user_id,
+        b.agent_id,
+        b.experience_id,
+        b.slot_id,
+        b.adults,
+        b.children,
+        b.subtotal_cents,
+        b.tax_cents,
+        b.total_cents,
+        b.resort_net_cents,
+        b.agent_commission_cents,
+        b.agent_commission_per_adult_cents,
+        b.agent_commission_per_child_cents,
+        b.agent_payment_type,
+        b.amount_paid_to_agent_cents,
+        b.amount_paid_to_resort_cents,
+        b.currency,
+        b.status,
+        b.booking_source,
+        b.cancel_reason,
+        b.created_at,
+        b.updated_at,
+        json_build_object(
+          'id', e.id,
+          'title', e.title,
+          'slug', e.slug,
+          'main_image_url', COALESCE(
+            (SELECT ei.url FROM experience_images ei 
+             WHERE ei.experience_id = e.id AND ei.image_type = 'hero' 
+             ORDER BY ei.sort_order ASC LIMIT 1),
+            ''
+          ),
+          'category', e.category,
+          'currency', e.currency
+        ) as experience,
+        json_build_object(
+          'id', s.id,
+          'start_time', s.start_time,
+          'end_time', s.end_time
+        ) as slot,
+        json_build_object(
+          'id', u.id,
+          'full_name', u.full_name,
+          'email', u.email,
+          'phone', u.phone
+        ) as client
+      FROM bookings b
+      LEFT JOIN experiences e ON e.id = b.experience_id
+      LEFT JOIN availability_slots s ON s.id = b.slot_id
+      LEFT JOIN users u ON u.id = b.user_id
+      WHERE b.agent_id = $1
+      ORDER BY b.created_at DESC
+      LIMIT $2 OFFSET $3
+    `;
+
+    const result = await this.db.query<BookingWithDetailsDto>(query, [agentId, limit, offset]);
+
+    const meta: PaginationMeta = {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+      hasNextPage: page < Math.ceil(total / limit),
+      hasPreviousPage: page > 1,
+    };
+
+    return {
+      data: result.rows,
+      meta,
+    };
+  }
+
   async findActivePendingBooking(userId: string, experienceId: string): Promise<(Booking & { start_time?: string }) | null> {
     const query = `
       SELECT b.*, s.start_time 
@@ -1078,4 +1171,173 @@ export class BookingsService {
       return bookings;
     }
   }
+
+  /**
+   * Create a booking from BNG (agent panel) - No online payment.
+   * The agent defines their commission per adult/child.
+   */
+  async createAgentBooking(
+    agentId: string,
+    resortId: string,
+    dto: {
+      slotId: string;
+      experienceId: string;
+      adults: number;
+      children: number;
+      agentCommissionPerAdultCents: number;
+      agentCommissionPerChildCents: number;
+      agentPaymentType: 'full_at_resort' | 'deposit_to_agent' | 'commission_to_agent';
+      amountPaidToAgentCents: number;
+      clientUserId?: string;
+      clientName?: string;
+      clientPhone?: string;
+      clientEmail?: string;
+    },
+  ): Promise<Booking> {
+    return await this.db.transaction(async (client) => {
+      // 1. Get slot info and calculate resort net (base price)
+      const slotResult = await client.query<{
+        price_per_adult_cents: number;
+        price_per_child_cents: number;
+        currency: string;
+        capacity: number;
+      }>(
+        `SELECT s.price_per_adult_cents, s.price_per_child_cents, e.currency, s.capacity
+         FROM availability_slots s
+         JOIN experiences e ON e.id = s.experience_id
+         WHERE s.id = $1`,
+        [dto.slotId],
+      );
+
+      if (slotResult.rows.length === 0) {
+        throw new NotFoundException('Slot not found');
+      }
+
+      const slot = slotResult.rows[0];
+
+      // 2. Check capacity
+      const remaining = await this.lockSlotCapacity(
+        client,
+        dto.slotId,
+        dto.adults,
+        dto.children,
+      );
+      if (remaining == null || remaining < 0) {
+        throw new BadRequestException('Insufficient capacity');
+      }
+
+      // 3. Calculate amounts
+      const resortNetCents =
+        slot.price_per_adult_cents * dto.adults +
+        slot.price_per_child_cents * dto.children;
+
+      const agentCommissionCents =
+        dto.agentCommissionPerAdultCents * dto.adults +
+        dto.agentCommissionPerChildCents * dto.children;
+
+      const totalCents = resortNetCents + agentCommissionCents;
+
+      // Amount paid to resort = total - what agent received
+      const amountPaidToResortCents = totalCents - dto.amountPaidToAgentCents;
+
+      // Validate payment distribution
+      if (dto.amountPaidToAgentCents + amountPaidToResortCents !== totalCents) {
+        throw new BadRequestException('Payment distribution does not match total');
+      }
+
+      // 4. Determine or create client user
+      let clientUserId = dto.clientUserId;
+      if (!clientUserId && dto.clientEmail) {
+        // Check if user exists by email
+        const existingUser = await client.query<{ id: string }>(
+          'SELECT id FROM users WHERE email = $1',
+          [dto.clientEmail],
+        );
+        if (existingUser.rows.length > 0) {
+          clientUserId = existingUser.rows[0].id;
+        } else {
+          // Create new user
+          const newUser = await client.query<{ id: string }>(
+            `INSERT INTO users (email, full_name, phone, role) 
+             VALUES ($1, $2, $3, 'tourist') 
+             RETURNING id`,
+            [dto.clientEmail, dto.clientName, dto.clientPhone],
+          );
+          clientUserId = newUser.rows[0].id;
+        }
+      }
+
+      if (!clientUserId) {
+        throw new BadRequestException('Client user ID or email is required');
+      }
+
+      // 5. Insert booking
+      const bookingResult = await client.query<Booking>(
+        `INSERT INTO bookings (
+          user_id,
+          experience_id,
+          slot_id,
+          booking_source,
+          adults,
+          children,
+          subtotal_cents,
+          tax_cents,
+          commission_cents,
+          resort_net_cents,
+          agent_commission_per_adult_cents,
+          agent_commission_per_child_cents,
+          agent_commission_cents,
+          agent_payment_type,
+          amount_paid_to_agent_cents,
+          amount_paid_to_resort_cents,
+          total_cents,
+          currency,
+          status,
+          agent_id
+        ) VALUES ($1,$2,$3,'bng',$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,'confirmed',$18)
+        RETURNING *`,
+        [
+          clientUserId,
+          dto.experienceId,
+          dto.slotId,
+          dto.adults,
+          dto.children,
+          resortNetCents + agentCommissionCents, // subtotal
+          0, // tax
+          0, // LIVEX commission (0 for BNG)
+          resortNetCents,
+          dto.agentCommissionPerAdultCents,
+          dto.agentCommissionPerChildCents,
+          agentCommissionCents,
+          dto.agentPaymentType,
+          dto.amountPaidToAgentCents,
+          amountPaidToResortCents,
+          totalCents,
+          slot.currency,
+          agentId,
+        ],
+      );
+
+      const booking = bookingResult.rows[0];
+
+      // 6. Create inventory lock (consumed immediately since it's confirmed)
+      await client.query(
+        `INSERT INTO inventory_locks (slot_id, user_id, booking_id, quantity, expires_at, consumed_at)
+         VALUES ($1, $2, $3, $4, NOW(), NOW())`,
+        [dto.slotId, clientUserId, booking.id, dto.adults + dto.children],
+      );
+
+      this.logger.logBusinessEvent('agent_booking_created', {
+        bookingId: booking.id,
+        agentId,
+        resortId,
+        totalCents,
+        agentCommissionCents,
+        paymentType: dto.agentPaymentType,
+      });
+
+      return booking;
+    });
+  }
 }
+
