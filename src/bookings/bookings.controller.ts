@@ -69,6 +69,21 @@ export class BookingsController {
     return await this.bookingsService.getAgentBookings(user.sub, paginationDto);
   }
 
+  @Get('resort')
+  @Roles(USER_ROLES[1])
+  async getResortBookings(
+    @Query() paginationDto: PaginationDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    this.logger.logBusinessEvent('resort_bookings_list_request', {
+      resortUserId: user.sub,
+      page: paginationDto.page,
+      limit: paginationDto.limit,
+    });
+
+    return await this.bookingsService.getResortBookings(user.sub, paginationDto);
+  }
+
   @Get()
   @Roles(USER_ROLES[0])
   async getUserBookings(

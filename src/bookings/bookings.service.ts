@@ -252,6 +252,112 @@ export class BookingsService {
     };
   }
 
+  /**
+   * Get bookings for a resort (based on logged in resort owner)
+   */
+  async getResortBookings(
+    resortUserId: string,
+    paginationDto: PaginationDto,
+  ): Promise<PaginatedResult<BookingWithDetailsDto>> {
+    const { page = 1, limit = 20 } = paginationDto;
+    const offset = (page - 1) * limit;
+
+    // Count total bookings for resort
+    const countQuery = `
+      SELECT COUNT(b.id) as count 
+      FROM bookings b
+      JOIN experiences e ON e.id = b.experience_id
+      JOIN resorts r ON r.id = e.resort_id
+      WHERE r.owner_user_id = $1
+    `;
+    const countResult = await this.db.query<{ count: string }>(countQuery, [resortUserId]);
+    const total = parseInt(countResult.rows[0]?.count || '0', 10);
+
+    // Fetch bookings with details
+    const query = `
+      SELECT 
+        b.id,
+        b.user_id,
+        b.agent_id,
+        b.experience_id,
+        b.slot_id,
+        b.adults,
+        b.children,
+        b.subtotal_cents,
+        b.tax_cents,
+        b.total_cents,
+        b.resort_net_cents,
+        b.agent_commission_cents,
+        b.agent_commission_per_adult_cents,
+        b.agent_commission_per_child_cents,
+        b.agent_payment_type,
+        b.amount_paid_to_agent_cents,
+        b.amount_paid_to_resort_cents,
+        b.currency,
+        b.status,
+        b.booking_source,
+        b.cancel_reason,
+        b.created_at,
+        b.updated_at,
+        json_build_object(
+          'id', e.id,
+          'title', e.title,
+          'slug', e.slug,
+          'main_image_url', COALESCE(
+            (SELECT ei.url FROM experience_images ei 
+             WHERE ei.experience_id = e.id AND ei.image_type = 'hero' 
+             ORDER BY ei.sort_order ASC LIMIT 1),
+            ''
+          ),
+          'category', e.category,
+          'currency', e.currency
+        ) as experience,
+        json_build_object(
+          'id', s.id,
+          'start_time', s.start_time,
+          'end_time', s.end_time
+        ) as slot,
+        json_build_object(
+          'id', u.id,
+          'full_name', u.full_name,
+          'email', u.email,
+          'phone', u.phone
+        ) as client,
+        CASE WHEN b.agent_id IS NOT NULL THEN
+          json_build_object(
+             'id', ag.id,
+             'full_name', ag.full_name,
+             'email', ag.email
+          )
+        ELSE NULL END as agent
+      FROM bookings b
+      JOIN experiences e ON e.id = b.experience_id
+      JOIN resorts r ON r.id = e.resort_id
+      LEFT JOIN availability_slots s ON s.id = b.slot_id
+      LEFT JOIN users u ON u.id = b.user_id
+      LEFT JOIN users ag ON ag.id = b.agent_id
+      WHERE r.owner_user_id = $1
+      ORDER BY b.created_at DESC
+      LIMIT $2 OFFSET $3
+    `;
+
+    const result = await this.db.query<BookingWithDetailsDto>(query, [resortUserId, limit, offset]);
+
+    const meta: PaginationMeta = {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+      hasNextPage: page < Math.ceil(total / limit),
+      hasPreviousPage: page > 1,
+    };
+
+    return {
+      data: result.rows,
+      meta,
+    };
+  }
+
   async findActivePendingBooking(userId: string, experienceId: string): Promise<(Booking & { start_time?: string }) | null> {
     const query = `
       SELECT b.*, s.start_time 
