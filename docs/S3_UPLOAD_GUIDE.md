@@ -70,3 +70,140 @@ Este endpoint recibe el archivo y lo sube inmediatamente a S3.
 - **GET**: Las imágenes se obtienen al consultar la experiencia con `?include_images=true`.
 - **Reordenar**: Endpoint `PATCH /api/v1/experiences/:id/images/reorder` permite cambiar el orden visual sin resubir archivos.
 - **Borrar**: `DELETE /api/v1/experiences/:id/images/:imageId` elimina el registro y el objeto en S3 (si es posible).
+
+---
+
+## 5. Subida de Documentos de Resorts
+
+Además de imágenes de experiencias, el sistema permite subir documentos legales de resorts (cámara de comercio, RUT, RNT, etc.).
+
+### Endpoint: `POST /api/v1/resorts/:id/documents/upload`
+
+**Autenticación:** Bearer Token (roles: `resort`, `admin`)
+
+**Headers:**
+- `Content-Type`: `multipart/form-data`
+- `Authorization`: `Bearer {token}`
+
+**Body (Form-Data):**
+
+| Key | Type | Requerido | Descripción |
+| :--- | :--- | :--- | :--- |
+| `file` | File | Sí | El archivo (imagen o PDF) |
+| `doc_type` | Text | Sí | Tipo de documento (ver tabla abajo) |
+
+**Tipos de documento (`doc_type`):**
+
+| Valor | Descripción |
+| :--- | :--- |
+| `camara_comercio` | Certificado de Cámara de Comercio |
+| `rut_nit` | RUT o NIT del negocio |
+| `rnt` | Registro Nacional de Turismo |
+| `other` | Otros documentos |
+
+**Tipos de archivo permitidos:**
+- Imágenes: `image/jpeg`, `image/png`, `image/webp`, `image/gif`
+- Documentos: `application/pdf`
+
+### Respuesta Exitosa (201)
+
+```json
+{
+  "document_url": "https://bucket.s3.region.amazonaws.com/docs/resort-slug/rut_nit/2026-01-13-uuid.pdf",
+  "document": {
+    "id": "uuid",
+    "doc_type": "rut_nit",
+    "file_url": "https://...",
+    "status": "uploaded",
+    "rejection_reason": null,
+    "reviewed_at": null,
+    "uploaded_at": "2026-01-13T20:00:00.000Z",
+    "created_at": "2026-01-13T20:00:00.000Z",
+    "updated_at": "2026-01-13T20:00:00.000Z"
+  }
+}
+```
+
+### Estructura de Carpetas en S3
+
+Los documentos se organizan bajo la carpeta `docs/`:
+
+```
+docs/
+├── resort-slug-1/
+│   ├── camara_comercio/
+│   │   └── 2026-01-13-uuid.pdf
+│   ├── rut_nit/
+│   │   └── 2026-01-13-uuid.pdf
+│   └── rnt/
+│       └── 2026-01-13-uuid.jpg
+└── resort-slug-2/
+    └── ...
+```
+
+### Ejemplo con cURL
+
+```bash
+curl -X POST "http://localhost:3000/api/v1/resorts/{resortId}/documents/upload" \
+  -H "Authorization: Bearer {token}" \
+  -F "file=@./documento.pdf" \
+  -F "doc_type=rut_nit"
+```
+
+### Ejemplo con JavaScript
+
+```javascript
+const uploadDocument = async (resortId, file, docType, token) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('doc_type', docType);
+
+  const response = await fetch(`/api/v1/resorts/${resortId}/documents/upload`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  return response.json();
+};
+```
+
+---
+
+## 6. Eliminación de Documentos de Resorts
+
+### Endpoint: `DELETE /api/v1/resorts/:id/documents/:docId`
+
+**Autenticación:** Bearer Token (roles: `resort`, `admin`)
+
+Este endpoint:
+1. Verifica permisos (solo el dueño del resort o admin)
+2. Elimina el archivo de S3
+3. Elimina el registro de la base de datos
+
+**Respuesta Exitosa:** `204 No Content`
+
+### Ejemplo con cURL
+
+```bash
+curl -X DELETE "http://localhost:3000/api/v1/resorts/{resortId}/documents/{docId}" \
+  -H "Authorization: Bearer {token}"
+```
+
+---
+
+## 7. Estados de Documentos
+
+Los documentos tienen un flujo de revisión:
+
+| Estado | Descripción |
+| :--- | :--- |
+| `uploaded` | Documento recién subido, pendiente de revisión |
+| `under_review` | En proceso de revisión por admin |
+| `approved` | Documento aprobado |
+| `rejected` | Documento rechazado (ver `rejection_reason`) |
+
+Los administradores pueden aprobar o rechazar documentos desde el panel de administración.
+

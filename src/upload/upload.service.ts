@@ -371,4 +371,35 @@ export class UploadService {
       return `experiences/${resortSlug}/${experienceSlug}/gallery/${index}-${uuid}.${extension}`;
     }
   }
+
+  /**
+   * Generate professional blob path for resort documents
+   * Structure: docs/{resortSlug}/{docType}/{uuid}.{extension}
+   */
+  generateDocumentBlobPath(
+    resortSlug: string,
+    docType: string,
+    fileName: string
+  ): string {
+    const extension = this.getFileExtensionFromName(fileName);
+    const uuid = randomUUID();
+    const timestamp = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+
+    return `docs/${resortSlug}/${docType}/${timestamp}-${uuid}.${extension}`;
+  }
+
+  /**
+   * Allowed document types for resort documents (images + PDF)
+   */
+  validateDocumentType(contentType: string): boolean {
+    const allowedTypes = [
+      'image/jpeg',
+      'image/jpg',
+      'image/png',
+      'image/webp',
+      'image/gif',
+      'application/pdf',
+    ];
+    return allowedTypes.includes(contentType.toLowerCase());
+  }
 }
