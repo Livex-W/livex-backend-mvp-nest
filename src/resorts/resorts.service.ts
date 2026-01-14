@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException, ForbiddenException,
 import { DatabaseClient } from '../database/database.client';
 import { DATABASE_CLIENT } from '../database/database.module';
 import { CustomLoggerService } from '../common/services/logger.service';
+import { UploadService } from '../upload/upload.service';
 import { CreateResortDto } from './dto/create-resort.dto';
 import { UpdateResortDto } from './dto/update-resort.dto';
 import { ApproveResortDto, RejectResortDto } from './dto/approve-resort.dto';
@@ -21,6 +22,7 @@ export class ResortsService {
   constructor(
     @Inject(DATABASE_CLIENT) private readonly db: DatabaseClient,
     private readonly logger: CustomLoggerService,
+    private readonly uploadService: UploadService,
   ) { }
 
   async create(createResortDto: CreateResortDto, userId: string): Promise<Resort> {
@@ -558,16 +560,105 @@ export class ResortsService {
       throw new ForbiddenException('You do not have permission to delete documents from this resort');
     }
 
-    const result = await this.db.query(
-      'DELETE FROM resort_documents WHERE id = $1 AND resort_id = $2 RETURNING id',
+    // Get document record first to get the file_url
+    const docResult = await this.db.query<{ id: string; file_url: string }>(
+      'SELECT id, file_url FROM resort_documents WHERE id = $1 AND resort_id = $2',
       [docId, resortId]
     );
 
-    if (result.rows.length === 0) {
+    if (docResult.rows.length === 0) {
       throw new NotFoundException('Document not found');
     }
 
+    const document = docResult.rows[0];
+
+    // Extract blob name from URL and delete from S3
+    const blobName = this.uploadService.extractBlobNameFromUrl(document.file_url);
+    if (blobName) {
+      try {
+        await this.uploadService.deleteFile('', blobName);
+        this.logger.logBusinessEvent('resort_document_file_deleted', { resortId, docId, blobName });
+      } catch (error) {
+        // Log error but don't fail the operation if blob doesn't exist
+        console.warn(`Failed to delete blob ${blobName}:`, error instanceof Error ? error.message : 'Unknown error');
+      }
+    }
+
+    // Remove from database
+    await this.db.query(
+      'DELETE FROM resort_documents WHERE id = $1',
+      [docId]
+    );
+
     this.logger.logBusinessEvent('resort_document_deleted', { resortId, docId, userId });
+  }
+
+  /**
+   * Upload a document file directly to S3 and save the record in resort_documents table.
+   * Structure: docs/{resortSlug}/{docType}/{timestamp}-{uuid}.{extension}
+   */
+  async uploadDocument(
+    resortId: string,
+    docType: string,
+    file: { buffer: Buffer; originalname: string; mimetype: string },
+    userId: string,
+    userRole: string
+  ): Promise<{ document_url: string; document: ResortDocumentDto }> {
+    // Verify ownership or admin
+    const resort = await this.findOne(resortId);
+    if (userRole !== 'admin' && resort.owner_user_id !== userId) {
+      throw new ForbiddenException('You do not have permission to upload documents to this resort');
+    }
+
+    // Validate file
+    if (!file || !file.buffer) {
+      throw new BadRequestException('No file provided');
+    }
+
+    // Validate file type (images + PDF)
+    if (!this.uploadService.validateDocumentType(file.mimetype)) {
+      throw new BadRequestException('Invalid file type. Only images and PDF files are allowed.');
+    }
+
+    // Generate resort slug for path structure
+    const resortSlug = this.uploadService.generateSlug(resort.name);
+
+    // Generate professional blob path under docs/ folder
+    const blobPath = this.uploadService.generateDocumentBlobPath(
+      resortSlug,
+      docType,
+      file.originalname || 'document',
+    );
+
+    // Upload file directly to S3
+    const documentUrl = await this.uploadService.uploadFile(
+      '', // containerName not used, goes to main bucket
+      blobPath,
+      file.buffer,
+      file.mimetype,
+    );
+
+    // Save the document record in database using existing createDocument logic
+    const documentRecord = await this.createDocument(
+      resortId,
+      docType,
+      documentUrl,
+      userId,
+      userRole,
+    );
+
+    this.logger.logBusinessEvent('resort_document_uploaded', {
+      resortId,
+      docType,
+      userId,
+      documentUrl,
+      fileSize: file.buffer.length,
+    });
+
+    return {
+      document_url: documentUrl,
+      document: documentRecord,
+    };
   }
 
   // ==================== Reviews Management ====================

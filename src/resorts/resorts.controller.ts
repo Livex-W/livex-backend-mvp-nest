@@ -12,10 +12,13 @@ import {
   Query,
   UseGuards,
   Request,
+  Req,
   ParseUUIDPipe,
   HttpCode,
   HttpStatus,
+  BadRequestException,
 } from '@nestjs/common';
+import type { FastifyRequest } from 'fastify';
 import { ResortsService } from './resorts.service';
 import { CreateResortDto } from './dto/create-resort.dto';
 import { UpdateResortDto } from './dto/update-resort.dto';
@@ -27,6 +30,22 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Throttle } from '@nestjs/throttler';
 import { CustomLoggerService } from '../common/services/logger.service';
+
+// When using attachFieldsToBody: 'keyValues', files come as this format
+interface FastifyMultipartFile {
+  value: Buffer;
+  filename: string;
+  mimetype: string;
+  encoding: string;
+  fieldname: string;
+  // Legacy method (not available in keyValues mode)
+  toBuffer?: () => Promise<Buffer>;
+}
+
+interface DocumentUploadBody {
+  file?: FastifyMultipartFile;
+  doc_type?: string;
+}
 
 @Controller('api/v1/resorts')
 @UseGuards(JwtAuthGuard)
@@ -372,5 +391,101 @@ export class ResortsController {
       documentId: docId,
       status: 'success'
     });
+  }
+
+  @Post(':id/documents/upload')
+  @HttpCode(HttpStatus.CREATED)
+  @Throttle({ default: { limit: 10, ttl: 60000 } }) // 10 requests per minute
+  @UseGuards(RolesGuard)
+  @Roles('resort', 'admin')
+  async uploadDocument(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: FastifyRequest,
+    @Body() body: DocumentUploadBody,
+  ) {
+    const file = body.file;
+    const docType = body.doc_type;
+
+    if (!docType) {
+      throw new BadRequestException('doc_type is required');
+    }
+
+    if (!file) {
+      this.logger.logError(new Error('File not found in request'), { action: 'uploadDocument' });
+      throw new BadRequestException('File not found in request');
+    }
+
+    // DEBUG: Log file structure keys to understand what we are receiving
+    console.log('DEBUG: uploadDocument received file keys:', Object.keys(file as any));
+
+    let fileBuffer: Buffer | undefined;
+    let mimeType = 'application/pdf'; // Default for documents
+    let originalName = 'document.pdf';
+
+    // With attachFieldsToBody: 'keyValues':
+    // For files, it should be an object with value (buffer), mimetype, filename
+    if (Buffer.isBuffer(file)) {
+      fileBuffer = file;
+      console.log('DEBUG: file is a Buffer directly');
+    } else if ((file as any).value && Buffer.isBuffer((file as any).value)) {
+      fileBuffer = (file as any).value;
+      console.log('DEBUG: file has value property which is Buffer');
+      mimeType = (file as any).mimetype || mimeType;
+      originalName = (file as any).filename || originalName;
+    } else if ((file as any).data && Buffer.isBuffer((file as any).data)) {
+      fileBuffer = (file as any).data;
+      console.log('DEBUG: file has data property which is Buffer');
+    } else if ((file as any).toBuffer) {
+      console.log('DEBUG: file has toBuffer method');
+      fileBuffer = await (file as any).toBuffer();
+      mimeType = (file as any).mimetype || mimeType;
+      originalName = (file as any).filename || originalName;
+    }
+
+    console.log('DEBUG: Final mimetype:', mimeType, 'originalName:', originalName);
+
+    if (!fileBuffer) {
+      this.logger.logError(new Error('Invalid file format received'), {
+        action: 'uploadDocument',
+        fileType: typeof file
+      });
+      throw new BadRequestException('Invalid file format received');
+    }
+
+    const adaptedFile = {
+      buffer: fileBuffer,
+      originalname: originalName,
+      mimetype: mimeType,
+    };
+
+    const user = (req as any).user;
+
+    this.logger.logRequest({
+      method: 'POST',
+      url: '/api/v1/resorts/:id/documents/upload',
+      userId: user.id,
+      role: user.role,
+      resortId: id,
+      docType,
+    });
+
+    const result = await this.resortsService.uploadDocument(
+      id,
+      docType,
+      adaptedFile,
+      user.id,
+      user.role
+    );
+
+    this.logger.logResponse({
+      method: 'POST',
+      url: '/api/v1/resorts/:id/documents/upload',
+      userId: user.id,
+      resortId: id,
+      documentId: result.document.id,
+      status: 'success'
+    });
+
+    return result;
   }
 }
