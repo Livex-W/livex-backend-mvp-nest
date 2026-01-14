@@ -14,6 +14,7 @@ import {
 import { BookingsService, type PendingBookingResult } from './bookings.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { CreateAgentBookingDto } from './dto/create-agent-booking.dto';
+import { CreateResortBookingDto } from './dto/create-resort-booking.dto';
 import { CancelBookingDto } from './dto/cancel-booking.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -52,6 +53,42 @@ export class BookingsController {
     const resortId = '00000000-0000-0000-0000-000000000000';
 
     return await this.bookingsService.createAgentBooking(user.sub, resortId, dto);
+  }
+
+  /**
+   * Create a booking from resort panel.
+   * Uses net pricing with no agent commission.
+   */
+  @Post('resort')
+  @Roles(USER_ROLES[1])
+  @HttpCode(HttpStatus.CREATED)
+  async createResortBooking(
+    @Body() dto: CreateResortBookingDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    this.logger.logBusinessEvent('resort_booking_create_request', {
+      resortUserId: user.sub,
+      slotId: dto.slotId,
+    });
+
+    // Convert to agent booking DTO with zero commission (resort direct booking)
+    const agentDto = {
+      slotId: dto.slotId,
+      experienceId: dto.experienceId,
+      adults: dto.adults,
+      children: dto.children,
+      agentCommissionPerAdultCents: 0,
+      agentCommissionPerChildCents: 0,
+      agentPaymentType: 'full_at_resort' as const,
+      amountPaidToAgentCents: 0,
+      clientUserId: dto.clientUserId,
+      clientName: dto.clientName,
+      clientPhone: dto.clientPhone,
+      clientEmail: dto.clientEmail,
+    };
+
+    // Resort user acts as the "agent" but with 0 commission
+    return await this.bookingsService.createAgentBooking(user.sub, user.sub, agentDto);
   }
 
   @Get('agent')
