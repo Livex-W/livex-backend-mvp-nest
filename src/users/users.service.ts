@@ -81,34 +81,46 @@ export class UsersService {
         documentNumber?: string | null;
         role: UserRole;
     }): Promise<UserEntity> {
-        const result = await this.db.query<UserRow>(
-            `INSERT INTO users (email, password_hash, firebase_uid, full_name, phone, avatar, document_type, document_number, role)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-            RETURNING id, email, password_hash, firebase_uid, full_name, phone, avatar, role, document_type, document_number, created_at, updated_at`,
-            [
-                params.email,
-                params.passwordHash ?? null,
-                params.firebaseUid ?? null,
-                params.fullName ?? null,
-                params.phone ?? null,
-                params.avatar ?? null,
-                params.documentType ?? null,
-                params.documentNumber ?? null,
-                params.role
-            ],
-        );
+        try {
+            const result = await this.db.query<UserRow>(
+                `INSERT INTO users (email, password_hash, firebase_uid, full_name, phone, avatar, document_type, document_number, role)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                RETURNING id, email, password_hash, firebase_uid, full_name, phone, avatar, role, document_type, document_number, created_at, updated_at`,
+                [
+                    params.email,
+                    params.passwordHash ?? null,
+                    params.firebaseUid ?? null,
+                    params.fullName ?? null,
+                    params.phone ?? null,
+                    params.avatar ?? null,
+                    params.documentType ?? null,
+                    params.documentNumber ?? null,
+                    params.role
+                ],
+            );
 
-        const user = this.mapRowToEntity(result.rows[0]);
+            const user = this.mapRowToEntity(result.rows[0]);
 
-        // Log business event
-        this.logger.logBusinessEvent('user_created', {
-            userId: user.id,
-            email: user.email,
-            role: user.role,
-            fullName: user.fullName
-        });
+            // Log business event
+            this.logger.logBusinessEvent('user_created', {
+                userId: user.id,
+                email: user.email,
+                role: user.role,
+                fullName: user.fullName
+            });
 
-        return user;
+            return user;
+        } catch (error: any) {
+            if (error.code === '23505') {
+                if (error.constraint === 'uq_users_document') {
+                    throw new ConflictException('Ya existe un usuario registrado con este tipo y número de documento.');
+                }
+                if (error.constraint === 'users_email_key' || error.detail?.includes('email')) {
+                    throw new ConflictException('El correo electrónico ya está registrado.');
+                }
+            }
+            throw error;
+        }
     }
 
     async updateProfile(

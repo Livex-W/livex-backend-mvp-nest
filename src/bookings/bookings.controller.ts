@@ -291,4 +291,35 @@ export class BookingsController {
     };
   }
 
+  /**
+   * Mark a booking as checked in (tourist arrived)
+   * Only available for resort users
+   */
+  @Patch(':id/check-in')
+  @Roles(USER_ROLES[1])
+  @HttpCode(HttpStatus.OK)
+  async markCheckIn(
+    @Param('id') bookingId: string,
+    @CurrentUser() user: JwtPayload,
+  ): Promise<{ success: boolean; bookingId: string; checkedInAt: string }> {
+    this.logger.logBusinessEvent('booking_check_in_request', {
+      bookingId,
+      resortUserId: user.sub,
+    });
+
+    const result = await this.bookingsService.markCheckIn(bookingId, user.sub);
+
+    this.logger.logBusinessEvent('booking_checked_in', {
+      bookingId,
+      checkedInAt: result.checked_in_at,
+    });
+
+    return {
+      success: true,
+      bookingId: result.id,
+      checkedInAt: result.checked_in_at,
+    };
+  }
+
 }
+

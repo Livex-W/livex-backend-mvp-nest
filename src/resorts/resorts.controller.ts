@@ -13,10 +13,13 @@ import {
   UseGuards,
   Request,
   Req,
+  Res,
+  Header,
   ParseUUIDPipe,
   HttpCode,
   HttpStatus,
   BadRequestException,
+  StreamableFile,
 } from '@nestjs/common';
 import type { FastifyRequest } from 'fastify';
 import { ResortsService } from './resorts.service';
@@ -30,6 +33,7 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Throttle } from '@nestjs/throttler';
 import { CustomLoggerService } from '../common/services/logger.service';
+import { ReportsService } from './reports.service';
 
 // When using attachFieldsToBody: 'keyValues', files come as this format
 interface FastifyMultipartFile {
@@ -52,6 +56,7 @@ interface DocumentUploadBody {
 export class ResortsController {
   constructor(
     private readonly resortsService: ResortsService,
+    private readonly reportsService: ReportsService,
     private readonly logger: CustomLoggerService,
   ) { }
 
@@ -136,6 +141,64 @@ export class ResortsController {
     });
 
     return profile;
+  }
+
+  @Get('my-resort/stats')
+  @Throttle({ default: { limit: 30, ttl: 60000 } }) // 30 requests per minute
+  @UseGuards(RolesGuard)
+  @Roles('resort', 'admin')
+  async getMyResortStats(@Request() req: any) {
+    this.logger.logRequest({
+      method: 'GET',
+      url: '/api/v1/resorts/my-resort/stats',
+      userId: req.user.id,
+      role: req.user.role,
+    });
+
+    const stats = await this.resortsService.getResortStats(req.user.id);
+
+    this.logger.logResponse({
+      method: 'GET',
+      url: '/api/v1/resorts/my-resort/stats',
+      userId: req.user.id,
+      status: 'success'
+    });
+
+    return stats;
+  }
+
+  @Get('my-resort/export')
+  @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 requests per minute
+  @UseGuards(RolesGuard)
+  @Roles('resort', 'admin')
+  @Header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+  async exportFinanceReport(
+    @Request() req: any,
+    @Res({ passthrough: true }) res: any,
+  ): Promise<StreamableFile> {
+    this.logger.logRequest({
+      method: 'GET',
+      url: '/api/v1/resorts/my-resort/export',
+      userId: req.user.id,
+      role: req.user.role,
+    });
+
+    const buffer = await this.reportsService.generateFinanceReport(req.user.id);
+
+    const fileName = `reporte-finanzas-${new Date().toISOString().slice(0, 10)}.xlsx`;
+
+    this.logger.logResponse({
+      method: 'GET',
+      url: '/api/v1/resorts/my-resort/export',
+      userId: req.user.id,
+      status: 'success',
+      fileName,
+    });
+
+    // Set Content-Disposition header for file download
+    res.header('Content-Disposition', `attachment; filename="${fileName}"`);
+
+    return new StreamableFile(buffer);
   }
 
   @Get(':id')

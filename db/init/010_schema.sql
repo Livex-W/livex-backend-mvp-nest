@@ -80,6 +80,11 @@ DO $$ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'agent_payment_type') THEN
         CREATE TYPE agent_payment_type AS ENUM ('full_at_resort','deposit_to_agent','commission_to_agent');
     END IF;
+
+    -- Tipo de entidad de negocio (para business_profiles compartido)
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'business_entity_type') THEN
+        CREATE TYPE business_entity_type AS ENUM ('resort', 'agent');
+    END IF;
 END $$;
 
 -- Función global para updated_at
@@ -170,6 +175,60 @@ CREATE INDEX IF NOT EXISTS idx_exchange_rates_updated_at ON exchange_rates(updat
 
 
 -- ====================================================================================
+-- 2.5 PERFILES DE NEGOCIO (Compartido entre Resorts y Agentes)
+-- ====================================================================================
+
+-- Perfil de negocio compartido para entidades comerciales (resorts y agentes)
+CREATE TABLE IF NOT EXISTS business_profiles (
+  id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  entity_type        business_entity_type NOT NULL,
+  name               text NOT NULL,
+  nit                text,  -- Format: 800098813-6
+  rnt                text,  -- Format: 23412 (5 digits)
+  contact_email      citext,
+  contact_phone      text,
+  
+  -- Estado y Aprobación
+  status             resort_status NOT NULL DEFAULT 'draft',
+  approved_by        uuid REFERENCES users(id) ON DELETE SET NULL,
+  approved_at        timestamptz,
+  rejection_reason   text,
+  
+  created_at         timestamptz NOT NULL DEFAULT now(),
+  updated_at         timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_business_profiles_entity_type ON business_profiles(entity_type);
+CREATE INDEX IF NOT EXISTS idx_business_profiles_status ON business_profiles(status);
+CREATE TRIGGER trg_business_profiles_updated_at BEFORE UPDATE ON business_profiles FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+COMMENT ON TABLE business_profiles IS 'Shared business profile for resorts and agents. Contains NIT, RNT, and approval workflow.';
+COMMENT ON COLUMN business_profiles.entity_type IS 'Type of entity: resort or agent';
+COMMENT ON COLUMN business_profiles.nit IS 'Tax ID number (NIT) - Format: 800098813-6';
+COMMENT ON COLUMN business_profiles.rnt IS 'National Tourism Registry (RNT) - Format: 23412 (5 digits)';
+
+-- Documentos de negocio compartidos
+CREATE TABLE IF NOT EXISTS business_documents (
+  id                    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  business_profile_id   uuid NOT NULL REFERENCES business_profiles(id) ON DELETE CASCADE,
+  doc_type              resort_doc_type NOT NULL,
+  file_url              text NOT NULL,
+  status                document_status NOT NULL DEFAULT 'uploaded',
+  rejection_reason      text,
+  reviewed_by           uuid REFERENCES users(id) ON DELETE SET NULL,
+  reviewed_at           timestamptz,
+  uploaded_at           timestamptz NOT NULL DEFAULT now(),
+  created_at            timestamptz NOT NULL DEFAULT now(),
+  updated_at            timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_business_documents_profile ON business_documents(business_profile_id);
+CREATE INDEX IF NOT EXISTS idx_business_documents_status ON business_documents(status);
+CREATE TRIGGER trg_business_documents_updated_at BEFORE UPDATE ON business_documents FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+COMMENT ON TABLE business_documents IS 'Documents attached to business profiles (shared between resorts and agents)';
+
+-- ====================================================================================
 -- 3. DOMINIO DE RESORTS (PROVEEDORES)
 -- ====================================================================================
 
@@ -183,11 +242,10 @@ CREATE TABLE IF NOT EXISTS resorts (
   address_line   text,
   city           text,
   country        text,
-  nit            text,  -- Format: 800098813-6
-  rnt            text,  -- Format: 23412 (5 digits)
   latitude       numeric(9,6),
   longitude      numeric(9,6),
   owner_user_id  uuid REFERENCES users(id) ON DELETE SET NULL,
+  business_profile_id uuid REFERENCES business_profiles(id) ON DELETE SET NULL,
   
   -- Estado y Aprobación
   is_active      boolean NOT NULL DEFAULT true,
@@ -202,22 +260,7 @@ CREATE TABLE IF NOT EXISTS resorts (
 CREATE INDEX IF NOT EXISTS idx_resorts_city ON resorts(city);
 CREATE INDEX IF NOT EXISTS idx_resorts_status_active ON resorts(status, is_active);
 CREATE TRIGGER trg_resorts_updated_at BEFORE UPDATE ON resorts FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-
-CREATE TABLE IF NOT EXISTS resort_documents (
-  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  resort_id       uuid NOT NULL REFERENCES resorts(id) ON DELETE CASCADE,
-  doc_type        resort_doc_type NOT NULL,
-  file_url        text NOT NULL,
-  status          document_status NOT NULL DEFAULT 'uploaded',
-  rejection_reason text,
-  reviewed_by     uuid REFERENCES users(id) ON DELETE SET NULL,
-  reviewed_at     timestamptz,
-  uploaded_at     timestamptz NOT NULL DEFAULT now(),
-  created_at      timestamptz NOT NULL DEFAULT now(),
-  updated_at      timestamptz NOT NULL DEFAULT now()
-);
-CREATE TRIGGER trg_resort_documents_updated_at BEFORE UPDATE ON resort_documents FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-
+       
 CREATE TABLE IF NOT EXISTS resort_bank_info (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   resort_id       uuid NOT NULL REFERENCES resorts(id) ON DELETE CASCADE,
@@ -237,6 +280,7 @@ CREATE TABLE IF NOT EXISTS resort_agents (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     resort_id uuid REFERENCES resorts(id), -- Nullable for global agents/influencers
     user_id uuid NOT NULL REFERENCES users(id),
+    business_profile_id uuid REFERENCES business_profiles(id) ON DELETE SET NULL, -- Agent's business docs
     commission_bps integer NOT NULL DEFAULT 0 CHECK (commission_bps >= 0 AND commission_bps <= 10000), 
     commission_fixed_cents integer NOT NULL DEFAULT 0 CHECK (commission_fixed_cents >= 0),
     is_active boolean DEFAULT true,
@@ -372,7 +416,7 @@ CREATE TABLE IF NOT EXISTS referral_codes (
     discount_value integer DEFAULT 0,
     max_discount_cents integer,
     min_purchase_cents integer DEFAULT 0,
-    currency text DEFAULT 'USD' CHECK (currency IN ('USD', 'COP', 'EUR')),
+    currency text DEFAULT 'COP' CHECK (currency IN ('USD', 'COP', 'EUR')),
     allow_stacking boolean DEFAULT false,
     
     commission_override_bps integer,
@@ -552,6 +596,7 @@ CREATE TABLE IF NOT EXISTS bookings (
   cancel_reason  text,
   expires_at     timestamptz,
   completed_at   timestamptz,
+  checked_in_at  timestamptz,  -- When tourist checked in at resort/day pass
   idempotency_key text,
   
   created_at     timestamptz NOT NULL DEFAULT now(),
@@ -570,12 +615,14 @@ COMMENT ON COLUMN bookings.agent_commission_cents IS 'Total agent commission = (
 COMMENT ON COLUMN bookings.agent_payment_type IS 'How BNG payment is distributed: full_at_resort, deposit_to_agent, commission_to_agent';
 COMMENT ON COLUMN bookings.amount_paid_to_agent_cents IS 'Amount client paid directly to agent (physical payment)';
 COMMENT ON COLUMN bookings.amount_paid_to_resort_cents IS 'Amount client paid/will pay at resort (physical payment)';
+COMMENT ON COLUMN bookings.checked_in_at IS 'Timestamp when tourist checked in at the resort/day pass';
 
 CREATE INDEX IF NOT EXISTS idx_bookings_user ON bookings(user_id);
 CREATE INDEX IF NOT EXISTS idx_bookings_experience ON bookings(experience_id);
 CREATE INDEX IF NOT EXISTS idx_bookings_slot ON bookings(slot_id);
 CREATE INDEX IF NOT EXISTS idx_bookings_status ON bookings(status);
 CREATE INDEX IF NOT EXISTS idx_bookings_agent ON bookings(agent_id);
+CREATE INDEX IF NOT EXISTS idx_bookings_checked_in ON bookings(checked_in_at) WHERE checked_in_at IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_bookings_idempotency ON bookings(idempotency_key) WHERE idempotency_key IS NOT NULL;
 CREATE TRIGGER trg_bookings_updated_at BEFORE UPDATE ON bookings FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
@@ -730,20 +777,6 @@ CREATE TABLE IF NOT EXISTS agent_commissions (
     paid_at timestamptz,
     created_at timestamptz DEFAULT now(),
     updated_at timestamptz DEFAULT now()
-);
-
-CREATE TABLE IF NOT EXISTS agent_profiles (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    bank_name text,
-    account_number text,
-    account_type text,
-    account_holder_name text,
-    tax_id text,
-    is_verified boolean DEFAULT false,
-    created_at timestamptz DEFAULT now(),
-    updated_at timestamptz DEFAULT now(),
-    CONSTRAINT unique_agent_profile UNIQUE (user_id)
 );
 
 -- Reconciliación

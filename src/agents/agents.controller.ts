@@ -37,6 +37,16 @@ export class AgentsController {
         return this.agentsService.createAgent(dto, user.id);
     }
 
+    @Get('search-unassigned')
+    searchUnassignedAgents(
+        @Query('resortId') resortId: string,
+        @Query('search') search: string,
+        @Query('page') page: number = 1,
+        @Query('limit') limit: number = 10,
+    ) {
+        return this.agentsService.searchUnassignedAgents(resortId, search, page, limit);
+    }
+
     @Post('resorts/:resortId')
     createAgreement(
         @Param('resortId', ParseUUIDPipe) resortId: string,

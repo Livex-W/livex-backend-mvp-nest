@@ -58,8 +58,16 @@ export class FavoritesService {
             ORDER BY ei.sort_order ASC LIMIT 1
           ),
           'category', e.category,
-          'price_per_adult_cents', e.price_per_adult_cents,
-          'commission_per_adult_cents', e.commission_per_adult_cents,
+          'price_per_adult_cents', (
+            SELECT s.price_per_adult_cents FROM availability_slots s 
+            WHERE s.experience_id = e.id 
+            ORDER BY s.price_per_adult_cents ASC LIMIT 1
+          ),
+          'commission_per_adult_cents', (
+            SELECT s.commission_per_adult_cents FROM availability_slots s 
+            WHERE s.experience_id = e.id 
+            ORDER BY s.price_per_adult_cents ASC LIMIT 1
+          ),
           'currency', e.currency,
           'rating_avg', e.rating_avg,
           'rating_count', e.rating_count

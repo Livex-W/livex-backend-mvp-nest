@@ -98,8 +98,8 @@ export class BookingsService {
             ''
           ),
           'category', e.category,
-          'price_per_adult_cents', e.price_per_adult_cents,
-          'price_per_child_cents', e.price_per_child_cents,
+          'price_per_adult_cents', s.price_per_adult_cents,
+          'price_per_child_cents', s.price_per_child_cents,
           'allows_children', e.allows_children,
           'currency', e.currency
         ) as experience,
@@ -297,6 +297,7 @@ export class BookingsService {
         b.status,
         b.booking_source,
         b.cancel_reason,
+        b.checked_in_at,
         b.created_at,
         b.updated_at,
         json_build_object(
@@ -745,6 +746,63 @@ export class BookingsService {
 
     return result.rowCount ?? 0;
   }
+
+  /**
+   * Mark a booking as checked in (tourist arrived at resort)
+   * Only the resort owner can mark check-in for their bookings
+   */
+  async markCheckIn(bookingId: string, resortUserId: string): Promise<{ id: string; checked_in_at: string }> {
+    // Verify the booking belongs to this resort and is confirmed
+    const bookingResult = await this.db.query<{
+      id: string;
+      status: string;
+      checked_in_at: string | null;
+      resort_owner_id: string;
+    }>(
+      `SELECT b.id, b.status, b.checked_in_at, r.owner_user_id as resort_owner_id
+       FROM bookings b
+       JOIN experiences e ON e.id = b.experience_id
+       JOIN resorts r ON r.id = e.resort_id
+       WHERE b.id = $1`,
+      [bookingId],
+    );
+
+    if (bookingResult.rows.length === 0) {
+      throw new NotFoundException('Reserva no encontrada');
+    }
+
+    const booking = bookingResult.rows[0];
+
+    // Verify ownership
+    if (booking.resort_owner_id !== resortUserId) {
+      throw new BadRequestException('No tienes permiso para marcar check-in de esta reserva');
+    }
+
+    // Verify booking is confirmed
+    if (booking.status !== 'confirmed') {
+      throw new BadRequestException(`Solo se puede hacer check-in de reservas confirmadas. Estado actual: ${booking.status}`);
+    }
+
+    // If already checked in, return existing data
+    if (booking.checked_in_at) {
+      return {
+        id: booking.id,
+        checked_in_at: booking.checked_in_at,
+      };
+    }
+
+    // Mark as checked in
+    const updateResult = await this.db.query<{ id: string; checked_in_at: string }>(
+      `UPDATE bookings 
+       SET checked_in_at = NOW(), updated_at = NOW()
+       WHERE id = $1
+       RETURNING id, checked_in_at`,
+      [bookingId],
+    );
+
+    return updateResult.rows[0];
+  }
+
 
   private calculateExpiry(): string {
     const config = this.configService.get<BookingConfig>('booking');

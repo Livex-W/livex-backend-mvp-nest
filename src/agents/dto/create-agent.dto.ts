@@ -1,4 +1,4 @@
-import { IsEmail, IsInt, IsOptional, IsString, IsUUID, Max, Min, MinLength, IsIn } from 'class-validator';
+import { IsEmail, IsInt, IsOptional, IsString, IsUUID, Max, Min, MinLength, IsIn, Matches } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreateAgentDto {
@@ -23,6 +23,16 @@ export class CreateAgentDto {
     @IsString()
     @MinLength(5)
     documentNumber!: string;
+
+    @IsOptional()
+    @IsString()
+    @Matches(/^\d{9}-\d$/, { message: 'NIT must be in format: 800098813-6' })
+    nit?: string;
+
+    @IsOptional()
+    @IsString()
+    @Matches(/^\d{5}$/, { message: 'RNT must be exactly 5 digits' })
+    rnt?: string;
 
     @IsOptional()
     @IsUUID()

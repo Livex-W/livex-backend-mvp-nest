@@ -32,12 +32,29 @@ export class ResortsService {
         resortData: { name: createResortDto.name, city: createResortDto.city }
       });
 
+      // 1. Create business_profile first
+      const businessProfileResult = await this.db.query(
+        `INSERT INTO business_profiles (
+          entity_type, name, nit, rnt, contact_email, contact_phone, status
+        ) VALUES ('resort', $1, $2, $3, $4, $5, 'draft')
+        RETURNING id`,
+        [
+          createResortDto.name,
+          createResortDto.nit || null,
+          createResortDto.rnt || null,
+          createResortDto.contact_email || null,
+          createResortDto.contact_phone || null,
+        ]
+      );
+      const businessProfileId = businessProfileResult.rows[0].id as string;
+
+      // 2. Create resort with reference to business_profile (NIT/RNT now only in business_profiles)
       const result = await this.db.query(
         `INSERT INTO resorts (
           name, description, contact_email, contact_phone, 
           address_line, city, country, latitude, longitude, 
-          owner_user_id, is_active, status
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'draft')
+          owner_user_id, business_profile_id, is_active, status
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'draft')
         RETURNING *`,
         [
           createResortDto.name,
@@ -50,6 +67,7 @@ export class ResortsService {
           createResortDto.latitude || null,
           createResortDto.longitude || null,
           userId,
+          businessProfileId,
           createResortDto.is_active ?? true,
         ]
       );
@@ -59,7 +77,8 @@ export class ResortsService {
       this.logger.logBusinessEvent('resort_created', {
         userId,
         resortId: resort.id,
-        resortName: resort.name
+        resortName: resort.name,
+        businessProfileId,
       });
 
       return resort;
@@ -389,9 +408,16 @@ export class ResortsService {
   }
 
   async findProfileByOwner(userId: string): Promise<ResortProfileDto | null> {
-    // Get the resort owned by this user
+    // Get the resort owned by this user with business_profile data
     const resortResult = await this.db.query(
-      'SELECT * FROM resorts WHERE owner_user_id = $1 LIMIT 1',
+      `SELECT r.*, 
+              bp.nit, 
+              bp.rnt,
+              bp.status as bp_status
+       FROM resorts r
+       LEFT JOIN business_profiles bp ON r.business_profile_id = bp.id
+       WHERE r.owner_user_id = $1 
+       LIMIT 1`,
       [userId]
     );
 
@@ -401,15 +427,19 @@ export class ResortsService {
 
     const resort = resortResult.rows[0];
     const resortId = resort.id as string;
+    const businessProfileId = resort.business_profile_id as string | null;
 
-    // Get related documents
-    const documentsResult = await this.db.query(
-      `SELECT id, doc_type, file_url, status, rejection_reason, reviewed_at, uploaded_at, created_at, updated_at
-       FROM resort_documents 
-       WHERE resort_id = $1 
-       ORDER BY created_at DESC`,
-      [resortId]
-    );
+    // Get documents from business_documents (no legacy fallback)
+    let documentsResult = { rows: [] as Record<string, unknown>[] };
+    if (businessProfileId) {
+      documentsResult = await this.db.query(
+        `SELECT id, doc_type, file_url, status, rejection_reason, reviewed_at, uploaded_at, created_at, updated_at
+         FROM business_documents 
+         WHERE business_profile_id = $1 
+         ORDER BY created_at DESC`,
+        [businessProfileId]
+      );
+    }
 
     // Get agents with user info
     const agentsResult = await this.db.query(
@@ -422,6 +452,10 @@ export class ResortsService {
       [resortId]
     );
 
+    // NIT/RNT from business_profile only
+    const nit = resort.nit as string | undefined;
+    const rnt = resort.rnt as string | undefined;
+
     const profile: ResortProfileDto = {
       id: resort.id as string,
       name: resort.name as string,
@@ -432,6 +466,8 @@ export class ResortsService {
       address_line: resort.address_line as string | undefined,
       city: resort.city as string | undefined,
       country: resort.country as string | undefined,
+      nit,
+      rnt,
       latitude: resort.latitude as number | undefined,
       longitude: resort.longitude as number | undefined,
       owner_user_id: resort.owner_user_id as string,
@@ -469,6 +505,7 @@ export class ResortsService {
     this.logger.logBusinessEvent('resort_profile_fetched', {
       userId,
       resortId,
+      businessProfileId,
       documentsCount: profile.documents.length,
       agentsCount: profile.agents.length,
     });
@@ -491,49 +528,42 @@ export class ResortsService {
       throw new ForbiddenException('You do not have permission to add documents to this resort');
     }
 
-    // Check if document of this type already exists
+    const businessProfileId = resort.business_profile_id;
+
+    // Resort must have a business_profile to upload documents
+    if (!businessProfileId) {
+      throw new BadRequestException('Resort does not have a business profile configured');
+    }
+
+    // Check if document of this type already exists in business_documents
     const existingDoc = await this.db.query(
-      'SELECT id FROM resort_documents WHERE resort_id = $1 AND doc_type = $2',
-      [resortId, docType]
+      'SELECT id FROM business_documents WHERE business_profile_id = $1 AND doc_type = $2',
+      [businessProfileId, docType]
     );
 
+    let doc;
     if (existingDoc.rows.length > 0) {
       // Update existing document
       const result = await this.db.query(
-        `UPDATE resort_documents 
+        `UPDATE business_documents 
          SET file_url = $1, status = 'uploaded', uploaded_at = now(), updated_at = now()
-         WHERE resort_id = $2 AND doc_type = $3
+         WHERE business_profile_id = $2 AND doc_type = $3
          RETURNING *`,
-        [fileUrl, resortId, docType]
+        [fileUrl, businessProfileId, docType]
       );
-
-      const doc = result.rows[0];
-      this.logger.logBusinessEvent('resort_document_updated', { resortId, docType, userId });
-
-      return {
-        id: doc.id as string,
-        doc_type: doc.doc_type as ResortDocumentDto['doc_type'],
-        file_url: doc.file_url as string,
-        status: doc.status as ResortDocumentDto['status'],
-        rejection_reason: doc.rejection_reason as string | undefined,
-        reviewed_at: doc.reviewed_at ? (doc.reviewed_at as Date).toISOString() : undefined,
-        uploaded_at: (doc.uploaded_at as Date).toISOString(),
-        created_at: (doc.created_at as Date).toISOString(),
-        updated_at: (doc.updated_at as Date).toISOString(),
-      };
+      doc = result.rows[0];
+      this.logger.logBusinessEvent('business_document_updated', { resortId, businessProfileId, docType, userId });
+    } else {
+      // Create new document
+      const result = await this.db.query(
+        `INSERT INTO business_documents (business_profile_id, doc_type, file_url, status, uploaded_at)
+         VALUES ($1, $2, $3, 'uploaded', now())
+         RETURNING *`,
+        [businessProfileId, docType, fileUrl]
+      );
+      doc = result.rows[0];
+      this.logger.logBusinessEvent('business_document_created', { resortId, businessProfileId, docType, userId });
     }
-
-    // Create new document
-    const result = await this.db.query(
-      `INSERT INTO resort_documents (resort_id, doc_type, file_url, status, uploaded_at)
-       VALUES ($1, $2, $3, 'uploaded', now())
-       RETURNING *`,
-      [resortId, docType, fileUrl]
-    );
-
-    const doc = result.rows[0];
-
-    this.logger.logBusinessEvent('resort_document_created', { resortId, docType, userId });
 
     return {
       id: doc.id as string,
@@ -560,10 +590,15 @@ export class ResortsService {
       throw new ForbiddenException('You do not have permission to delete documents from this resort');
     }
 
-    // Get document record first to get the file_url
+    const businessProfileId = resort.business_profile_id;
+    if (!businessProfileId) {
+      throw new BadRequestException('Resort does not have a business profile configured');
+    }
+
+    // Get document record from business_documents
     const docResult = await this.db.query<{ id: string; file_url: string }>(
-      'SELECT id, file_url FROM resort_documents WHERE id = $1 AND resort_id = $2',
-      [docId, resortId]
+      'SELECT id, file_url FROM business_documents WHERE id = $1 AND business_profile_id = $2',
+      [docId, businessProfileId]
     );
 
     if (docResult.rows.length === 0) {
@@ -577,7 +612,7 @@ export class ResortsService {
     if (blobName) {
       try {
         await this.uploadService.deleteFile('', blobName);
-        this.logger.logBusinessEvent('resort_document_file_deleted', { resortId, docId, blobName });
+        this.logger.logBusinessEvent('business_document_file_deleted', { resortId, docId, blobName });
       } catch (error) {
         // Log error but don't fail the operation if blob doesn't exist
         console.warn(`Failed to delete blob ${blobName}:`, error instanceof Error ? error.message : 'Unknown error');
@@ -586,11 +621,11 @@ export class ResortsService {
 
     // Remove from database
     await this.db.query(
-      'DELETE FROM resort_documents WHERE id = $1',
+      'DELETE FROM business_documents WHERE id = $1',
       [docId]
     );
 
-    this.logger.logBusinessEvent('resort_document_deleted', { resortId, docId, userId });
+    this.logger.logBusinessEvent('business_document_deleted', { resortId, docId, userId });
   }
 
   /**
@@ -734,6 +769,254 @@ export class ResortsService {
         total_reviews: parseInt(statsRow?.total_reviews as string) || 0,
         reviews_this_month: parseInt(statsRow?.reviews_this_month as string) || 0,
       }
+    };
+  }
+
+  // ==================== Resort Statistics ====================
+
+  async getResortStats(userId: string): Promise<{
+    summary: {
+      totalBookingsMonth: number;
+      totalRevenueCentsMonth: number;
+      totalResortNetCentsMonth: number;
+      totalGuestsMonth: number;
+      checkedInMonth: number;
+      pendingCheckIn: number;
+    };
+    comparison: {
+      revenueChangePercent: number;
+      bookingsChangePercent: number;
+      guestsChangePercent: number;
+    };
+    topExperiences: {
+      id: string;
+      title: string;
+      bookings: number;
+      revenue_cents: number;
+    }[];
+    dailyBreakdown: {
+      date: string;
+      bookings: number;
+      revenue_cents: number;
+      guests: number;
+    }[];
+    bookingsBySource: {
+      source: string;
+      count: number;
+      revenue_cents: number;
+    }[];
+    bookingsByStatus: {
+      status: string;
+      count: number;
+    }[];
+  }> {
+    // Get resort ID for this user
+    const resortResult = await this.db.query<{ id: string }>(
+      'SELECT id FROM resorts WHERE owner_user_id = $1 LIMIT 1',
+      [userId]
+    );
+
+    if (resortResult.rows.length === 0) {
+      throw new NotFoundException('No resort found for this user');
+    }
+
+    const resortId = resortResult.rows[0].id;
+    const now = new Date();
+    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const firstDayOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastDayOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+
+    // Current month summary
+    const summaryResult = await this.db.query<{
+      total_bookings: string;
+      total_revenue_cents: string;
+      total_resort_net_cents: string;
+      total_guests: string;
+      checked_in_count: string;
+    }>(`
+      SELECT 
+        COUNT(b.id) as total_bookings,
+        COALESCE(SUM(b.total_cents), 0) as total_revenue_cents,
+        COALESCE(SUM(b.resort_net_cents), 0) as total_resort_net_cents,
+        COALESCE(SUM(b.adults + b.children), 0) as total_guests,
+        COUNT(CASE WHEN b.checked_in_at IS NOT NULL THEN 1 END) as checked_in_count
+      FROM bookings b
+      JOIN experiences e ON e.id = b.experience_id
+      WHERE e.resort_id = $1 
+        AND b.status IN ('confirmed', 'pending')
+        AND b.created_at >= $2
+    `, [resortId, firstDayOfMonth.toISOString()]);
+
+    const summary = summaryResult.rows[0];
+
+    // Pending check-ins (confirmed bookings without check_in)
+    const pendingCheckInResult = await this.db.query<{ count: string }>(`
+      SELECT COUNT(b.id) as count
+      FROM bookings b
+      JOIN experiences e ON e.id = b.experience_id
+      WHERE e.resort_id = $1 
+        AND b.status = 'confirmed'
+        AND b.checked_in_at IS NULL
+    `, [resortId]);
+
+    // Last month for comparison
+    const lastMonthResult = await this.db.query<{
+      total_bookings: string;
+      total_revenue_cents: string;
+      total_guests: string;
+    }>(`
+      SELECT 
+        COUNT(b.id) as total_bookings,
+        COALESCE(SUM(b.total_cents), 0) as total_revenue_cents,
+        COALESCE(SUM(b.adults + b.children), 0) as total_guests
+      FROM bookings b
+      JOIN experiences e ON e.id = b.experience_id
+      WHERE e.resort_id = $1 
+        AND b.status IN ('confirmed', 'pending')
+        AND b.created_at >= $2
+        AND b.created_at <= $3
+    `, [resortId, firstDayOfLastMonth.toISOString(), lastDayOfLastMonth.toISOString()]);
+
+    const lastMonth = lastMonthResult.rows[0];
+
+    // Calculate comparison percentages
+    const currentRevenue = parseInt(summary.total_revenue_cents) || 0;
+    const lastRevenue = parseInt(lastMonth?.total_revenue_cents) || 0;
+    const currentBookings = parseInt(summary.total_bookings) || 0;
+    const lastBookings = parseInt(lastMonth?.total_bookings) || 0;
+    const currentGuests = parseInt(summary.total_guests) || 0;
+    const lastGuests = parseInt(lastMonth?.total_guests) || 0;
+
+    const revenueChangePercent = lastRevenue > 0
+      ? Math.round(((currentRevenue - lastRevenue) / lastRevenue) * 100)
+      : currentRevenue > 0 ? 100 : 0;
+    const bookingsChangePercent = lastBookings > 0
+      ? Math.round(((currentBookings - lastBookings) / lastBookings) * 100)
+      : currentBookings > 0 ? 100 : 0;
+    const guestsChangePercent = lastGuests > 0
+      ? Math.round(((currentGuests - lastGuests) / lastGuests) * 100)
+      : currentGuests > 0 ? 100 : 0;
+
+    // Top 5 experiences by revenue this month
+    const topExperiencesResult = await this.db.query<{
+      id: string;
+      title: string;
+      bookings: string;
+      revenue_cents: string;
+    }>(`
+      SELECT 
+        e.id,
+        e.title,
+        COUNT(b.id) as bookings,
+        COALESCE(SUM(b.resort_net_cents), 0) as revenue_cents
+      FROM experiences e
+      LEFT JOIN bookings b ON b.experience_id = e.id 
+        AND b.status IN ('confirmed', 'pending')
+        AND b.created_at >= $2
+      WHERE e.resort_id = $1
+      GROUP BY e.id, e.title
+      ORDER BY revenue_cents DESC
+      LIMIT 5
+    `, [resortId, firstDayOfMonth.toISOString()]);
+
+    // Daily breakdown for last 7 days
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+    sevenDaysAgo.setHours(0, 0, 0, 0);
+
+    const dailyResult = await this.db.query<{
+      date: string;
+      bookings: string;
+      revenue_cents: string;
+      guests: string;
+    }>(`
+      SELECT 
+        DATE(b.created_at) as date,
+        COUNT(b.id) as bookings,
+        COALESCE(SUM(b.resort_net_cents), 0) as revenue_cents,
+        COALESCE(SUM(b.adults + b.children), 0) as guests
+      FROM bookings b
+      JOIN experiences e ON e.id = b.experience_id
+      WHERE e.resort_id = $1 
+        AND b.status IN ('confirmed', 'pending')
+        AND b.created_at >= $2
+      GROUP BY DATE(b.created_at)
+      ORDER BY date ASC
+    `, [resortId, sevenDaysAgo.toISOString()]);
+
+    // Bookings by source
+    const sourceResult = await this.db.query<{
+      source: string;
+      count: string;
+      revenue_cents: string;
+    }>(`
+      SELECT 
+        b.booking_source as source,
+        COUNT(b.id) as count,
+        COALESCE(SUM(b.resort_net_cents), 0) as revenue_cents
+      FROM bookings b
+      JOIN experiences e ON e.id = b.experience_id
+      WHERE e.resort_id = $1 
+        AND b.status IN ('confirmed', 'pending')
+        AND b.created_at >= $2
+      GROUP BY b.booking_source
+    `, [resortId, firstDayOfMonth.toISOString()]);
+
+    // Bookings by status (all time for context)
+    const statusResult = await this.db.query<{
+      status: string;
+      count: string;
+    }>(`
+      SELECT 
+        b.status,
+        COUNT(b.id) as count
+      FROM bookings b
+      JOIN experiences e ON e.id = b.experience_id
+      WHERE e.resort_id = $1
+      GROUP BY b.status
+    `, [resortId]);
+
+    this.logger.logBusinessEvent('resort_stats_fetched', {
+      userId,
+      resortId,
+      month: now.toISOString().slice(0, 7),
+    });
+
+    return {
+      summary: {
+        totalBookingsMonth: parseInt(summary.total_bookings) || 0,
+        totalRevenueCentsMonth: parseInt(summary.total_revenue_cents) || 0,
+        totalResortNetCentsMonth: parseInt(summary.total_resort_net_cents) || 0,
+        totalGuestsMonth: parseInt(summary.total_guests) || 0,
+        checkedInMonth: parseInt(summary.checked_in_count) || 0,
+        pendingCheckIn: parseInt(pendingCheckInResult.rows[0]?.count) || 0,
+      },
+      comparison: {
+        revenueChangePercent,
+        bookingsChangePercent,
+        guestsChangePercent,
+      },
+      topExperiences: topExperiencesResult.rows.map(row => ({
+        id: row.id,
+        title: row.title,
+        bookings: parseInt(row.bookings) || 0,
+        revenue_cents: parseInt(row.revenue_cents) || 0,
+      })),
+      dailyBreakdown: dailyResult.rows.map(row => ({
+        date: row.date,
+        bookings: parseInt(row.bookings) || 0,
+        revenue_cents: parseInt(row.revenue_cents) || 0,
+        guests: parseInt(row.guests) || 0,
+      })),
+      bookingsBySource: sourceResult.rows.map(row => ({
+        source: row.source,
+        count: parseInt(row.count) || 0,
+        revenue_cents: parseInt(row.revenue_cents) || 0,
+      })),
+      bookingsByStatus: statusResult.rows.map(row => ({
+        status: row.status,
+        count: parseInt(row.count) || 0,
+      })),
     };
   }
 }

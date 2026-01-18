@@ -57,16 +57,36 @@ export class AgentsService {
             documentNumber: dto.documentNumber,
         });
 
+        // 4. Create business_profile for the agent
+        const businessProfileResult = await this.db.query(
+            `INSERT INTO business_profiles (
+                entity_type, name, nit, rnt, contact_email, contact_phone, status
+            ) VALUES ('agent', $1, $2, $3, $4, $5, 'draft')
+            RETURNING id`,
+            [
+                `${dto.fullName} - Agente`,
+                dto.nit || null,
+                dto.rnt || null,
+                dto.email,
+                dto.phone,
+            ]
+        );
+        const businessProfileId = businessProfileResult.rows[0].id as string;
+
+        // 5. Create resort_agents relationship with business_profile reference
         await this.db.query(
-            `INSERT INTO resort_agents (resort_id, user_id, commission_bps, commission_fixed_cents)
-                VALUES ($1, $2, $3, $4)
-                ON CONFLICT (resort_id, user_id) DO NOTHING`,
-            [resortId, newUser.id, dto.commissionBps || 0, dto.commissionFixedCents || 0],
+            `INSERT INTO resort_agents (resort_id, user_id, business_profile_id, commission_bps, commission_fixed_cents)
+                VALUES ($1, $2, $3, $4, $5)
+                ON CONFLICT (resort_id, user_id) DO UPDATE SET
+                    business_profile_id = EXCLUDED.business_profile_id,
+                    updated_at = NOW()`,
+            [resortId, newUser.id, businessProfileId, dto.commissionBps || 0, dto.commissionFixedCents || 0],
         );
 
         return {
             ...newUser,
             resortId,
+            businessProfileId,
             commissionBps: dto.commissionBps || 0,
             commissionFixedCents: dto.commissionFixedCents || 0,
         };
@@ -109,10 +129,10 @@ export class AgentsService {
 
         try {
             const result = await this.db.query(
-                `INSERT INTO resort_agents (resort_id, user_id, commission_bps)
-         VALUES ($1, $2, $3)
+                `INSERT INTO resort_agents (resort_id, user_id, commission_bps, commission_fixed_cents)
+         VALUES ($1, $2, $3, $4)
          RETURNING *`,
-                [resortId, dto.userId, dto.commissionBps],
+                [resortId, dto.userId, dto.commissionBps, dto.commissionFixedCents || 0],
             );
             return result.rows[0];
         } catch (error) {
@@ -122,6 +142,48 @@ export class AgentsService {
             }
             throw new InternalServerErrorException('Failed to create agent agreement');
         }
+    }
+
+    async searchUnassignedAgents(resortId: string, search: string, page: number = 1, limit: number = 10) {
+        const offset = (page - 1) * limit;
+
+        const countQuery = `
+            SELECT COUNT(*) as total
+            FROM users u
+            LEFT JOIN resort_agents ra ON u.id = ra.user_id AND ra.resort_id = $1
+            WHERE ra.id IS NULL 
+            AND u.role = 'agent'
+            ${search ? 'AND (u.email ILIKE $2 OR u.full_name ILIKE $2)' : ''}
+        `;
+
+        const dataQuery = `
+            SELECT u.id, u.email, u.full_name, u.avatar 
+            FROM users u
+            LEFT JOIN resort_agents ra ON u.id = ra.user_id AND ra.resort_id = $1
+            WHERE ra.id IS NULL 
+            AND u.role = 'agent'
+            ${search ? 'AND (u.email ILIKE $2 OR u.full_name ILIKE $2)' : ''}
+            ORDER BY u.created_at DESC
+            LIMIT $${search ? '3' : '2'} OFFSET $${search ? '4' : '3'}
+        `;
+
+        const countParams = search ? [resortId, `%${search}%`] : [resortId];
+        const dataParams = search ? [resortId, `%${search}%`, limit, offset] : [resortId, limit, offset];
+
+        const [countResult, dataResult] = await Promise.all([
+            this.db.query(countQuery, countParams),
+            this.db.query(dataQuery, dataParams)
+        ]);
+
+        return {
+            data: dataResult.rows,
+            meta: {
+                total: parseInt(countResult.rows[0].total, 10),
+                page,
+                limit,
+                total_pages: Math.ceil(parseInt(countResult.rows[0].total, 10) / limit),
+            }
+        };
     }
 
     async getAgentsByResort(resortId: string, requesterId: string) {
@@ -189,37 +251,126 @@ export class AgentsService {
     }
 
     async getProfile(userId: string) {
+        // Get agent profile via resort_agents and business_profile data
         const result = await this.db.query(
-            `SELECT * FROM agent_profiles WHERE user_id = $1`,
+            `SELECT ra.id, ra.user_id, ra.business_profile_id, ra.commission_bps, ra.commission_fixed_cents,
+                    u.full_name, u.email, u.phone,
+                    bp.nit, 
+                    bp.rnt,
+                    bp.status as business_status
+             FROM resort_agents ra
+             JOIN users u ON u.id = ra.user_id
+             LEFT JOIN business_profiles bp ON ra.business_profile_id = bp.id
+             WHERE ra.user_id = $1
+             LIMIT 1`,
             [userId],
         );
-        return result.rows[0] || null;
+
+        if (result.rows.length === 0) {
+            // Agent not linked to any resort yet, return basic user info
+            const userResult = await this.db.query(
+                'SELECT id, full_name, email, phone FROM users WHERE id = $1',
+                [userId]
+            );
+            if (userResult.rows.length === 0) return null;
+            return {
+                user_id: userId,
+                ...userResult.rows[0],
+                documents: [],
+            };
+        }
+
+        const profile = result.rows[0] as { business_profile_id?: string };
+        const businessProfileId = profile.business_profile_id;
+
+        // Get business documents if business_profile exists
+        let documents: unknown[] = [];
+        if (businessProfileId) {
+            const docsResult = await this.db.query(
+                `SELECT id, doc_type, file_url, status, rejection_reason, reviewed_at, uploaded_at, created_at, updated_at
+                 FROM business_documents 
+                 WHERE business_profile_id = $1 
+                 ORDER BY created_at DESC`,
+                [businessProfileId]
+            );
+            documents = docsResult.rows;
+        }
+
+        return {
+            ...profile,
+            documents,
+        };
     }
 
     async updateProfile(userId: string, dto: UpdateAgentProfileDto) {
-        // Upsert profile
-        const result = await this.db.query(
-            `INSERT INTO agent_profiles (
-         user_id, bank_name, account_number, account_type, account_holder_name, tax_id, updated_at
-       ) VALUES ($1, $2, $3, $4, $5, $6, NOW())
-       ON CONFLICT (user_id) DO UPDATE SET
-         bank_name = EXCLUDED.bank_name,
-         account_number = EXCLUDED.account_number,
-         account_type = EXCLUDED.account_type,
-         account_holder_name = EXCLUDED.account_holder_name,
-         tax_id = EXCLUDED.tax_id,
-         updated_at = NOW()
-       RETURNING *`,
-            [
-                userId,
-                dto.bankName ?? null,
-                dto.accountNumber ?? null,
-                dto.accountType ?? null,
-                dto.accountHolderName ?? null,
-                dto.taxId ?? null,
-            ],
+        // Check if user has resort_agents entry and get business_profile_id
+        const existingProfile = await this.db.query(
+            'SELECT id, business_profile_id FROM resort_agents WHERE user_id = $1 LIMIT 1',
+            [userId]
         );
-        return result.rows[0];
+
+        let businessProfileId = existingProfile.rows[0]?.business_profile_id as string | null;
+        const resortAgentId = existingProfile.rows[0]?.id as string | undefined;
+
+        // If NIT or RNT is provided, upsert business_profile
+        if (dto.nit !== undefined || dto.rnt !== undefined) {
+            if (businessProfileId) {
+                // Update existing business_profile
+                await this.db.query(
+                    `UPDATE business_profiles 
+                     SET nit = COALESCE($1, nit), 
+                         rnt = COALESCE($2, rnt),
+                         updated_at = NOW()
+                     WHERE id = $3`,
+                    [dto.nit ?? null, dto.rnt ?? null, businessProfileId]
+                );
+            } else {
+                // Get user info for business_profile name
+                const userResult = await this.db.query(
+                    'SELECT full_name, email, phone FROM users WHERE id = $1',
+                    [userId]
+                );
+                const user = userResult.rows[0] as { full_name?: string; email?: string; phone?: string } | undefined;
+
+                // Create new business_profile
+                const newBpResult = await this.db.query(
+                    `INSERT INTO business_profiles (
+                        entity_type, name, nit, rnt, contact_email, contact_phone, status
+                    ) VALUES ('agent', $1, $2, $3, $4, $5, 'draft')
+                    RETURNING id`,
+                    [
+                        `${user?.full_name || 'Agent'} - Agente`,
+                        dto.nit ?? null,
+                        dto.rnt ?? null,
+                        user?.email ?? null,
+                        user?.phone ?? null,
+                    ]
+                );
+                businessProfileId = newBpResult.rows[0].id as string;
+
+                // Link to resort_agents if exists
+                if (resortAgentId) {
+                    await this.db.query(
+                        'UPDATE resort_agents SET business_profile_id = $1 WHERE id = $2',
+                        [businessProfileId, resortAgentId]
+                    );
+                }
+            }
+        }
+
+        // Return updated profile
+        const bpResult = await this.db.query(
+            'SELECT nit, rnt, status FROM business_profiles WHERE id = $1',
+            [businessProfileId]
+        );
+
+        return {
+            user_id: userId,
+            business_profile_id: businessProfileId,
+            nit: bpResult.rows[0]?.nit ?? null,
+            rnt: bpResult.rows[0]?.rnt ?? null,
+            business_status: bpResult.rows[0]?.status ?? null,
+        };
     }
 
     // ===== Referral Codes =====

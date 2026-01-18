@@ -61,27 +61,6 @@ services:
     networks:
       - livex_net
 
-  # Emulador local de Azure Storage (opcional, útil en dev)
-  azurite:
-    image: mcr.microsoft.com/azure-storage/azurite
-    container_name: livex_azurite
-    profiles: ["dev"]
-    environment:
-      - AZURITE_DISABLE_TELEMETRY=true
-    command: "azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --disableProductStyleUrl"
-    ports:
-      - "10000:10000" # Blob
-      - "10001:10001" # Queue
-    volumes:
-      - azurite_data:/data
-    healthcheck:
-      test: ["CMD-SHELL", "nc -z 127.0.0.1 10000 || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-    networks:
-      - livex_net
-
   # API (backend)
   app:
     build:
@@ -101,7 +80,7 @@ services:
       PORT: ${PORT:-3000}
     ports:
       - "${PORT:-3000}:3000"
-    command: ["sh", "-c", "${APP_COMMAND:-npm run dev}"]
+    command: ["sh", "-c", "echo 'Esperando a la DB...' && sleep 10 && ${APP_COMMAND:-npm run dev}"]
     volumes:
       - type: bind
         source: .
@@ -131,7 +110,7 @@ services:
       - ${ENV_FILE:-.env.development}
     environment:
       NODE_ENV: ${NODE_ENV:-development}
-    command: ["sh", "-c", "${WORKER_COMMAND:-npm run worker:dev}"]
+    command: ["sh", "-c", "echo '⏳ Esperando a que la DB se estabilice...' && sleep 15 && ${WORKER_COMMAND:-npm run dev}"]
     volumes:
       - type: bind
         source: .
@@ -159,7 +138,7 @@ services:
       - ${ENV_FILE:-.env.development}
     environment:
       NODE_ENV: ${NODE_ENV:-development}
-    command: ["sh", "-c", "${WORKER_COMMAND:-npm run notification-worker:dev}"]
+    command: ["sh", "-c", "echo '⏳ Esperando a que la DB se estabilice...' && sleep 15 && ${WORKER_COMMAND:-npm run notification-worker:dev}"]
     volumes:
       - type: bind
         source: .
@@ -240,6 +219,8 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/static:/usr/share/nginx/html/static:ro
+      - ./fotos_experiencias:/usr/share/nginx/html/images:ro
       # Descomenta si usas Basic Auth:
       # - ./nginx/htpasswd:/etc/nginx/htpasswd:ro
     # restart: unless-stopped
@@ -248,12 +229,9 @@ services:
 
 volumes:
   dbdata:
-  azurite_data:
 
 networks:
   livex_net:
     name: livex_network
     driver: bridge
-    ipam:
-      config:
-        - subnet: 172.25.0.0/16
+    

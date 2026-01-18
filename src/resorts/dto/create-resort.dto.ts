@@ -8,6 +8,11 @@ export class CreateResortDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(200)
+  website?: string;
+
+  @IsOptional()
+  @IsString()
   @MaxLength(1000)
   description?: string;
 

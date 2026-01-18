@@ -117,44 +117,61 @@ up AS (
   SELECT id, 'es', 'COP' FROM u WHERE email = 'operador@marysol.co'
   UNION ALL
   SELECT id, 'es', 'COP' FROM u WHERE email = 'carlos.ventas@livex.app'
-  RETURNING user_id, currency
 ),
 
--- 2. Prestadores (Resorts)
+-- 2. Business Profiles para Resorts
+bp_resorts AS (
+  INSERT INTO business_profiles (entity_type, name, nit, rnt, contact_email, contact_phone, status, approved_by, approved_at)
+  VALUES
+    ('resort'::business_entity_type, 'Mar y Sol Cartagena', '900111222-1', '12345', 'contacto@marysol.co', '+57 300 1111111', 'approved'::resort_status, (SELECT id FROM u WHERE email='admin@livex.app'), now()),
+    ('resort'::business_entity_type, 'Isla Brisa Resort', '900333444-2', '23456', 'hola@islabrisa.co', '+57 300 2222222', 'approved'::resort_status, (SELECT id FROM u WHERE email='admin@livex.app'), now()),
+    ('resort'::business_entity_type, 'Náutica Bahía Club', '900555666-3', '34567', 'info@nauticabahia.co', '+57 300 3333333', 'approved'::resort_status, (SELECT id FROM u WHERE email='admin@livex.app'), now())
+  RETURNING id, name
+),
+
+-- 3. Prestadores (Resorts) con referencia a business_profiles
 r AS (
   INSERT INTO resorts (
     name, description, website, contact_email, contact_phone,
     address_line, city, country, latitude, longitude,
-    owner_user_id, is_active, status, approved_by, approved_at
+    owner_user_id, business_profile_id, is_active, status, approved_by, approved_at
   )
   SELECT
     'Mar y Sol Cartagena', 'Operador de actividades de playa y city tours', 'https://marysol.co', 'contacto@marysol.co', '+57 300 1111111',
     'Bocagrande Cra 1 #1-23', 'Cartagena', 'Colombia', 10.400000, -75.550000,
-    (SELECT id FROM u WHERE email='operaciones@marysol.co'), true, 'approved'::resort_status,
+    (SELECT id FROM u WHERE email='operaciones@marysol.co'), 
+    (SELECT id FROM bp_resorts WHERE name='Mar y Sol Cartagena'),
+    true, 'approved'::resort_status,
     (SELECT id FROM u WHERE email='admin@livex.app'), now()
   UNION ALL
   SELECT
     'Isla Brisa Resort', 'Resort boutique en Islas del Rosario', 'https://islabrisa.co', 'hola@islabrisa.co', '+57 300 2222222',
     'Muelle La Bodeguita', 'Cartagena', 'Colombia', 10.411100, -75.545000,
-    (SELECT id FROM u WHERE email='coordinacion@islabrisa.co'), true, 'approved'::resort_status,
+    (SELECT id FROM u WHERE email='coordinacion@islabrisa.co'),
+    (SELECT id FROM bp_resorts WHERE name='Isla Brisa Resort'),
+    true, 'approved'::resort_status,
     (SELECT id FROM u WHERE email='admin@livex.app'), now()
   UNION ALL
   SELECT
     'Náutica Bahía Club', 'Club náutico con experiencias de vela y atardecer', 'https://nauticabahia.co', 'info@nauticabahia.co', '+57 300 3333333',
     'Marina Santa Cruz', 'Cartagena', 'Colombia', 10.420000, -75.530000,
-    (SELECT id FROM u WHERE email='reservas@nauticabahia.co'), true, 'approved'::resort_status,
+    (SELECT id FROM u WHERE email='reservas@nauticabahia.co'),
+    (SELECT id FROM bp_resorts WHERE name='Náutica Bahía Club'),
+    true, 'approved'::resort_status,
     (SELECT id FROM u WHERE email='admin@livex.app'), now()
   RETURNING id, name
 ),
 
--- 4. Documentos Legales
-docs AS (
-  INSERT INTO resort_documents (resort_id, doc_type, file_url, status, reviewed_by, reviewed_at)
+-- 4. Business Documents (documentos en la nueva tabla compartida)
+bp_docs AS (
+  INSERT INTO business_documents (business_profile_id, doc_type, file_url, status, reviewed_by, reviewed_at)
   VALUES
-    ((SELECT id FROM r WHERE name='Mar y Sol Cartagena'), 'rut_nit'::resort_doc_type, 'https://files.example.com/marysol-rut.pdf', 'approved'::document_status, (SELECT id FROM u WHERE email='admin@livex.app'), now()),
-    ((SELECT id FROM r WHERE name='Isla Brisa Resort'),   'rnt'::resort_doc_type, 'https://files.example.com/islabrisa-lic.pdf', 'approved'::document_status, (SELECT id FROM u WHERE email='admin@livex.app'), now()),
-    ((SELECT id FROM r WHERE name='Náutica Bahía Club'),  'camara_comercio'::resort_doc_type,'https://files.example.com/nautica-pola.pdf', 'approved'::document_status, (SELECT id FROM u WHERE email='admin@livex.app'), now())
-  RETURNING resort_id
+    ((SELECT id FROM bp_resorts WHERE name='Mar y Sol Cartagena'), 'rut_nit'::resort_doc_type, 'https://files.example.com/marysol-rut.pdf', 'approved'::document_status, (SELECT id FROM u WHERE email='admin@livex.app'), now()),
+    ((SELECT id FROM bp_resorts WHERE name='Mar y Sol Cartagena'), 'camara_comercio'::resort_doc_type, 'https://files.example.com/marysol-camara.pdf', 'approved'::document_status, (SELECT id FROM u WHERE email='admin@livex.app'), now()),
+    ((SELECT id FROM bp_resorts WHERE name='Isla Brisa Resort'), 'rnt'::resort_doc_type, 'https://files.example.com/islabrisa-lic.pdf', 'approved'::document_status, (SELECT id FROM u WHERE email='admin@livex.app'), now()),
+    ((SELECT id FROM bp_resorts WHERE name='Isla Brisa Resort'), 'rut_nit'::resort_doc_type, 'https://files.example.com/islabrisa-rut.pdf', 'approved'::document_status, (SELECT id FROM u WHERE email='admin@livex.app'), now()),
+    ((SELECT id FROM bp_resorts WHERE name='Náutica Bahía Club'), 'camara_comercio'::resort_doc_type, 'https://files.example.com/nautica-pola.pdf', 'approved'::document_status, (SELECT id FROM u WHERE email='admin@livex.app'), now())
+  RETURNING business_profile_id
 ),
 
 -- 5. Categorías
@@ -639,23 +656,39 @@ VALUES
 INSERT INTO users (email, password_hash, full_name, phone, role) 
 VALUES ('agente.carlos@gmail.com', '$2b$10$j54QekkMZucJ.hKpcRMmqe4SnETnpr.8OxLyRfAZVLnSVkBgP4eFS', 'Carlos El Vendedor', '+573005555555', 'agent');
 
+-- 4.1.1 Business Profile para el Agente
+INSERT INTO business_profiles (entity_type, name, nit, rnt, contact_email, contact_phone, status, approved_by, approved_at)
+SELECT
+  'agent'::business_entity_type, 
+  'Carlos El Vendedor - Agente', 
+  '72345678-9',
+  '45678',
+  'agente.carlos@gmail.com', 
+  '+573005555555', 
+  'approved'::resort_status, 
+  (SELECT id FROM users WHERE email='admin@livex.app'), 
+  now();
+
+-- 4.1.2 Business Documents para el Agente
+INSERT INTO business_documents (business_profile_id, doc_type, file_url, status, reviewed_by, reviewed_at)
+SELECT
+  (SELECT id FROM business_profiles WHERE name='Carlos El Vendedor - Agente'),
+  'rut_nit'::resort_doc_type,
+  'https://files.example.com/carlos-rut.pdf',
+  'approved'::document_status,
+  (SELECT id FROM users WHERE email='admin@livex.app'),
+  now();
+
 -- 4.2 Acuerdo Comercial (15% Comisión para Carlos con Mar y Sol)
-INSERT INTO resort_agents (resort_id, user_id, commission_bps, is_active)
+INSERT INTO resort_agents (resort_id, user_id, business_profile_id, commission_bps, is_active)
 SELECT 
   (SELECT id FROM resorts WHERE name='Mar y Sol Cartagena'),
   (SELECT id FROM users WHERE email='agente.carlos@gmail.com'),
+  (SELECT id FROM business_profiles WHERE name='Carlos El Vendedor - Agente'),
   1500, -- 15%
   true;
 
--- 4.3 Perfil Financiero del Agente
-INSERT INTO agent_profiles (
-  user_id, bank_name, account_number, account_type, account_holder_name, tax_id, is_verified
-)
-SELECT 
-  (SELECT id FROM users WHERE email='agente.carlos@gmail.com'),
-  'Bancolombia', '9876543210', 'savings', 'Carlos Vendedor', '1234567890', true;
-
--- 4.4 Crear Reserva por Agente (Confirmada)
+-- 4.3 Crear Reserva por Agente (Confirmada)
 -- Usando el nuevo modelo: commission_cents = pago online, resort_net_cents = pago presencial
 INSERT INTO bookings (
   user_id, experience_id, slot_id, agent_id,
@@ -670,7 +703,7 @@ SELECT
   2, 0, 96000000, 0, 24000000, 96000000, 120000000, 'COP',  -- 2 personas × ($480k neto + $120k comisión) = $1.2M total, $240k comisión
   'confirmed', now(), now();
 
--- 4.5 Registrar Pago
+-- 4.4 Registrar Pago
 INSERT INTO payments (
   booking_id, provider, provider_reference, amount_cents, currency, 
   status, payment_method, paid_at
@@ -681,7 +714,7 @@ SELECT
   952000000, 'COP',
   'paid', 'card', now();
 
--- 4.6 Generar Comisiones
+-- 4.5 Generar Comisiones
 -- A) Comisión de Plataforma (10%)
 INSERT INTO commissions (booking_id, rate_bps, commission_cents, created_at)
 SELECT
@@ -714,7 +747,7 @@ ORDER BY b.created_at DESC LIMIT 1;
 INSERT INTO referral_codes (owner_user_id, code, code_type, description)
 VALUES ((SELECT id FROM users WHERE email='agente.carlos@gmail.com'), 'CARLOSVIP', 'commission', 'Código personal de Carlos - Solo tracking');
 
--- 5.2 Código Mixto (Descuento 10% + Comisión)
+-- 5.2 Código Mixto (Descuento 25000 + Comisión)
 INSERT INTO referral_codes (owner_user_id, code, code_type, discount_type, discount_value, description)
 VALUES ((SELECT id FROM users WHERE email='agente.carlos@gmail.com'), 'VERANO2025', 'both', 'fixed', 2500000, 'Promoción de verano - $25.000 de descuento');
 
