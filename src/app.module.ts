@@ -31,6 +31,7 @@ import awsConfig from './config/aws.config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ExchangeRatesModule } from './exchange-rates/exchange-rates.module';
 import { UserPreferencesModule } from './user-preferences/user-preferences.module';
+import { PdfModule } from './pdf/pdf.module';
 
 
 
@@ -59,6 +60,7 @@ import { UserPreferencesModule } from './user-preferences/user-preferences.modul
     ScheduleModule.forRoot(),
     ExchangeRatesModule,
     UserPreferencesModule,
+    PdfModule,
   ],
   controllers: [AppController],
   providers: [

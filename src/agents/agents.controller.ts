@@ -9,7 +9,12 @@ import {
     Query,
     UseGuards,
     ParseUUIDPipe,
+    BadRequestException,
+    HttpCode,
+    HttpStatus,
+    Req,
 } from '@nestjs/common';
+import type { FastifyRequest } from 'fastify';
 import { AgentsService } from './agents.service';
 import { CreateAgentAgreementDto } from './dto/create-agent-agreement.dto';
 import { UpdateAgentCommissionDto } from './dto/update-agent-commission.dto';
@@ -23,6 +28,21 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayload } from '../common/interfaces/jwt-payload.interface';
 
 type User = JwtPayload & { id: string };
+
+// Fastify multipart file interface
+interface FastifyMultipartFile {
+    value: Buffer;
+    filename: string;
+    mimetype: string;
+    encoding: string;
+    fieldname: string;
+    toBuffer?: () => Promise<Buffer>;
+}
+
+interface DocumentUploadBody {
+    file?: FastifyMultipartFile;
+    doc_type?: string;
+}
 
 @Controller('api/v1/agents')
 @UseGuards(JwtAuthGuard)
@@ -59,9 +79,29 @@ export class AgentsController {
     @Get('resorts/:resortId')
     getAgentsByResort(
         @Param('resortId', ParseUUIDPipe) resortId: string,
+        @Query('status') status: string | undefined,
         @CurrentUser() user: User,
     ) {
-        return this.agentsService.getAgentsByResort(resortId, user.id);
+        return this.agentsService.getAgentsByResort(resortId, user.id, status);
+    }
+
+    @Post('resorts/:resortId/users/:userId/approve')
+    approveAgent(
+        @Param('resortId', ParseUUIDPipe) resortId: string,
+        @Param('userId', ParseUUIDPipe) userId: string,
+        @CurrentUser() user: User,
+    ) {
+        return this.agentsService.approveAgent(resortId, userId, user.id);
+    }
+
+    @Post('resorts/:resortId/users/:userId/reject')
+    rejectAgent(
+        @Param('resortId', ParseUUIDPipe) resortId: string,
+        @Param('userId', ParseUUIDPipe) userId: string,
+        @Body('reason') reason: string,
+        @CurrentUser() user: User,
+    ) {
+        return this.agentsService.rejectAgent(resortId, userId, reason, user.id);
     }
 
     @Patch('resorts/:resortId/users/:userId')
@@ -95,6 +135,94 @@ export class AgentsController {
         @Body() dto: UpdateAgentProfileDto,
     ) {
         return this.agentsService.updateProfile(user.id, dto);
+    }
+
+    // ===== Document Upload =====
+
+    @Post('profile/documents/upload')
+    @HttpCode(HttpStatus.CREATED)
+    async uploadDocument(
+        @Req() req: FastifyRequest,
+        @Body() body: DocumentUploadBody,
+    ) {
+        const file = body.file;
+        const docType = body.doc_type;
+        const user = (req as any).user as User;
+
+        if (!docType) {
+            throw new BadRequestException('doc_type is required');
+        }
+
+        if (!file) {
+            throw new BadRequestException('File not found in request');
+        }
+
+        let fileBuffer: Buffer | undefined;
+        let mimeType = 'application/pdf';
+        let originalName = 'document.pdf';
+
+        if (Buffer.isBuffer(file)) {
+            fileBuffer = file;
+        } else if ((file as any).value && Buffer.isBuffer((file as any).value)) {
+            fileBuffer = (file as any).value;
+            mimeType = (file as any).mimetype || mimeType;
+            originalName = (file as any).filename || originalName;
+        } else if ((file as any).data && Buffer.isBuffer((file as any).data)) {
+            fileBuffer = (file as any).data;
+        } else if ((file as any).toBuffer) {
+            fileBuffer = await (file as any).toBuffer();
+            mimeType = (file as any).mimetype || mimeType;
+            originalName = (file as any).filename || originalName;
+        }
+
+        if (!fileBuffer) {
+            throw new BadRequestException('Invalid file format received');
+        }
+
+        const adaptedFile = {
+            buffer: fileBuffer,
+            originalname: originalName,
+            mimetype: mimeType,
+        };
+
+        return this.agentsService.uploadDocument(user.id, adaptedFile, docType);
+    }
+
+    @Delete('profile/documents/:docId')
+    @HttpCode(HttpStatus.NO_CONTENT)
+    deleteDocument(
+        @CurrentUser() user: User,
+        @Param('docId', ParseUUIDPipe) docId: string,
+    ) {
+        return this.agentsService.deleteDocument(user.id, docId);
+    }
+
+    // ===== Document Approval (for resort owners) =====
+
+    @Post('resorts/:resortId/documents/:docId/approve')
+    @HttpCode(HttpStatus.OK)
+    approveAgentDocument(
+        @Param('resortId', ParseUUIDPipe) resortId: string,
+        @Param('docId', ParseUUIDPipe) docId: string,
+        @CurrentUser() user: User,
+    ) {
+        return this.agentsService.approveDocument(resortId, docId, user.id);
+    }
+
+    @Post('resorts/:resortId/documents/:docId/reject')
+    @HttpCode(HttpStatus.OK)
+    rejectAgentDocument(
+        @Param('resortId', ParseUUIDPipe) resortId: string,
+        @Param('docId', ParseUUIDPipe) docId: string,
+        @Body('rejection_reason') rejectionReason: string,
+        @CurrentUser() user: User,
+    ) {
+        return this.agentsService.rejectDocument(resortId, docId, rejectionReason, user.id);
+    }
+
+    @Get('me/resorts')
+    getMyResorts(@CurrentUser() user: User) {
+        return this.agentsService.getAgentResorts(user.id);
     }
 
     // ===== Referral Codes =====

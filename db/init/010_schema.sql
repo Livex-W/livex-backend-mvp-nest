@@ -284,10 +284,20 @@ CREATE TABLE IF NOT EXISTS resort_agents (
     commission_bps integer NOT NULL DEFAULT 0 CHECK (commission_bps >= 0 AND commission_bps <= 10000), 
     commission_fixed_cents integer NOT NULL DEFAULT 0 CHECK (commission_fixed_cents >= 0),
     is_active boolean DEFAULT true,
+    
+    -- Estado y Aprobación (igual que resorts)
+    status resort_status NOT NULL DEFAULT 'draft',
+    approved_by uuid REFERENCES users(id) ON DELETE SET NULL,
+    approved_at timestamptz,
+    rejection_reason text,
+    
     created_at timestamptz DEFAULT now(),
     updated_at timestamptz DEFAULT now(),
     CONSTRAINT unique_active_agent_resort UNIQUE (resort_id, user_id)
 );
+
+CREATE INDEX IF NOT EXISTS idx_resort_agents_status ON resort_agents(status);
+CREATE TRIGGER trg_resort_agents_updated_at BEFORE UPDATE ON resort_agents FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- ====================================================================================
 -- 4. CATÁLOGO Y EXPERIENCIAS
@@ -306,7 +316,11 @@ CREATE TABLE IF NOT EXISTS experiences (
   title           text NOT NULL,
   slug            text GENERATED ALWAYS AS (regexp_replace(lower(title), '\s+', '-', 'g')) STORED,
   description     text,
-  category        text NOT NULL CHECK (category IN ('islands','nautical','city_tour')),
+  category        text NOT NULL CHECK (category IN (
+    'islands','nautical','city_tour',
+    'sun_beach','cultural','adventure','ecotourism',
+    'agrotourism','gastronomic','religious','educational'
+  )),
   
   -- Moneda para esta experiencia (los precios van en availability_slots)
   currency        text NOT NULL DEFAULT 'COP',
@@ -420,6 +434,8 @@ CREATE TABLE IF NOT EXISTS referral_codes (
     allow_stacking boolean DEFAULT false,
     
     commission_override_bps integer,
+
+    usage_count integer DEFAULT 0,
     
     is_active boolean DEFAULT true,
     usage_limit integer,

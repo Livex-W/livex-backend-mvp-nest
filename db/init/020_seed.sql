@@ -177,9 +177,14 @@ bp_docs AS (
 -- 5. Categorías
 c AS (
   INSERT INTO categories (slug, name) VALUES
-    ('city_tour','City Tour'),
-    ('islands','Islas y Playa'),
-    ('nautical','Náutica y Vela')
+    ('sun_beach', 'Sol y playa (Resort, vacacionales)'),
+    ('cultural', 'Cultural (Arte, Historia, Tradiciones y Museos)'),
+    ('adventure', 'Turismo Aventura'),
+    ('ecotourism', 'Ecoturismo'),
+    ('agrotourism', 'Agro turismo'),
+    ('gastronomic', 'Turismo gastronómico'),
+    ('religious', 'Turismo religioso'),
+    ('educational', 'Turismo educativo')
   RETURNING id, slug
 ),
 -- 6. Experiencias (sin precios - ahora van en availability_slots)
@@ -192,7 +197,7 @@ e AS (
   VALUES
     -- 1. City Tour Histórico
     ((SELECT id FROM r WHERE name='Mar y Sol Cartagena'),
-      'City Tour Histórico', 'Recorrido por el Centro Histórico y Getsemaní', 'city_tour',
+      'City Tour Histórico', 'Recorrido por el Centro Histórico y Getsemaní', 'cultural',
       true, 3, 9,
       'COP', 'Guía certificado, hidratación', 'Almuerzo',
       'active'::experience_status,
@@ -216,7 +221,7 @@ e AS (
 
     -- 4. Tour Murallas y Castillo
     ((SELECT id FROM r WHERE name='Mar y Sol Cartagena'),
-      'Tour Murallas y Castillo', 'Recorrido por las murallas y el Castillo San Felipe', 'city_tour',
+      'Tour Murallas y Castillo', 'Recorrido por las murallas y el Castillo San Felipe', 'cultural',
       true, 5, 12,
       'COP', 'Guía especializado, entrada al castillo', 'Propinas',
       'active'::experience_status,
@@ -224,7 +229,7 @@ e AS (
 
     -- 5. Kayak Mangrove Tour
     ((SELECT id FROM r WHERE name='Náutica Bahía Club'),
-      'Kayak Mangrove Tour', 'Aventura en kayak por los manglares de la bahía', 'nautical',
+      'Kayak Mangrove Tour', 'Aventura en kayak por los manglares de la bahía', 'ecotourism',
       true, 8, 16,
       'COP', 'Kayak doble, chaleco, instructor', 'Refrigerio',
       'active'::experience_status,
@@ -240,7 +245,7 @@ e AS (
 
     -- 7. Tour Nocturno Getsemaní
     ((SELECT id FROM r WHERE name='Mar y Sol Cartagena'),
-      'Tour Nocturno Getsemaní', 'Descubre el barrio más bohemio de noche', 'city_tour',
+      'Tour Nocturno Getsemaní', 'Descubre el barrio más bohemio de noche', 'cultural',
       false, NULL, NULL,
       'COP', 'Guía, coctel de bienvenida', 'Cena',
       'active'::experience_status,
@@ -248,7 +253,7 @@ e AS (
 
     -- 8. Jet Ski Adventure
     ((SELECT id FROM r WHERE name='Náutica Bahía Club'),
-      'Jet Ski Adventure', 'Adrenalina pura en moto acuática', 'nautical',
+      'Jet Ski Adventure', 'Adrenalina pura en moto acuática', 'adventure',
       false, NULL, NULL,
       'COP', 'Jet ski, chaleco, instructor', 'Seguro adicional',
       'active'::experience_status,
@@ -264,7 +269,7 @@ e AS (
 
     -- 10. Tour del Café
     ((SELECT id FROM r WHERE name='Mar y Sol Cartagena'),
-      'Tour del Café', 'Degustación y cultura del café colombiano', 'city_tour',
+      'Tour del Café', 'Degustación y cultura del café colombiano', 'gastronomic',
       true, 6, 15,
       'COP', 'Degustación, souvenirs', 'Almuerzo',
       'active'::experience_status,
@@ -272,7 +277,7 @@ e AS (
 
     -- 11. Paddleboard Sunset
     ((SELECT id FROM r WHERE name='Náutica Bahía Club'),
-      'Paddleboard Sunset', 'Paddleboard al atardecer en la bahía', 'nautical',
+      'Paddleboard Sunset', 'Paddleboard al atardecer en la bahía', 'adventure',
       true, 10, 17,
       'COP', 'Tabla, remo, instructor', 'Fotos',
       'active'::experience_status,
@@ -280,7 +285,7 @@ e AS (
 
     -- 12. Tour Gastronómico
     ((SELECT id FROM r WHERE name='Mar y Sol Cartagena'),
-      'Tour Gastronómico', 'Prueba los sabores auténticos de Cartagena', 'city_tour',
+      'Tour Gastronómico', 'Prueba los sabores auténticos de Cartagena', 'gastronomic',
       true, 5, 14,
       'COP', 'Degustaciones en 5 paradas, guía local', 'Bebidas alcohólicas',
       'active'::experience_status,
@@ -288,7 +293,7 @@ e AS (
 
     -- 13. Avistamiento de Delfines
     ((SELECT id FROM r WHERE name='Náutica Bahía Club'),
-      'Avistamiento de Delfines', 'Navega en busca de delfines en su hábitat', 'nautical',
+      'Avistamiento de Delfines', 'Navega en busca de delfines en su hábitat', 'ecotourism',
       true, 4, 12,
       'COP', 'Embarcación, guía biólogo, snacks', 'Garantía de avistamiento',
       'active'::experience_status,
@@ -304,7 +309,7 @@ e AS (
 
     -- 15. Tours Islas + Playa Tranquila
     ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
-      'Tours Islas + Playa Tranquila', 'tour por las paradisiacas islas del rosario y parada en Playa Tranquila Baru para disfrutar del mar azul', 'islands',
+      'Tours Islas + Playa Tranquila', 'tour por las paradisiacas islas del rosario y parada en Playa Tranquila Baru para disfrutar del mar azul', 'sun_beach',
       true, 3, 12,
       'COP', 'Transporte maritimo ida y vuelta, Tour panoramico islas, Llegada al Oceanario, Llegada a playa tranquila, Almuerzo tipico', 'Boleto de entrada al Oceanario, Impuestos de zarpe',
       'active'::experience_status,
@@ -312,7 +317,7 @@ e AS (
 
     -- 16. Palmarito Beach
     ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
-      'Palmarito Beach', 'Atencion y servicio que te haran querer volver', 'islands',
+      'Palmarito Beach', 'Atencion y servicio que te haran querer volver', 'sun_beach',
       true, 3, 12,
       'COP', 'Transporte maritimo ida y vuelta, Coctel de bienvenida, Almuerzo, Camas y Sillas asoleadoras, Piscina, canchas, zonas comunes', 'Cualquier producto o servicio no especificado',
       'active'::experience_status,
@@ -320,7 +325,7 @@ e AS (
 
     -- 17. Luxury Open Bar Area House
     ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
-      'Luxury Open Bar Area House', 'Vive una experiencia junto al mar en uno de los lugares mas exclusivos de Islas del Rosario', 'islands',
+      'Luxury Open Bar Area House', 'Vive una experiencia junto al mar en uno de los lugares mas exclusivos de Islas del Rosario', 'sun_beach',
       true, 3, 12,
       'COP', 'Transporte maritimo ida y vuelta, Barra abierta bebida nacional ilimitada, Traslado al oceanario (opcional), Kayak y paddle board, Careta para snorkel, Cama de playa, Almuerzo tipico', 'Boleto de entrada al Oceanario, Impuestos de zarpe',
       'active'::experience_status,
@@ -328,7 +333,7 @@ e AS (
 
     -- 18. BACHEROLETTE
     ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
-      'BACHEROLETTE', 'Plan extra mejorado para un disfrute mas pleno en un lugar lleno de tranquilidad y excelente atencion', 'islands',
+      'BACHEROLETTE', 'Plan extra mejorado para un disfrute mas pleno en un lugar lleno de tranquilidad y excelente atencion', 'sun_beach',
       false, 0, 0,
       'COP', 'Transporte maritimo ida y vuelta, 4 cocteles de la casa, Almuerzo y bebida, Cama Lounge y Silla asoleadora, Piscina, Playa semi privada, Postre shot, Mini ensalada de frutas', 'Cualquier producto o servicio no especificado',
       'active'::experience_status,
@@ -336,7 +341,7 @@ e AS (
 
     -- 19. Tamarindo Beach
     ((SELECT id FROM r WHERE name='Isla Brisa Resort'),
-      'Tamarindo Beach', 'A solo 10 minutos de cartagena un lugar lleno de tranquilidad y excelente atencion', 'islands',
+      'Tamarindo Beach', 'A solo 10 minutos de cartagena un lugar lleno de tranquilidad y excelente atencion', 'sun_beach',
       true, 3, 12,
       'COP', 'Transporte maritimo ida y vuelta, Coctel de bienvenida, Almuerzo, Cama Lounge y Silla asoleadora, Piscina, Playa semi privada', 'Cualquier producto o servicio no especificado',
       'active'::experience_status,

@@ -4,6 +4,7 @@ import {
     NotFoundException,
     ConflictException,
     InternalServerErrorException,
+    BadRequestException,
 } from '@nestjs/common';
 import { DatabaseClient } from '../database/database.client';
 import { DATABASE_CLIENT } from '../database/database.module';
@@ -16,12 +17,14 @@ import { CreateCodeVariantDto } from './dto/create-code-variant.dto';
 import { CreateAgentDto } from './dto/create-agent.dto';
 import { UsersService } from '../users/users.service';
 import { PasswordHashService } from '../auth/services/password-hash.service';
+import { UploadService } from '../upload/upload.service';
 @Injectable()
 export class AgentsService {
     constructor(
         @Inject(DATABASE_CLIENT) private readonly db: DatabaseClient,
         private readonly usersService: UsersService,
         private readonly passwordHashService: PasswordHashService,
+        private readonly uploadService: UploadService,
     ) { }
 
     async createAgent(dto: CreateAgentDto, requesterId: string) {
@@ -73,12 +76,13 @@ export class AgentsService {
         );
         const businessProfileId = businessProfileResult.rows[0].id as string;
 
-        // 5. Create resort_agents relationship with business_profile reference
+        // 5. Create resort_agents relationship with business_profile reference and status='draft'
         await this.db.query(
-            `INSERT INTO resort_agents (resort_id, user_id, business_profile_id, commission_bps, commission_fixed_cents)
-                VALUES ($1, $2, $3, $4, $5)
+            `INSERT INTO resort_agents (resort_id, user_id, business_profile_id, commission_bps, commission_fixed_cents, status)
+                VALUES ($1, $2, $3, $4, $5, 'draft')
                 ON CONFLICT (resort_id, user_id) DO UPDATE SET
                     business_profile_id = EXCLUDED.business_profile_id,
+                    status = 'draft',
                     updated_at = NOW()`,
             [resortId, newUser.id, businessProfileId, dto.commissionBps || 0, dto.commissionFixedCents || 0],
         );
@@ -129,8 +133,8 @@ export class AgentsService {
 
         try {
             const result = await this.db.query(
-                `INSERT INTO resort_agents (resort_id, user_id, commission_bps, commission_fixed_cents)
-         VALUES ($1, $2, $3, $4)
+                `INSERT INTO resort_agents (resort_id, user_id, commission_bps, commission_fixed_cents, status)
+         VALUES ($1, $2, $3, $4, 'draft')
          RETURNING *`,
                 [resortId, dto.userId, dto.commissionBps, dto.commissionFixedCents || 0],
             );
@@ -186,20 +190,99 @@ export class AgentsService {
         };
     }
 
-    async getAgentsByResort(resortId: string, requesterId: string) {
+    async getAgentsByResort(resortId: string, requesterId: string, statusFilter?: string) {
         const isOwner = await this.checkResortOwnership(resortId, requesterId);
         if (!isOwner) {
             throw new ConflictException('You do not have permission to view agents for this resort');
         }
 
-        const result = await this.db.query(
-            `SELECT ra.*, u.email, u.full_name
-       FROM resort_agents ra
-       JOIN users u ON u.id = ra.user_id
-       WHERE ra.resort_id = $1`,
-            [resortId],
+        let query = `
+            SELECT ra.*, u.email, u.full_name, u.phone,
+                   bp.nit, bp.rnt, bp.status as business_status
+            FROM resort_agents ra
+            JOIN users u ON u.id = ra.user_id
+            LEFT JOIN business_profiles bp ON bp.id = ra.business_profile_id
+            WHERE ra.resort_id = $1
+        `;
+        const params: (string | undefined)[] = [resortId];
+
+        if (statusFilter) {
+            query += ` AND ra.status = $2`;
+            params.push(statusFilter);
+        }
+
+        query += ` ORDER BY ra.created_at DESC`;
+
+        const result = await this.db.query(query, params);
+
+        // Fetch documents for each agent with business_profile
+        const agentsWithDocs = await Promise.all(
+            result.rows.map(async (agent: { business_profile_id?: string }) => {
+                if (agent.business_profile_id) {
+                    const docsResult = await this.db.query(
+                        `SELECT id, doc_type, file_url, status, rejection_reason, uploaded_at
+                         FROM business_documents
+                         WHERE business_profile_id = $1
+                         ORDER BY created_at DESC`,
+                        [agent.business_profile_id]
+                    );
+                    return { ...agent, documents: docsResult.rows };
+                }
+                return { ...agent, documents: [] };
+            })
         );
-        return result.rows;
+
+        return agentsWithDocs;
+    }
+
+    async approveAgent(resortId: string, userId: string, requesterId: string) {
+        const isOwner = await this.checkResortOwnership(resortId, requesterId);
+        if (!isOwner) {
+            throw new ConflictException('You do not have permission to approve agents');
+        }
+
+        const result = await this.db.query(
+            `UPDATE resort_agents
+             SET status = 'approved', 
+                 approved_by = $1,
+                 approved_at = NOW(),
+                 rejection_reason = NULL,
+                 updated_at = NOW()
+             WHERE resort_id = $2 AND user_id = $3
+             RETURNING *`,
+            [requesterId, resortId, userId],
+        );
+
+        if (result.rows.length === 0) {
+            throw new NotFoundException('Agent not found');
+        }
+
+        return result.rows[0];
+    }
+
+    async rejectAgent(resortId: string, userId: string, reason: string, requesterId: string) {
+        const isOwner = await this.checkResortOwnership(resortId, requesterId);
+        if (!isOwner) {
+            throw new ConflictException('You do not have permission to reject agents');
+        }
+
+        const result = await this.db.query(
+            `UPDATE resort_agents
+             SET status = 'rejected', 
+                 approved_by = $1,
+                 approved_at = NOW(),
+                 rejection_reason = $2,
+                 updated_at = NOW()
+             WHERE resort_id = $3 AND user_id = $4
+             RETURNING *`,
+            [requesterId, reason, resortId, userId],
+        );
+
+        if (result.rows.length === 0) {
+            throw new NotFoundException('Agent not found');
+        }
+
+        return result.rows[0];
     }
 
     async updateCommission(resortId: string, userId: string, dto: UpdateAgentCommissionDto, requesterId: string) {
@@ -371,6 +454,230 @@ export class AgentsService {
             rnt: bpResult.rows[0]?.rnt ?? null,
             business_status: bpResult.rows[0]?.status ?? null,
         };
+    }
+
+    async getAgentResorts(userId: string) {
+        const result = await this.db.query<{
+            id: string;
+            name: string;
+            city: string | null;
+            country: string | null;
+        }>(
+            `SELECT r.id, r.name, r.city, r.country
+             FROM resorts r
+             INNER JOIN resort_agents ra ON ra.resort_id = r.id
+             WHERE ra.user_id = $1 AND ra.is_active = true
+             ORDER BY r.name ASC`,
+            [userId],
+        );
+
+        return { resorts: result.rows };
+    }
+
+    // ===== Document Upload =====
+
+    async uploadDocument(
+        userId: string,
+        file: { buffer: Buffer; originalname: string; mimetype: string },
+        docType: string,
+    ): Promise<{ document: { id: string; doc_type: string; file_url: string; status: string; uploaded_at: string } }> {
+        // Get business profile from any resort_agents record for this user
+        const raResult = await this.db.query<{ business_profile_id: string | null }>(`
+            SELECT business_profile_id FROM resort_agents 
+            WHERE user_id = $1 AND business_profile_id IS NOT NULL 
+            LIMIT 1
+        `, [userId]);
+
+        let businessProfileId: string;
+
+        if (raResult.rows.length > 0 && raResult.rows[0].business_profile_id) {
+            businessProfileId = raResult.rows[0].business_profile_id;
+        } else {
+            // Get user info to create business profile
+            const userResult = await this.db.query<{ full_name: string; email: string }>(`
+                SELECT full_name, email FROM users WHERE id = $1
+            `, [userId]);
+
+            if (userResult.rows.length === 0) {
+                throw new NotFoundException('User not found');
+            }
+
+            const user = userResult.rows[0];
+
+            // Create business profile for the agent
+            const createBpResult = await this.db.query<{ id: string }>(`
+                INSERT INTO business_profiles (entity_type, name, contact_email, status)
+                VALUES ('agent', $1, $2, 'draft')
+                RETURNING id
+            `, [user.full_name, user.email]);
+
+            businessProfileId = createBpResult.rows[0].id;
+
+            // Link the business profile to the first resort_agent record
+            await this.db.query(`
+                UPDATE resort_agents SET business_profile_id = $1 
+                WHERE user_id = $2 AND business_profile_id IS NULL
+            `, [businessProfileId, userId]);
+        }
+
+        // Validate file
+        if (!file || !file.buffer) {
+            throw new BadRequestException('No file provided');
+        }
+
+        // Validate file type
+        if (!this.uploadService.validateDocumentType(file.mimetype)) {
+            throw new BadRequestException('Invalid file type. Only images and PDF files are allowed.');
+        }
+
+        // Generate blob path
+        const blobPath = this.uploadService.generateDocumentBlobPath(
+            `agent-${userId.slice(0, 8)}`,
+            docType,
+            file.originalname || 'document',
+        );
+
+        // Upload to S3
+        const fileUrl = await this.uploadService.uploadFile('', blobPath, file.buffer, file.mimetype);
+
+        // Check if document of this type already exists
+        const existingDoc = await this.db.query(
+            'SELECT id FROM business_documents WHERE business_profile_id = $1 AND doc_type = $2',
+            [businessProfileId, docType],
+        );
+
+        let doc;
+        if (existingDoc.rows.length > 0) {
+            // Update existing
+            const result = await this.db.query(
+                `UPDATE business_documents 
+                 SET file_url = $1, status = 'uploaded', uploaded_at = now(), updated_at = now()
+                 WHERE business_profile_id = $2 AND doc_type = $3
+                 RETURNING *`,
+                [fileUrl, businessProfileId, docType],
+            );
+            doc = result.rows[0];
+        } else {
+            // Create new
+            const result = await this.db.query(
+                `INSERT INTO business_documents (business_profile_id, doc_type, file_url, status, uploaded_at)
+                 VALUES ($1, $2, $3, 'uploaded', now())
+                 RETURNING *`,
+                [businessProfileId, docType, fileUrl],
+            );
+            doc = result.rows[0];
+        }
+
+        return {
+            document: {
+                id: doc.id,
+                doc_type: doc.doc_type,
+                file_url: doc.file_url,
+                status: doc.status,
+                uploaded_at: doc.uploaded_at?.toISOString?.() ?? doc.uploaded_at,
+            },
+        };
+    }
+
+    async deleteDocument(userId: string, docId: string): Promise<void> {
+        // Get business profile from resort_agents for this user
+        const raResult = await this.db.query<{ business_profile_id: string | null }>(`
+            SELECT business_profile_id FROM resort_agents 
+            WHERE user_id = $1 AND business_profile_id IS NOT NULL 
+            LIMIT 1
+        `, [userId]);
+
+        if (raResult.rows.length === 0 || !raResult.rows[0].business_profile_id) {
+            throw new NotFoundException('Business profile not found');
+        }
+
+        const businessProfileId = raResult.rows[0].business_profile_id;
+
+        // Get document
+        const docResult = await this.db.query<{ id: string; file_url: string }>(
+            'SELECT id, file_url FROM business_documents WHERE id = $1 AND business_profile_id = $2',
+            [docId, businessProfileId],
+        );
+
+        if (docResult.rows.length === 0) {
+            throw new NotFoundException('Document not found');
+        }
+
+        const document = docResult.rows[0];
+
+        // Delete from S3
+        const blobName = this.uploadService.extractBlobNameFromUrl(document.file_url);
+        if (blobName) {
+            try {
+                await this.uploadService.deleteFile('', blobName);
+            } catch (error) {
+                console.warn(`Failed to delete blob ${blobName}:`, error instanceof Error ? error.message : 'Unknown');
+            }
+        }
+
+        // Delete from database
+        await this.db.query('DELETE FROM business_documents WHERE id = $1', [docId]);
+    }
+
+    // ===== Document Approval/Rejection by Resort =====
+
+    async approveDocument(
+        resortId: string,
+        docId: string,
+        requesterId: string,
+    ): Promise<{ id: string; status: string }> {
+        // Check resort ownership
+        await this.checkResortOwnership(resortId, requesterId);
+
+        // Verify the document belongs to an agent of this resort
+        const docCheck = await this.db.query<{ id: string }>(`
+            SELECT bd.id FROM business_documents bd
+            JOIN resort_agents ra ON ra.business_profile_id = bd.business_profile_id
+            WHERE bd.id = $1 AND ra.resort_id = $2
+        `, [docId, resortId]);
+
+        if (docCheck.rows.length === 0) {
+            throw new NotFoundException('Document not found or does not belong to an agent of this resort');
+        }
+
+        const result = await this.db.query<{ id: string; status: string }>(`
+            UPDATE business_documents 
+            SET status = 'approved', reviewed_at = now(), updated_at = now()
+            WHERE id = $1
+            RETURNING id, status
+        `, [docId]);
+
+        return result.rows[0];
+    }
+
+    async rejectDocument(
+        resortId: string,
+        docId: string,
+        rejectionReason: string,
+        requesterId: string,
+    ): Promise<{ id: string; status: string; rejection_reason: string }> {
+        // Check resort ownership
+        await this.checkResortOwnership(resortId, requesterId);
+
+        // Verify the document belongs to an agent of this resort
+        const docCheck = await this.db.query<{ id: string }>(`
+            SELECT bd.id FROM business_documents bd
+            JOIN resort_agents ra ON ra.business_profile_id = bd.business_profile_id
+            WHERE bd.id = $1 AND ra.resort_id = $2
+        `, [docId, resortId]);
+
+        if (docCheck.rows.length === 0) {
+            throw new NotFoundException('Document not found or does not belong to an agent of this resort');
+        }
+
+        const result = await this.db.query<{ id: string; status: string; rejection_reason: string }>(`
+            UPDATE business_documents 
+            SET status = 'rejected', rejection_reason = $1, reviewed_at = now(), updated_at = now()
+            WHERE id = $2
+            RETURNING id, status, rejection_reason
+        `, [rejectionReason, docId]);
+
+        return result.rows[0];
     }
 
     // ===== Referral Codes =====
