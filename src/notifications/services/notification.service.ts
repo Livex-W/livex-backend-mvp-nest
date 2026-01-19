@@ -115,12 +115,75 @@ export class NotificationService implements OnModuleInit {
     );
   }
 
+  sendBookingCancelledToResort(
+    resortEmail: string,
+    data: {
+      resortName: string;
+      customerName: string;
+      experienceName: string;
+      bookingCode: string;
+      bookingDate: string;
+    }
+  ): string {
+    return this.sendEmailNotification(
+      resortEmail,
+      EmailTemplateType.BOOKING_CANCELLED_RESORT,
+      data,
+      { priority: 'medium' }
+    );
+  }
+
+  sendBookingCancelledToAdminPaypal(
+    adminEmail: string,
+    data: {
+      resortName: string;
+      customerName: string;
+      customerEmail: string;
+      bookingCode: string;
+      experienceName: string;
+      refundAmount?: number;
+    }
+  ): string {
+    return this.sendEmailNotification(
+      adminEmail,
+      EmailTemplateType.BOOKING_CANCELLED_ADMIN_PAYPAL,
+      data,
+      { priority: 'medium' }
+    );
+  }
+
+  sendBookingCancelledToAdminWompi(
+    adminEmail: string,
+    data: {
+      resortName: string;
+      customerName: string;
+      customerEmail: string;
+      bookingCode: string;
+      experienceName: string;
+      refundAmount?: number;
+    }
+  ): string {
+    return this.sendEmailNotification(
+      adminEmail,
+      EmailTemplateType.BOOKING_CANCELLED_ADMIN_WOMPI,
+      data,
+      { priority: 'medium' }
+    );
+  }
+
   sendPaymentConfirmation(
     customerEmail: string,
     paymentData: {
       customerName: string;
-      amount: number;
+      experienceName: string;
+      bookingDate: string;
+      bookingTime: string;
+      guestCount: number;
+      resortName: string;
+      resortNetAmount: number;
+      commissionAmount: number;
       bookingCode: string;
+      location: string;
     }
   ): string {
     return this.sendEmailNotification(
@@ -147,7 +210,7 @@ export class NotificationService implements OnModuleInit {
     );
   }
 
-  sendRefundProcessed(
+  sendRefundProcessedPaypal(
     customerEmail: string,
     refundData: {
       customerName: string;
@@ -157,7 +220,23 @@ export class NotificationService implements OnModuleInit {
   ): string {
     return this.sendEmailNotification(
       customerEmail,
-      EmailTemplateType.REFUND_PROCESSED,
+      EmailTemplateType.REFUND_PROCESSED_PAYPAL,
+      refundData,
+      { priority: 'medium' }
+    );
+  }
+
+  sendRefundProcessedWompi(
+    customerEmail: string,
+    refundData: {
+      customerName: string;
+      refundAmount: number;
+      bookingCode: string;
+    }
+  ): string {
+    return this.sendEmailNotification(
+      customerEmail,
+      EmailTemplateType.REFUND_PROCESSED_WOMPI,
       refundData,
       { priority: 'medium' }
     );
@@ -272,6 +351,163 @@ export class NotificationService implements OnModuleInit {
     );
   }
 
+  sendBookingConfirmationToResort(
+    resortEmail: string,
+    data: {
+      resortName: string;
+      experienceName: string;
+      customerName: string;
+      bookingDate: string;
+      bookingTime: string;
+      guestCount: number;
+      bookingCode: string;
+      resortNetAmount: number;
+      childrenCount: number;
+    }
+  ): string {
+    return this.sendEmailNotification(
+      resortEmail,
+      EmailTemplateType.BOOKING_CONFIRMED_RESORT,
+      data,
+      { priority: 'high' }
+    );
+  }
+
+  sendBookingConfirmationToAdmin(
+    adminEmail: string,
+    data: {
+      resortName: string;
+      experienceName: string;
+      customerName: string;
+      bookingDate: string;
+      bookingTime: string;
+      guestCount: number;
+      commissionAmount: number;
+      bookingId: string;
+      location: string;
+    }
+  ): string {
+    return this.sendEmailNotification(
+      adminEmail,
+      EmailTemplateType.BOOKING_CONFIRMED_ADMIN,
+      data,
+      { priority: 'low' }
+    );
+  }
+
+  sendRefundProcessedToResort(
+    resortEmail: string,
+    data: {
+      resortName: string;
+      bookingCode: string;
+    }
+  ): string {
+    return this.sendEmailNotification(
+      resortEmail,
+      EmailTemplateType.REFUND_PROCESSED_RESORT,
+      data,
+      { priority: 'medium' }
+    );
+  }
+
+  sendRefundProcessedToAdmin(
+    adminEmail: string,
+    data: {
+      bookingCode: string;
+      refundAmount: number;
+    }
+  ): string {
+    return this.sendEmailNotification(
+      adminEmail,
+      EmailTemplateType.REFUND_PROCESSED_ADMIN,
+      data,
+      { priority: 'low' }
+    );
+  }
+
+  sendPaymentFailedToAdmin(
+    adminEmail: string,
+    data: {
+      customerName: string;
+      customerEmail: string;
+      bookingCode: string;
+      reason: string;
+    }
+  ): string {
+    return this.sendEmailNotification(
+      adminEmail,
+      EmailTemplateType.PAYMENT_FAILED_ADMIN,
+      data,
+      { priority: 'high' }
+    );
+  }
+
+  sendExperienceCreatedToAdmin(
+    adminEmail: string,
+    data: {
+      resortName: string;
+      experienceName: string;
+      experienceId: string;
+      adminLink: string;
+    }
+  ): string {
+    return this.sendEmailNotification(
+      adminEmail,
+      EmailTemplateType.EXPERIENCE_CREATED_ADMIN,
+      data,
+      { priority: 'medium' }
+    );
+  }
+
+  sendUserRegisteredToAdmin(
+    adminEmail: string,
+    data: {
+      userName: string;
+      userEmail: string;
+      userId: string;
+    }
+  ): string {
+    return this.sendEmailNotification(
+      adminEmail,
+      EmailTemplateType.USER_REGISTERED_ADMIN,
+      data,
+      { priority: 'low' }
+    );
+  }
+
+  sendEmailConfirmation(
+    userEmail: string,
+    data: {
+      userName: string;
+      confirmationLink: string;
+      confirmationCode: string;
+    }
+  ): string {
+    return this.sendEmailNotification(
+      userEmail,
+      EmailTemplateType.EMAIL_CONFIRMATION,
+      data,
+      { priority: 'high' }
+    );
+  }
+
+  sendMonthlyReportToResort(
+    resortEmail: string,
+    data: {
+      month: string;
+      resortName: string;
+      totalBookings: number;
+      totalRevenue: number;
+    }
+  ): string {
+    return this.sendEmailNotification(
+      resortEmail,
+      EmailTemplateType.MONTHLY_REPORT_RESORT,
+      data,
+      { priority: 'low' }
+    );
+  }
+
   /**
    * Obtiene estadísticas de las colas de notificaciones
    */
@@ -327,7 +563,6 @@ export class NotificationService implements OnModuleInit {
         userName: 'Usuario de Prueba',
         resetLink: 'https://livex.com/reset-password?token=test-token'
       },
-      // Agregar más datos de prueba según sea necesario
       [EmailTemplateType.BOOKING_CANCELLED]: {
         customerName: 'Ana Martínez',
         experienceName: 'Buceo en Arrecife',
@@ -338,7 +573,12 @@ export class NotificationService implements OnModuleInit {
         customerName: 'Pedro Rodríguez',
         bookingCode: 'LVX-TEST-005'
       },
-      [EmailTemplateType.REFUND_PROCESSED]: {
+      [EmailTemplateType.REFUND_PROCESSED_PAYPAL]: {
+        customerName: 'Laura Sánchez',
+        refundAmount: 120000,
+        bookingCode: 'LVX-TEST-006'
+      },
+      [EmailTemplateType.REFUND_PROCESSED_WOMPI]: {
         customerName: 'Laura Sánchez',
         refundAmount: 120000,
         bookingCode: 'LVX-TEST-006'
@@ -364,6 +604,86 @@ export class NotificationService implements OnModuleInit {
         resortName: 'Resort de Prueba',
         experienceName: 'Experiencia de Prueba',
         rejectionReason: 'Descripción insuficiente'
+      },
+      [EmailTemplateType.BOOKING_CONFIRMED_RESORT]: {
+        resortName: 'Resort de Prueba',
+        experienceName: 'Experiencia Test',
+        customerName: 'Cliente Test',
+        bookingDate: '2024-02-20',
+        bookingTime: '10:00',
+        guestCount: 2,
+        amount: 250000,
+        bookingCode: 'LVX-RESORT-TEST'
+      },
+      [EmailTemplateType.BOOKING_CONFIRMED_ADMIN]: {
+        resortName: 'Resort de Prueba',
+        experienceName: 'Experiencia Test',
+        amount: 250000,
+        bookingId: 'booking-uuid-123'
+      },
+      [EmailTemplateType.PAYMENT_FAILED_ADMIN]: {
+        customerName: 'Cliente Fallido',
+        customerEmail: 'fail@test.com',
+        bookingCode: 'LVX-FAIL-001',
+        reason: 'Fondos insuficientes'
+      },
+      [EmailTemplateType.REFUND_PROCESSED_RESORT]: {
+        resortName: 'Resort de Prueba',
+        bookingCode: 'LVX-REFUND-001',
+        refundAmount: 50000
+      },
+      [EmailTemplateType.REFUND_PROCESSED_ADMIN]: {
+        bookingCode: 'LVX-REFUND-001',
+        refundAmount: 50000
+      },
+      [EmailTemplateType.EXPERIENCE_CREATED_ADMIN]: {
+        resortName: 'Resort Creador',
+        experienceName: 'Nueva Experiencia',
+        experienceId: 'exp-123',
+        adminLink: 'http://admin.livex.com'
+      },
+      [EmailTemplateType.USER_REGISTERED_ADMIN]: {
+        userName: 'Nuevo Usuario',
+        userEmail: 'new@user.com',
+        userId: 'user-123'
+      },
+      [EmailTemplateType.EMAIL_CONFIRMATION]: {
+        userName: 'Usuario Nuevo',
+        confirmationLink: 'http://livex.com/confirm?token=123',
+        confirmationCode: '123456'
+      },
+      [EmailTemplateType.MONTHLY_REPORT_RESORT]: {
+        month: 'Enero 2024',
+        resortName: 'Resort Demo',
+        totalBookings: 15,
+        totalRevenue: 4500000
+      },
+      [EmailTemplateType.MONTHLY_REPORT_ADMIN]: {
+        month: 'Enero 2024',
+        totalBookings: 150,
+        totalVolume: 45000000,
+        newUsers: 25
+      },
+      [EmailTemplateType.BOOKING_CANCELLED_RESORT]: {
+        resortName: 'Resort de Prueba',
+        customerName: 'Ana Martínez',
+        experienceName: 'Buceo en Arrecife',
+        bookingCode: 'LVX-TEST-004',
+        refundAmount: 180000
+      },
+      [EmailTemplateType.BOOKING_CANCELLED_ADMIN_PAYPAL]: {
+        resortName: 'Resort de Prueba',
+        customerName: 'Ana Martínez',
+        customerEmail: 'fail@test.com',
+        bookingCode: 'LVX-TEST-004',
+        refundAmount: 180000
+      },
+      [EmailTemplateType.BOOKING_CANCELLED_ADMIN_WOMPI]: {
+        resortName: 'Resort de Prueba',
+        customerName: 'Ana Martínez',
+        customerEmail: 'fail@test.com',
+        bookingCode: 'LVX-TEST-004',
+        refundAmount: 180000
       }
     };
 

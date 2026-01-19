@@ -115,5 +115,8 @@
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
+  },
+  "resolutions": {
+    "tar": "^7.5.3"
   }
 }

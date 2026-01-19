@@ -15,6 +15,8 @@ import {
   ResortCreatedEvent,
   ExperienceApprovedEvent,
   ExperienceRejectedEvent,
+  ExperienceCreatedEvent,
+  EmailConfirmationRequestedEvent,
   BookingReminderEvent,
 } from '../events/notification.events';
 
@@ -56,8 +58,15 @@ export class NotificationListener {
         event.customerEmail,
         {
           customerName: event.customerName,
-          amount: event.amount,
+          commissionAmount: event.commissionAmount,
+          resortNetAmount: event.resortNetAmount,
           bookingCode: event.bookingCode,
+          experienceName: event.experienceName,
+          bookingDate: event.bookingDate,
+          bookingTime: event.bookingTime,
+          guestCount: event.guestCount,
+          resortName: event.resortName,
+          location: event.location,
         }
       );
 
@@ -99,16 +108,45 @@ export class NotificationListener {
         }
       );
 
+      // 2. Notify Resort
+      if (event.resortEmail) {
+        this.notificationService.sendBookingCancelledToResort(
+          event.resortEmail,
+          {
+            resortName: event.resortName,
+            customerName: event.customerName,
+            experienceName: event.experienceName,
+            bookingCode: event.bookingCode,
+            bookingDate: event.bookingDate,
+          }
+        );
+      }
+
+      // 3. Notify Admin
+      const adminEmail = this.configService.get<string>('ADMIN_EMAIL', 'admin@livex.com');
+      this.notificationService.sendBookingCancelledToAdminPaypal(
+        adminEmail,
+        {
+          resortName: event.resortName,
+          customerName: event.customerName,
+          customerEmail: event.customerEmail,
+          bookingCode: event.bookingCode,
+          experienceName: event.experienceName,
+          refundAmount: event.refundAmount,
+
+        }
+      );
+
       this.logger.log(`Booking cancellation notification sent for booking ${event.bookingId}`);
     } catch (error) {
       this.logger.error(`Failed to send booking cancellation notification for ${event.bookingId}:`, error);
     }
   }
 
-  @OnEvent('refund.processed')
-  handleRefundProcessed(event: RefundProcessedEvent) {
+  @OnEvent('refund.processed.paypal')
+  handleRefundProcessedPaypal(event: RefundProcessedEvent) {
     try {
-      this.notificationService.sendRefundProcessed(
+      this.notificationService.sendRefundProcessedPaypal(
         event.customerEmail,
         {
           customerName: event.customerName,
@@ -123,9 +161,49 @@ export class NotificationListener {
     }
   }
 
+  @OnEvent('refund.processed.wompi')
+  handleRefundProcessedWompi(event: RefundProcessedEvent) {
+    try {
+      this.notificationService.sendRefundProcessedWompi(
+        event.customerEmail,
+        {
+          customerName: event.customerName,
+          refundAmount: event.refundAmount,
+          bookingCode: event.bookingCode,
+        }
+      );
+
+      this.logger.log(`Refund processed notification sent for refund ${event.refundId}`);
+    } catch (error) {
+      this.logger.error(`Failed to send refund processed notification for ${event.refundId}:`, error);
+    }
+  }
+
+  @OnEvent('experience.created')
+  handleExperienceCreated(event: ExperienceCreatedEvent) {
+    try {
+      const adminEmail = this.configService.get<string>('ADMIN_EMAIL', 'admin@livex.com');
+
+      this.notificationService.sendExperienceCreatedToAdmin(
+        adminEmail,
+        {
+          resortName: event.resortName,
+          experienceName: event.experienceName,
+          experienceId: event.experienceId,
+          adminLink: `${this.configService.get<string>('ADMIN_PANEL_URL')}/experiences/${event.experienceId}`
+        }
+      );
+
+      this.logger.log(`Experience created notification sent to admin for experience ${event.experienceId}`);
+    } catch (error) {
+      this.logger.error(`Failed to send experience created notification for ${event.experienceId}:`, error);
+    }
+  }
+
   @OnEvent('user.registered')
   handleUserRegistered(event: UserRegisteredEvent) {
     try {
+      // 1. Welcome email to user
       this.notificationService.sendWelcomeEmail(
         event.userEmail,
         {
@@ -133,17 +211,46 @@ export class NotificationListener {
         }
       );
 
-      this.logger.log(`Welcome email sent for user ${event.userId}`);
+      // 2. Notification to admin
+      const adminEmail = this.configService.get<string>('ADMIN_EMAIL', 'admin@livex.com');
+      this.notificationService.sendUserRegisteredToAdmin(
+        adminEmail,
+        {
+          userName: event.userName,
+          userEmail: event.userEmail,
+          userId: event.userId
+        }
+      );
+
+      this.logger.log(`Welcome email and admin notification sent for user ${event.userId}`);
     } catch (error) {
       this.logger.error(`Failed to send welcome email for user ${event.userId}:`, error);
+    }
+  }
+
+  @OnEvent('email.confirmation.requested')
+  handleEmailConfirmationRequested(event: EmailConfirmationRequestedEvent) {
+    try {
+      const confirmationLink = `${this.configService.get<string>('FRONTEND_URL')}/confirm-email?token=${event.confirmationToken}`;
+
+      this.notificationService.sendEmailConfirmation(
+        event.userEmail,
+        {
+          userName: event.userName,
+          confirmationLink: confirmationLink,
+          confirmationCode: event.confirmationToken.substring(0, 6).toUpperCase() // Simple code version
+        }
+      );
+
+      this.logger.log(`Email confirmation sent for user ${event.userId}`);
+    } catch (error) {
+      this.logger.error(`Failed to send email confirmation for user ${event.userId}:`, error);
     }
   }
 
   @OnEvent('password.reset.requested')
   handlePasswordResetRequested(event: PasswordResetRequestedEvent) {
     try {
-
-
       this.notificationService.sendPasswordReset(
         event.userEmail,
         {

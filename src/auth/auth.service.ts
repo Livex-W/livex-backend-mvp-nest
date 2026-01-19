@@ -50,7 +50,7 @@ interface PasswordResetTokenRow extends QueryResultRow {
 }
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { PasswordResetRequestedEvent, ResortCreatedEvent } from '../notifications/events/notification.events';
+import { PasswordResetRequestedEvent, ResortCreatedEvent, UserRegisteredEvent } from '../notifications/events/notification.events';
 
 @Injectable()
 export class AuthService {
@@ -103,6 +103,11 @@ export class AuthService {
             documentNumber: dto.documentNumber,
             role: dto.role || 'tourist',
         });
+
+        this.eventEmitter.emit(
+            'user.registered',
+            new UserRegisteredEvent(user.id, user.email, user.fullName || '')
+        );
 
         // If role is 'resort', create an associated resort with minimal data
         // The resort owner can complete the details later
