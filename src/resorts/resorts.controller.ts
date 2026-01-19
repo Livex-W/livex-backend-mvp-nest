@@ -27,6 +27,7 @@ import { CreateResortDto } from './dto/create-resort.dto';
 import { UpdateResortDto } from './dto/update-resort.dto';
 import { CreateResortDocumentDto } from './dto/resort-documents.dto';
 import { ApproveResortDto, RejectResortDto } from './dto/approve-resort.dto';
+import { ResortQueryDto } from './dto/resort-query.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -90,16 +91,16 @@ export class ResortsController {
   @Throttle({ default: { limit: 30, ttl: 60000 } }) // 30 requests per minute
   @UseGuards(RolesGuard)
   @Roles('admin')
-  async findAll(@Query() paginationDto: PaginationDto, @Request() req: any) {
+  async findAll(@Query() queryDto: ResortQueryDto, @Request() req: any) {
     this.logger.logRequest({
       method: 'GET',
       url: '/api/v1/resorts',
       userId: req.user.id,
       role: req.user.role,
-      query: paginationDto
+      query: queryDto
     });
 
-    return this.resortsService.findAll(paginationDto);
+    return this.resortsService.findAll(queryDto, queryDto.status);
   }
 
   @Get('my-resorts')

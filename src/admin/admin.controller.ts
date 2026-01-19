@@ -37,7 +37,7 @@ export class AdminController {
   constructor(
     private readonly adminService: AdminService,
     private readonly logger: CustomLoggerService,
-  ) {}
+  ) { }
 
   // ========== DASHBOARD ==========
 
@@ -143,6 +143,73 @@ export class AdminController {
     });
 
     return resort;
+  }
+
+  // ========== DOCUMENT MANAGEMENT ==========
+
+  @Post('documents/:id/approve')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 10, ttl: 60000 } }) // 10 requests per minute
+  async approveDocument(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    this.logger.logRequest({
+      method: 'POST',
+      url: '/v1/admin/documents/:id/approve',
+      userId: req.user.id,
+      role: req.user.role,
+      documentId: id,
+    });
+
+    const document = await this.adminService.approveDocument(id, req.user.id);
+
+    this.logger.logResponse({
+      method: 'POST',
+      url: '/v1/admin/documents/:id/approve',
+      userId: req.user.id,
+      documentId: id,
+      newStatus: document.status,
+      statusCode: 200,
+    });
+
+    return document;
+  }
+
+  @Post('documents/:id/reject')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 10, ttl: 60000 } }) // 10 requests per minute
+  async rejectDocument(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() rejectDto: RejectResortDto,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    this.logger.logRequest({
+      method: 'POST',
+      url: '/v1/admin/documents/:id/reject',
+      userId: req.user.id,
+      role: req.user.role,
+      documentId: id,
+      rejectionReason: rejectDto.rejection_reason,
+    });
+
+    const document = await this.adminService.rejectDocument(
+      id,
+      rejectDto.rejection_reason,
+      req.user.id,
+    );
+
+    this.logger.logResponse({
+      method: 'POST',
+      url: '/v1/admin/documents/:id/reject',
+      userId: req.user.id,
+      documentId: id,
+      newStatus: document.status,
+      rejectionReason: rejectDto.rejection_reason,
+      statusCode: 200,
+    });
+
+    return document;
   }
 
   // ========== EXPERIENCE MANAGEMENT ==========

@@ -20,7 +20,7 @@ export class AdminService {
   constructor(
     @Inject(DATABASE_CLIENT) private readonly db: DatabaseClient,
     private readonly logger: CustomLoggerService,
-  ) {}
+  ) { }
 
   // ========== RESORT MANAGEMENT ==========
 
@@ -52,7 +52,7 @@ export class AdminService {
       ${orderClause} 
       LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}
     `;
-    
+
     const dataResult = await this.db.query(dataQuery, [...queryParams, limit, offset]);
 
     const meta: PaginationMeta = {
@@ -73,7 +73,7 @@ export class AdminService {
   async approveResort(id: string, approveDto: ApproveResortDto, adminUserId: string): Promise<Resort> {
     // Check if resort exists and is under review
     const resortResult = await this.db.query('SELECT * FROM resorts WHERE id = $1', [id]);
-    
+
     if (resortResult.rows.length === 0) {
       throw new NotFoundException('Resort not found');
     }
@@ -121,7 +121,7 @@ export class AdminService {
   async rejectResort(id: string, rejectDto: RejectResortDto, adminUserId: string): Promise<Resort> {
     // Check if resort exists and is under review
     const resortResult = await this.db.query('SELECT * FROM resorts WHERE id = $1', [id]);
-    
+
     if (resortResult.rows.length === 0) {
       throw new NotFoundException('Resort not found');
     }
@@ -166,6 +166,101 @@ export class AdminService {
     return result.rows[0] as Resort;
   }
 
+  // ========== DOCUMENT MANAGEMENT ==========
+
+  async approveDocument(id: string, adminUserId: string): Promise<any> {
+    // Check if document exists
+    const docResult = await this.db.query(
+      'SELECT * FROM business_documents WHERE id = $1',
+      [id]
+    );
+
+    if (docResult.rows.length === 0) {
+      throw new NotFoundException('Document not found');
+    }
+
+    const document = docResult.rows[0];
+
+    // Update document status
+    const result = await this.db.query(
+      `UPDATE business_documents 
+       SET status = 'approved', 
+           reviewed_by = $1, 
+           reviewed_at = NOW(),
+           rejection_reason = NULL,
+           updated_at = NOW()
+       WHERE id = $2 
+       RETURNING *`,
+      [adminUserId, id]
+    );
+
+    // Log the action
+    this.logger.logBusinessEvent('admin_document_approved', {
+      adminUserId,
+      documentId: id,
+      docType: document.doc_type,
+    });
+
+    // Create audit log
+    await this.createAuditLog(
+      adminUserId,
+      'approve',
+      'business_document',
+      id,
+      { status: document.status },
+      { status: 'approved', reviewed_by: adminUserId }
+    );
+
+    return result.rows[0];
+  }
+
+  async rejectDocument(id: string, rejectionReason: string, adminUserId: string): Promise<any> {
+    // Check if document exists
+    const docResult = await this.db.query(
+      'SELECT * FROM business_documents WHERE id = $1',
+      [id]
+    );
+
+    if (docResult.rows.length === 0) {
+      throw new NotFoundException('Document not found');
+    }
+
+    const document = docResult.rows[0];
+
+    // Update document status
+    const result = await this.db.query(
+      `UPDATE business_documents 
+       SET status = 'rejected', 
+           reviewed_by = $1, 
+           reviewed_at = NOW(),
+           rejection_reason = $2,
+           updated_at = NOW()
+       WHERE id = $3 
+       RETURNING *`,
+      [adminUserId, rejectionReason, id]
+    );
+
+    // Log the action
+    this.logger.logBusinessEvent('admin_document_rejected', {
+      adminUserId,
+      documentId: id,
+      docType: document.doc_type,
+      rejectionReason,
+    });
+
+    // Create audit log
+    await this.createAuditLog(
+      adminUserId,
+      'reject',
+      'business_document',
+      id,
+      { status: document.status },
+      { status: 'rejected', rejection_reason: rejectionReason }
+    );
+
+    return result.rows[0];
+  }
+
   // ========== EXPERIENCE MANAGEMENT ==========
 
   async getExperiencesForReview(paginationDto: PaginationDto): Promise<PaginatedResult<Experience>> {
@@ -201,7 +296,7 @@ export class AdminService {
       ${orderClause} 
       LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}
     `;
-    
+
     const dataResult = await this.db.query(dataQuery, [...queryParams, limit, offset]);
 
     const meta: PaginationMeta = {
@@ -222,7 +317,7 @@ export class AdminService {
   async approveExperience(id: string, approveDto: ApproveExperienceDto, adminUserId: string): Promise<Experience> {
     // Check if experience exists and is under review
     const experienceResult = await this.db.query('SELECT * FROM experiences WHERE id = $1', [id]);
-    
+
     if (experienceResult.rows.length === 0) {
       throw new NotFoundException('Experience not found');
     }
@@ -270,7 +365,7 @@ export class AdminService {
   async rejectExperience(id: string, rejectDto: RejectExperienceDto, adminUserId: string): Promise<Experience> {
     // Check if experience exists and is under review
     const experienceResult = await this.db.query('SELECT * FROM experiences WHERE id = $1', [id]);
-    
+
     if (experienceResult.rows.length === 0) {
       throw new NotFoundException('Experience not found');
     }
@@ -481,7 +576,7 @@ export class AdminService {
       ${orderClause} 
       LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}
     `;
-    
+
     const dataResult = await this.db.query(dataQuery, [...queryParams, limit, offset]);
 
     const meta: PaginationMeta = {

@@ -96,19 +96,30 @@ export class ResortsService {
     }
   }
 
-  async findAll(paginationDto: PaginationDto): Promise<PaginatedResult<Resort>> {
+  async findAll(paginationDto: PaginationDto, status?: string): Promise<PaginatedResult<Resort>> {
     const { page = 1, limit = 10, search } = paginationDto;
     const offset = (page - 1) * limit;
 
-    let whereClause = '';
+    const conditions: string[] = [];
     let orderClause = 'ORDER BY created_at DESC';
     const queryParams: unknown[] = [];
+    let paramIndex = 1;
+
+    // Status filter
+    if (status) {
+      conditions.push(`status = $${paramIndex}`);
+      queryParams.push(status);
+      paramIndex++;
+    }
 
     // Search functionality
     if (search) {
-      whereClause = 'WHERE (name ILIKE $1 OR city ILIKE $1 OR description ILIKE $1)';
+      conditions.push(`(name ILIKE $${paramIndex} OR city ILIKE $${paramIndex} OR description ILIKE $${paramIndex})`);
       queryParams.push(`%${search}%`);
+      paramIndex++;
     }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
     // Sorting
     const sortParam = paginationDto.sort;
@@ -135,7 +146,7 @@ export class ResortsService {
       SELECT * FROM resorts 
       ${whereClause} 
       ${orderClause} 
-      LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}
+      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `;
 
     const dataResult = await this.db.query(dataQuery, [...queryParams, limit, offset]);
@@ -1017,6 +1028,136 @@ export class ResortsService {
         status: row.status,
         count: parseInt(row.count) || 0,
       })),
+    };
+  }
+
+  // ==================== Admin Methods ====================
+
+  /**
+   * Get admin dashboard statistics in a single query
+   */
+  async getAdminStats(): Promise<{
+    totalResorts: number;
+    resortsApproved: number;
+    resortsPending: number;
+    resortsUnderReview: number;
+    resortsRejected: number;
+    resortsDraft: number;
+    totalExperiences: number;
+    totalBookings: number;
+    totalAgents: number;
+  }> {
+    // Resorts stats
+    const resortsStatsResult = await this.db.query(`
+      SELECT 
+        COUNT(*) FILTER (WHERE TRUE) as total_resorts,
+        COUNT(*) FILTER (WHERE status = 'approved') as approved,
+        COUNT(*) FILTER (WHERE status = 'under_review') as under_review,
+        COUNT(*) FILTER (WHERE status = 'rejected') as rejected,
+        COUNT(*) FILTER (WHERE status = 'draft') as draft
+      FROM resorts
+    `);
+
+    // Experiences count
+    const experiencesResult = await this.db.query(`
+      SELECT COUNT(*) as total FROM experiences
+    `);
+
+    // Bookings count
+    const bookingsResult = await this.db.query(`
+      SELECT COUNT(*) as total FROM bookings
+    `);
+
+    // Agents count
+    const agentsResult = await this.db.query(`
+      SELECT COUNT(DISTINCT ra.user_id) as total 
+      FROM resort_agents ra
+      WHERE ra.is_active = true
+    `);
+
+    const resortsStats = resortsStatsResult.rows[0];
+
+    return {
+      totalResorts: parseInt(resortsStats.total_resorts) || 0,
+      resortsApproved: parseInt(resortsStats.approved) || 0,
+      resortsPending: parseInt(resortsStats.under_review) || 0,
+      resortsUnderReview: parseInt(resortsStats.under_review) || 0,
+      resortsRejected: parseInt(resortsStats.rejected) || 0,
+      resortsDraft: parseInt(resortsStats.draft) || 0,
+      totalExperiences: parseInt(experiencesResult.rows[0].total) || 0,
+      totalBookings: parseInt(bookingsResult.rows[0].total) || 0,
+      totalAgents: parseInt(agentsResult.rows[0].total) || 0,
+    };
+  }
+
+  /**
+   * Find all resorts for admin with filtering
+   */
+  async findAllForAdmin(queryDto: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: string;
+    is_active?: boolean;
+  }): Promise<PaginatedResult<Resort>> {
+    const { page = 1, limit = 10, search, status, is_active } = queryDto;
+    const offset = (page - 1) * limit;
+
+    const conditions: string[] = [];
+    const orderClause = 'ORDER BY created_at DESC';
+    const queryParams: unknown[] = [];
+    let paramIndex = 1;
+
+    // Status filter
+    if (status) {
+      conditions.push(`status = $${paramIndex}`);
+      queryParams.push(status);
+      paramIndex++;
+    }
+
+    // Active filter
+    if (is_active !== undefined) {
+      conditions.push(`is_active = $${paramIndex}`);
+      queryParams.push(is_active);
+      paramIndex++;
+    }
+
+    // Search functionality
+    if (search) {
+      conditions.push(`(name ILIKE $${paramIndex} OR city ILIKE $${paramIndex} OR contact_email ILIKE $${paramIndex})`);
+      queryParams.push(`%${search}%`);
+      paramIndex++;
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    // Get total count
+    const countQuery = `SELECT COUNT(*) FROM resorts ${whereClause}`;
+    const countResult = await this.db.query(countQuery, queryParams);
+    const total = parseInt(countResult.rows[0].count as string);
+
+    // Get paginated results
+    const dataQuery = `
+      SELECT * FROM resorts 
+      ${whereClause} 
+      ${orderClause} 
+      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    `;
+
+    const dataResult = await this.db.query(dataQuery, [...queryParams, limit, offset]);
+
+    const meta: PaginationMeta = {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+      hasNextPage: page < Math.ceil(total / limit),
+      hasPreviousPage: page > 1,
+    };
+
+    return {
+      data: dataResult.rows as Resort[],
+      meta,
     };
   }
 }
