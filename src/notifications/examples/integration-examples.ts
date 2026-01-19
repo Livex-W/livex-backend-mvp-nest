@@ -96,7 +96,8 @@ export class IntegrationExamples {
         bookingId: string;
         customerEmail: string;
         customerName: string;
-        amount: number;
+        commissionAmount: number;
+        resortNetAmount: number;
         bookingCode: string;
         status: 'success' | 'failed';
         errorReason?: string;
@@ -113,7 +114,8 @@ export class IntegrationExamples {
                 paymentData.bookingId,
                 paymentData.customerEmail,
                 paymentData.customerName,
-                paymentData.amount,
+                paymentData.commissionAmount,
+                paymentData.resortNetAmount,
                 paymentData.bookingCode,
                 paymentData.experienceName,
                 paymentData.bookingDate,
