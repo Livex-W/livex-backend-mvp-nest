@@ -126,8 +126,15 @@ export class NotificationController {
           eventData.bookingId || 'test-booking-001',
           eventData.customerEmail,
           eventData.customerName || 'Usuario de Prueba',
-          eventData.amount || 150000,
-          eventData.bookingCode || 'LVX-TEST-001'
+          eventData.commissionAmount || 25000,
+          eventData.resortNetAmount || 150000,
+          eventData.bookingCode || 'LVX-TEST-001',
+          eventData.experienceName || 'Experiencia de Prueba',
+          eventData.bookingDate || '2024-01-15',
+          eventData.bookingTime || '10:00 AM',
+          eventData.guestCount || 2,
+          eventData.resortName || 'Resort de Prueba',
+          eventData.location || 'Ubicación de Prueba'
         );
         break;
 
@@ -191,9 +198,13 @@ export class NotificationController {
       [EmailTemplateType.BOOKING_CONFIRMATION]: 'Confirmación de reserva exitosa',
       [EmailTemplateType.BOOKING_REMINDER]: 'Recordatorio de experiencia próxima',
       [EmailTemplateType.BOOKING_CANCELLED]: 'Notificación de reserva cancelada',
+      [EmailTemplateType.BOOKING_CANCELLED_RESORT]: 'Notificación de reserva cancelada al resort',
+      [EmailTemplateType.BOOKING_CANCELLED_ADMIN_PAYPAL]: 'Notificación de reserva cancelada al admin',
+      [EmailTemplateType.BOOKING_CANCELLED_ADMIN_WOMPI]: 'Notificación de reserva cancelada al admin',
       [EmailTemplateType.PAYMENT_CONFIRMED]: 'Confirmación de pago exitoso',
       [EmailTemplateType.PAYMENT_FAILED]: 'Notificación de pago fallido',
-      [EmailTemplateType.REFUND_PROCESSED]: 'Confirmación de reembolso procesado',
+      [EmailTemplateType.REFUND_PROCESSED_PAYPAL]: 'Confirmación de reembolso procesado',
+      [EmailTemplateType.REFUND_PROCESSED_WOMPI]: 'Confirmación de reembolso procesado',
       [EmailTemplateType.RESORT_APPROVED]: 'Aprobación de prestador',
       [EmailTemplateType.RESORT_REJECTED]: 'Rechazo de prestador',
       [EmailTemplateType.RESORT_CREATED_ADMIN]: 'Notificación al admin de nuevo prestador',
@@ -201,6 +212,16 @@ export class NotificationController {
       [EmailTemplateType.EXPERIENCE_REJECTED]: 'Rechazo de experiencia',
       [EmailTemplateType.WELCOME]: 'Email de bienvenida para nuevos usuarios',
       [EmailTemplateType.PASSWORD_RESET]: 'Enlace para restablecer contraseña',
+      [EmailTemplateType.BOOKING_CONFIRMED_RESORT]: 'Notificación de nueva reserva al resort',
+      [EmailTemplateType.BOOKING_CONFIRMED_ADMIN]: 'Notificación de nueva reserva al admin',
+      [EmailTemplateType.PAYMENT_FAILED_ADMIN]: 'Notificación de pago fallido al admin',
+      [EmailTemplateType.REFUND_PROCESSED_RESORT]: 'Notificación de reembolso al resort',
+      [EmailTemplateType.REFUND_PROCESSED_ADMIN]: 'Notificación de reembolso al admin',
+      [EmailTemplateType.EXPERIENCE_CREATED_ADMIN]: 'Notificación de nueva experiencia al admin',
+      [EmailTemplateType.USER_REGISTERED_ADMIN]: 'Notificación de nuevo usuario al admin',
+      [EmailTemplateType.EMAIL_CONFIRMATION]: 'Confirmación de correo electrónico',
+      [EmailTemplateType.MONTHLY_REPORT_RESORT]: 'Reporte mensual para resort',
+      [EmailTemplateType.MONTHLY_REPORT_ADMIN]: 'Reporte mensual para admin',
     };
 
     return descriptions[templateType] || 'Descripción no disponible';

@@ -100,6 +100,12 @@ export class IntegrationExamples {
         bookingCode: string;
         status: 'success' | 'failed';
         errorReason?: string;
+        experienceName: string;
+        bookingDate: string;
+        bookingTime: string;
+        guestCount: number;
+        resortName: string;
+        location: string;
     }) {
         if (paymentData.status === 'success') {
             this.eventEmitter.emit('payment.confirmed', new PaymentConfirmedEvent(
@@ -108,7 +114,13 @@ export class IntegrationExamples {
                 paymentData.customerEmail,
                 paymentData.customerName,
                 paymentData.amount,
-                paymentData.bookingCode
+                paymentData.bookingCode,
+                paymentData.experienceName,
+                paymentData.bookingDate,
+                paymentData.bookingTime,
+                paymentData.guestCount,
+                paymentData.resortName,
+                paymentData.location,
             ));
         } else {
             this.eventEmitter.emit('payment.failed', {

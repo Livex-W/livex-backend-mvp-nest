@@ -20,8 +20,15 @@ export class PaymentConfirmedEvent implements NotificationEvent {
     public readonly bookingId: string,
     public readonly customerEmail: string,
     public readonly customerName: string,
-    public readonly amount: number,
+    public readonly commissionAmount: number,
+    public readonly resortNetAmount: number,
     public readonly bookingCode: string,
+    public readonly experienceName: string,
+    public readonly bookingDate: string,
+    public readonly bookingTime: string,
+    public readonly guestCount: number,
+    public readonly resortName: string,
+    public readonly location: string,
   ) { }
 }
 
@@ -43,6 +50,9 @@ export class BookingCancelledEvent implements NotificationEvent {
     public readonly customerName: string,
     public readonly experienceName: string,
     public readonly bookingCode: string,
+    public readonly resortName: string,
+    public readonly resortEmail: string,
+    public readonly bookingDate: string,
     public readonly refundAmount?: number,
   ) { }
 }
@@ -134,5 +144,34 @@ export class BookingReminderEvent implements NotificationEvent {
     public readonly location: string,
     public readonly bookingCode: string,
     public readonly reminderDate: Date,
+  ) { }
+}
+
+export class ExperienceCreatedEvent implements NotificationEvent {
+  constructor(
+    public readonly experienceId: string,
+    public readonly resortName: string,
+    public readonly experienceName: string,
+  ) { }
+}
+
+export class MonthlyReportEvent implements NotificationEvent {
+  constructor(
+    public readonly reportDate: Date,
+    public readonly totalBookings: number,
+    public readonly totalRevenue: number,
+    // Puede llevar más datos o enviarse un evento por resort
+    public readonly resortId?: string,
+    public readonly resortEmail?: string,
+    public readonly resortName?: string,
+  ) { }
+}
+
+export class EmailConfirmationRequestedEvent implements NotificationEvent {
+  constructor(
+    public readonly userId: string,
+    public readonly userEmail: string,
+    public readonly userName: string,
+    public readonly confirmationToken: string,
   ) { }
 }

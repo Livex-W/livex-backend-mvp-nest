@@ -214,7 +214,6 @@ export class EmailService {
             <li><strong>Fecha:</strong> {{bookingDate}}</li>
             <li><strong>Hora:</strong> {{bookingTime}}</li>
             <li><strong>Personas:</strong> {{guestCount}}</li>
-            <li><strong>Total:</strong> $\{{ totalAmount }}</li>
           </ul>
           <p>Código de reserva: <strong>{{bookingCode}}</strong></p>
           <p>¡Esperamos que disfrutes tu experiencia!</p>
@@ -250,15 +249,67 @@ export class EmailService {
         `,
         text: 'Tu reserva {{bookingCode}} ha sido cancelada.'
       },
+      [EmailTemplateType.BOOKING_CANCELLED_RESORT]: {
+        subject: '❌ Reserva Cancelada - LIVEX',
+        html: `
+          <h2>Reserva Cancelada</h2>
+          <p>Hola {{resortName}},</p>
+          <p>La reserva para la experiencia <strong>{{experienceName}}</strong> ha sido cancelada.</p>
+          <ul>
+            <li><strong>Cliente:</strong> {{customerName}}</li>
+            <li><strong>Fecha reservada:</strong> {{bookingDate}}</li>
+          </ul>
+          <p>Código de reserva: <strong>{{bookingCode}}</strong></p>
+          <p>El cupo ha sido liberado automáticamente.</p>
+        `,
+        text: 'Reserva cancelada: {{experienceName}} por {{customerName}}. Código: {{bookingCode}}'
+      },
+      [EmailTemplateType.BOOKING_CANCELLED_ADMIN_PAYPAL]: {
+        subject: '🔔 [ADMIN] Reserva Cancelada',
+        html: `
+          <h2>Reserva Cancelada</h2>
+          <ul>
+            <li><strong>Resort:</strong> {{resortName}}</li>
+            <li><strong>Experiencia:</strong> {{experienceName}}</li>
+            <li><strong>Cliente:</strong> {{customerName}}</li>
+            <li><strong>Email del cliente:</strong> {{customerEmail}}</li>
+            <li><strong>Código:</strong> {{bookingCode}}</li>
+          </ul>
+          {{#if refundAmount}}
+          <p>Reembolso pendiente/procesado: $\{{ refundAmount }}</p>
+          {{/if}}
+        `,
+        text: 'Reserva cancelada {{bookingCode}}. Resort: {{resortName}}'
+      },
+
+      [EmailTemplateType.BOOKING_CANCELLED_ADMIN_WOMPI]: {
+        subject: '🔔 [ADMIN] Reserva Cancelada',
+        html: `
+          <h2>Reserva Cancelada</h2>
+          <ul>
+            <li><strong>Resort:</strong> {{resortName}}</li>
+            <li><strong>Experiencia:</strong> {{experienceName}}</li>
+            <li><strong>Cliente:</strong> {{customerName}}</li>
+            <li><strong>Email del cliente:</strong> {{customerEmail}}</li>
+            <li><strong>Código:</strong> {{bookingCode}}</li>
+          </ul>
+          {{#if refundAmount}}
+          <p>Reembolso pendiente: $\{{ refundAmount }}</p>
+          <p>Se debe contactar con el cliente para realizar el reembolso.</p>
+          {{/if}}
+        `,
+        text: 'Reserva cancelada {{bookingCode}}. Resort: {{resortName}}'
+      },
+
       [EmailTemplateType.PAYMENT_CONFIRMED]: {
         subject: '💳 Pago Confirmado - LIVEX',
         html: `
           <h2>¡Pago confirmado!</h2>
           <p>Hola {{customerName}},</p>
-          <p>Hemos recibido tu pago de $\{{ amount }} para la reserva {{bookingCode}}.</p>
+          <p>Hemos recibido tu pago de $\{{ commissionAmount }} para la reserva {{bookingCode}}.</p>
           <p>Tu experiencia está confirmada.</p>
         `,
-        text: 'Pago de ${{amount}} confirmado para reserva {{bookingCode}}'
+        text: 'Pago de ${{commissionAmount}} confirmado para reserva {{bookingCode}}'
       },
       [EmailTemplateType.PAYMENT_FAILED]: {
         subject: '⚠️ Error en el Pago - LIVEX',
@@ -270,13 +321,23 @@ export class EmailService {
         `,
         text: 'Error en el pago para reserva {{bookingCode}}. Intenta nuevamente.'
       },
-      [EmailTemplateType.REFUND_PROCESSED]: {
+      [EmailTemplateType.REFUND_PROCESSED_PAYPAL]: {
         subject: '💰 Reembolso Procesado - LIVEX',
         html: `
           <h2>Reembolso procesado</h2>
           <p>Hola {{customerName}},</p>
           <p>Se ha procesado un reembolso de $\{{ refundAmount }} para tu reserva {{bookingCode}}.</p>
           <p>El dinero aparecerá en tu cuenta en 3-5 días hábiles.</p>
+        `,
+        text: 'Reembolso de ${{refundAmount}} procesado para reserva {{bookingCode}}'
+      },
+      [EmailTemplateType.REFUND_PROCESSED_WOMPI]: {
+        subject: '💰 Reembolso Procesado - LIVEX',
+        html: `
+          <h2>Reembolso procesado</h2>
+          <p>Hola {{customerName}},</p>
+          <p>Has procesado un reembolso de $\{{ refundAmount }} para tu reserva {{bookingCode}}.</p>
+          <p>El equipo de LIVEX se pondrá en contacto contigo para la realizacion del reembolso.</p>
         `,
         text: 'Reembolso de ${{refundAmount}} procesado para reserva {{bookingCode}}'
       },
@@ -359,6 +420,128 @@ export class EmailService {
           <p>Por favor, revisa la información y aprueba o rechaza el prestador en el panel de administración.</p>
         `,
         text: 'Nuevo prestador registrado: {{resortName}} por {{ownerName}} ({{ownerEmail}}). ID: {{resortId}}'
+      },
+      [EmailTemplateType.BOOKING_CONFIRMED_RESORT]: {
+        subject: '📅 Nueva Reserva Confirmada - LIVEX',
+        html: `
+          <h2>¡Nueva Reserva Recibida!</h2>
+          <p>Hola {{resortName}},</p>
+          <p>Has recibido una nueva reserva para la experiencia <strong>{{experienceName}}</strong>.</p>
+          <ul>
+            <li><strong>Cliente:</strong> {{customerName}}</li>
+            <li><strong>Fecha:</strong> {{bookingDate}}</li>
+            <li><strong>Hora:</strong> {{bookingTime}}</li>
+            <li><strong>Adultos:</strong> {{guestCount}}</li>
+            <li><strong>Niños:</strong> {{childrenCount}}</li>
+          </ul>
+          <p>Valor de la reserva a cobrar: <strong>$ {{resortNetAmount}}</strong></p>
+          <p>Código de reserva: <strong>{{bookingCode}}</strong></p>
+          <p>Por favor, asegúrate de estar preparado para recibir a tus huéspedes.</p>
+        `,
+        text: 'Nueva reserva confirmada: {{experienceName}} por {{customerName}}. Fecha: {{bookingDate}} {{bookingTime}}. Código: {{bookingCode}}'
+      },
+      [EmailTemplateType.BOOKING_CONFIRMED_ADMIN]: {
+        subject: '🔔 [ADMIN] Nueva Reserva Confirmada',
+        html: `
+          <h2>Nueva transacción en plataforma</h2>
+          <ul>
+            <li><strong>Resort:</strong> {{resortName}}</li>
+            <li><strong>Experiencia:</strong> {{experienceName}}</li>
+            <li><strong>Monto Total:</strong> $\{{ commissionAmount }}</li>
+            <li><strong>ID Reserva:</strong> {{bookingId}}</li>
+          </ul>
+        `,
+        text: 'Nueva reserva confirmada. Monto: ${{amount}}. Resort: {{resortName}}'
+      },
+      [EmailTemplateType.PAYMENT_FAILED_ADMIN]: {
+        subject: '⚠️ [ADMIN] Fallo en Pago',
+        html: `
+          <h2>Alerta de Pago Fallido</h2>
+          <p>Un intento de pago ha fallado.</p>
+          <ul>
+            <li><strong>Usuario:</strong> {{customerName}} ({{customerEmail}})</li>
+            <li><strong>Código Reserva:</strong> {{bookingCode}}</li>
+            <li><strong>Motivo:</strong> {{reason}}</li>
+          </ul>
+        `,
+        text: 'Pago fallido para reserva {{bookingCode}}. Motivo: {{reason}}'
+      },
+      [EmailTemplateType.REFUND_PROCESSED_RESORT]: {
+        subject: '💸 Reembolso Procesado - LIVEX',
+        html: `
+          <h2>Notificación de Reembolso</h2>
+          <p>Hola {{resortName}},</p>
+          <p>Se ha procesado un reembolso para la reserva <strong>{{bookingCode}}</strong>.</p>
+          <p><strong>Monto reembolsado al cliente:</strong> $\{{ refundAmount }}</p>
+          <p>Este monto será deducido de tu próximo pago.</p>
+        `,
+        text: 'Reembolso procesado para reserva {{bookingCode}}. Monto: ${{refundAmount}}'
+      },
+      [EmailTemplateType.REFUND_PROCESSED_ADMIN]: {
+        subject: '🔔 [ADMIN] Reembolso Procesado',
+        html: `
+          <h2>Reembolso ejecutado</h2>
+          <ul>
+             <li><strong>Reserva:</strong> {{bookingCode}}</li>
+             <li><strong>Monto:</strong> $\{{ refundAmount }}</li>
+          </ul>
+        `,
+        text: 'Reembolso procesado ${{refundAmount}} para {{bookingCode}}'
+      },
+      [EmailTemplateType.EXPERIENCE_CREATED_ADMIN]: {
+        subject: '🌟 [ADMIN] Nueva Experiencia Creada',
+        html: `
+           <h2>Nueva experiencia pendiente de revisión</h2>
+           <p>El resort <strong>{{resortName}}</strong> ha creado la experiencia: <strong>{{experienceName}}</strong></p>
+           <p>ID: {{experienceId}}</p>
+           <p><a href="{{adminLink}}">Ir al panel de administración para aprobar/rechazar</a></p>
+        `,
+        text: 'Nueva experiencia creada por {{resortName}}: {{experienceName}}. ID: {{experienceId}}'
+      },
+      [EmailTemplateType.USER_REGISTERED_ADMIN]: {
+        subject: '👤 [ADMIN] Nuevo Usuario Registrado',
+        html: `
+           <p>Nuevo usuario registrado: <strong>{{userName}}</strong> ({{userEmail}})</p>
+           <p>ID: {{userId}}</p>
+        `,
+        text: 'Nuevo usuario: {{userName}} ({{userEmail}})'
+      },
+      [EmailTemplateType.EMAIL_CONFIRMATION]: {
+        subject: '✉️ Confirma tu correo electrónico - LIVEX',
+        html: `
+          <h2>Confirma tu cuenta</h2>
+          <p>Hola {{userName}},</p>
+          <p>Para completar tu registro, por favor confirma tu dirección de correo electrónico haciendo clic en el siguiente enlace:</p>
+          <p><a href="{{confirmationLink}}">Confirmar mi correo</a></p>
+          <p>O ingresa este código: <strong>{{confirmationCode}}</strong></p>
+        `,
+        text: 'Confirma tu correo: {{confirmationLink}} o código {{confirmationCode}}'
+      },
+      [EmailTemplateType.MONTHLY_REPORT_RESORT]: {
+        subject: '📊 Tu Reporte Mensual - LIVEX',
+        html: `
+           <h2>Resumen de {{month}}</h2>
+           <p>Hola {{resortName}},</p>
+           <p>Aquí tienes el resumen de tu actividad este mes:</p>
+           <ul>
+             <li><strong>Reservas Totales:</strong> {{totalBookings}}</li>
+             <li><strong>Ingresos Brutos:</strong> $\{{ totalRevenue }}</li>
+           </ul>
+           <p>Gracias por trabajar con nosotros.</p>
+        `,
+        text: 'Resumen mensual {{month}}: {{totalBookings}} reservas, ${{totalRevenue}} ingresos.'
+      },
+      [EmailTemplateType.MONTHLY_REPORT_ADMIN]: {
+        subject: '📈 [ADMIN] Reporte Mensual de Plataforma',
+        html: `
+           <h2>Resumen Global - {{month}}</h2>
+           <ul>
+             <li><strong>Total Reservas:</strong> {{totalBookings}}</li>
+             <li><strong>Volumen Total Transaccionado:</strong> $\{{ totalVolume }}</li>
+             <li><strong>Nuevos Usuarios:</strong> {{newUsers}}</li>
+           </ul>
+        `,
+        text: 'Reporte Mensual {{month}}: {{totalBookings}} reservas, ${{totalVolume}} volumen.'
       },
     };
 

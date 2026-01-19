@@ -15,6 +15,7 @@ import { CouponsService } from '../coupons/coupons.service';
 import { UserPreferencesService } from '../user-preferences/user-preferences.service';
 import { ExchangeRatesService } from '../exchange-rates/exchange-rates.service';
 import { convertPrice } from '../common/utils/price-converter';
+import { EmailTemplateType } from 'src/notifications/interfaces/email-template.interface';
 
 interface Payment {
   id: string;
@@ -823,24 +824,93 @@ export class PaymentsService {
    */
   private async sendRefundNotification(client: any, refundId: string): Promise<void> {
     try {
-      const userDetails = await client.query(
-        `SELECT u.email, u.full_name, b.id as booking_id, r.amount_cents
-         FROM refunds r
-         JOIN payments p ON p.id = r.payment_id
+      const refundDetails = await client.query(
+        `SELECT 
+           u.email as user_email, 
+           u.full_name as user_name, 
+           b.id as booking_id,
+           s.start_time::DATE as booking_date,
+           s.start_time::TIME as booking_time,
+           e.title as experience_name,
+           rfd.amount_cents,
+           res.contact_email as resort_email,
+           res.name as resort_name,
+           p.provider
+         FROM refunds rfd
+         JOIN payments p ON p.id = rfd.payment_id
          JOIN bookings b ON b.id = p.booking_id
          JOIN users u ON u.id = b.user_id
-         WHERE r.id = $1`,
+         JOIN experiences e ON e.id = b.experience_id
+         JOIN availability_slots s ON s.id = b.slot_id
+         JOIN resorts res ON res.id = e.resort_id
+         WHERE rfd.id = $1`,
         [refundId]
       );
 
-      if (userDetails.rows.length > 0) {
-        const user = userDetails.rows[0];
-        this.notificationService.sendRefundProcessed(user.email, {
-          customerName: user.full_name,
-          refundAmount: Number((user.amount_cents / 100).toFixed(2)),
-          bookingCode: user.booking_id.substring(0, 8).toUpperCase(),
-        });
-        this.logger.log(`Refund notification sent for refund ${refundId}`);
+      if (refundDetails.rows.length > 0) {
+        const data = refundDetails.rows[0];
+        const refundAmount = Number((data.amount_cents / 100).toFixed(2));
+        const bookingCode = data.booking_id.substring(0, 8).toUpperCase();
+        const adminEmail = this.configService.get<string>('ADMIN_EMAIL', 'admin@livex.com');
+        const bookingDate = data.booking_date
+          ? new Date(data.booking_date).toLocaleDateString('es-ES', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+          })
+          : 'Fecha no disponible';
+
+        const notifications: string[] = [];
+
+        // 1. Notify User
+        const provider = data.provider?.toLowerCase();
+
+        if (provider === EPaymentProvider.PAYPAL) {
+          notifications.push(this.notificationService.sendRefundProcessedPaypal(data.user_email, {
+            customerName: data.user_name,
+            refundAmount: refundAmount,
+            bookingCode: bookingCode,
+          }));
+
+          notifications.push(this.notificationService.sendBookingCancelledToAdminPaypal(adminEmail, {
+            resortName: data.resort_name,
+            bookingCode: bookingCode,
+            customerName: data.user_name,
+            customerEmail: data.user_email,
+            experienceName: data.experience_name,
+            refundAmount: refundAmount,
+          }));
+        } else if (provider === EPaymentProvider.WOMPI) {
+          notifications.push(this.notificationService.sendRefundProcessedWompi(data.user_email, {
+            customerName: data.user_name,
+            refundAmount: refundAmount,
+            bookingCode: bookingCode,
+          }));
+
+          notifications.push(this.notificationService.sendBookingCancelledToAdminWompi(adminEmail, {
+            resortName: data.resort_name,
+            bookingCode: bookingCode,
+            customerName: data.user_name,
+            customerEmail: data.user_email,
+            experienceName: data.experience_name,
+            refundAmount: refundAmount,
+          }));
+        }
+
+        // 2. Notify Resort
+        notifications.push(this.notificationService.sendBookingCancelledToResort(data.resort_email, {
+          resortName: data.resort_name,
+          customerName: data.user_name,
+          experienceName: data.experience_name,
+          bookingCode: bookingCode,
+          bookingDate: bookingDate,
+        }));
+
+
+
+        await Promise.allSettled(notifications);
+
+        this.logger.log(`Refund notifications sent for refund ${refundId}`);
       }
     } catch (error) {
       this.logger.error(`Failed to send refund notification for refund ${refundId}`, error);
@@ -1054,22 +1124,79 @@ export class PaymentsService {
 
     // Enviar notificación de pago confirmado
     try {
-      const userDetails = await client.query(
-        `SELECT u.email, u.full_name, b.total_cents
-         FROM bookings b
-         JOIN users u ON u.id = b.user_id
-         WHERE b.id = $1`,
+      const bookingDetails = await client.query(
+        `SELECT 
+         u.email, u.full_name,
+         b.resort_net_cents, b.adults, b.children, b.currency,
+         b.commission_cents,
+         s.start_time::DATE as slot_date,
+         s.start_time::TIME as slot_time,
+         r.contact_email as resort_email, 
+         r.name as resort_name,
+         r.city,
+         e.title as experience_name,
+         COALESCE(el.name, el.address_line, r.city) as location
+       FROM bookings b
+       JOIN users u ON u.id = b.user_id
+       JOIN experiences e ON e.id = b.experience_id
+       JOIN resorts r ON r.id = e.resort_id
+       LEFT JOIN availability_slots s ON s.id = b.slot_id
+       LEFT JOIN experience_locations el ON el.experience_id = e.id
+       WHERE b.id = $1
+       LIMIT 1`,
         [bookingId]
       );
 
-      if (userDetails.rows.length > 0) {
-        const user = userDetails.rows[0];
-        this.notificationService.sendPaymentConfirmation(user.email, {
-          customerName: user.full_name,
-          amount: Number((user.total_cents / 100).toFixed(2)),
-          bookingCode: bookingId.substring(0, 8).toUpperCase(),
-        });
-      }
+      if (bookingDetails.rows.length === 0) return;
+
+      const d = bookingDetails.rows[0];
+      const resortNetAmount = Number((d.resort_net_cents / 100).toFixed(2));
+      const commissionAmount = Number((d.commission_cents / 100).toFixed(2));
+      const bookingCode = bookingId.substring(0, 8).toUpperCase();
+      const guestCount = (d.adults || 0);
+      const childrenCount = (d.children || 0);
+
+      const bookingDate = d.slot_date
+        ? new Date(d.slot_date).toLocaleDateString('es-ES', {
+          weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+        })
+        : 'Fecha por confirmar';
+
+      const bookingTime = d.slot_time ? String(d.slot_time).substring(0, 5) : 'Hora por confirmar';
+
+      // Enviar en paralelo (más rápido)
+      await Promise.allSettled([
+        this.notificationService.sendPaymentConfirmation(d.email, {
+          customerName: d.full_name,
+          resortNetAmount, commissionAmount, bookingCode,
+          experienceName: d.experience_name,
+          resortName: d.resort_name,
+          bookingDate, bookingTime, guestCount,
+          location: d.location
+        }),
+        this.notificationService.sendBookingConfirmationToResort(d.resort_email, {
+          resortName: d.resort_name,
+          experienceName: d.experience_name,
+          customerName: d.full_name,
+          bookingDate, bookingTime, guestCount, bookingCode,
+          resortNetAmount,
+          childrenCount
+        }),
+        this.notificationService.sendBookingConfirmationToAdmin(
+          this.configService.get('ADMIN_EMAIL', 'admin@livex.com'),
+          {
+            resortName: d.resort_name,
+            experienceName: d.experience_name,
+            customerName: d.full_name,
+            bookingDate, bookingTime, guestCount,
+            commissionAmount, bookingId,
+            location: d.location
+          }
+        )
+      ]);
+
+      this.logger.log(`Payment confirmation emails sent for booking ${bookingId}`);
+
     } catch (error) {
       this.logger.error(`Failed to send payment confirmation email for booking ${bookingId}`, error);
     }
@@ -1227,7 +1354,7 @@ export class PaymentsService {
     this.logger.log(`Refund ${refundId} executed. Status: ${refundProviderResult.status}`);
 
     // 6. Notificación (Centralizada)
-    if (refundProviderResult.status === 'processed') {
+    if (refundProviderResult.status === 'processed' || payment.provider === EPaymentProvider.WOMPI) {
       await this.sendRefundNotification(client, refundId);
     } else {
       this.logger.log(`Refund ${refundId} is pending. Notification delegated to webhook.`);
