@@ -439,7 +439,6 @@ CREATE TABLE IF NOT EXISTS referral_codes (
     
     is_active boolean DEFAULT true,
     usage_limit integer,
-    usage_count integer DEFAULT 0,
     expires_at timestamptz,
     
     description text,
