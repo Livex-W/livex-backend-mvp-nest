@@ -435,7 +435,7 @@ CREATE TABLE IF NOT EXISTS referral_codes (
     
     commission_override_bps integer,
 
-    usage_count integer DEFAULT 0,
+    agent_commission_cents integer DEFAULT 0,
     
     is_active boolean DEFAULT true,
     usage_limit integer,
