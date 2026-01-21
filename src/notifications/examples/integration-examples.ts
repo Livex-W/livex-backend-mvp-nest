@@ -27,12 +27,13 @@ export class IntegrationExamples {
      * Ejemplo 1: Integración en el módulo de Auth
      * Cuando un usuario se registra, enviar email de bienvenida
      */
-    onUserRegistered(userId: string, email: string, name: string) {
+    onUserRegistered(userId: string, email: string, name: string, role: string) {
         // Opción A: Usando eventos (recomendado)
         this.eventEmitter.emit('user.registered', new UserRegisteredEvent(
             userId,
             email,
-            name
+            name,
+            role,
         ));
 
         // Opción B: Llamada directa al servicio
