@@ -122,14 +122,14 @@ export class AdminService {
 
     const adminEmail = this.configService.get<string>('ADMIN_EMAIL', 'admin@livex.com');
 
-    this.notificationService.sendResortApprovedAdmin(adminEmail, {
+    this.notificationService.sendResortApprovedNotifyAdmin(adminEmail, {
       resortId: resort.id,
       resortName: resort.name,
       ownerEmail: resort.contact_email || "",
       ownerName: resort.name,
     });
 
-    this.notificationService.sendResortApprovedResort(resort.contact_email || "", {
+    this.notificationService.sendResortApprovedNotifyOwnerResort(resort.contact_email || "", {
       resortName: resort.name,
     });
 
@@ -184,7 +184,7 @@ export class AdminService {
 
     const adminEmail = this.configService.get<string>('ADMIN_EMAIL', 'admin@livex.com');
 
-    this.notificationService.sendResortRejectedAdmin(adminEmail, {
+    this.notificationService.sendResortRejectedNotifyAdmin(adminEmail, {
       resortId: resort.id,
       resortName: resort.name,
       ownerEmail: resort.contact_email || "",
@@ -192,7 +192,7 @@ export class AdminService {
       rejectionReason: rejectDto.rejection_reason
     });
 
-    this.notificationService.sendResortRejectedResort(resort.contact_email || "", {
+    this.notificationService.sendResortRejectedNotifyOwnerResort(resort.contact_email || "", {
       resortName: resort.name,
       rejectionReason: rejectDto.rejection_reason
     });
@@ -264,14 +264,14 @@ export class AdminService {
 
     const adminEmail = this.configService.get<string>('ADMIN_EMAIL', 'admin@livex.com');
 
-    this.notificationService.sendResortApprovedDocumentsAdmin(adminEmail, {
+    this.notificationService.sendResortApprovedDocumentsNotifyAdmin(adminEmail, {
       resortId: resort.resort_id,
       resortName: resort.resort_name,
       ownerEmail: resort.owner_email,
       ownerName: resort.owner_name,
     });
 
-    this.notificationService.sendResortApprovedDocumentsResort(resort.owner_email || "", {
+    this.notificationService.sendResortApprovedDocumentsNotifyOwnerResort(resort.owner_email || "", {
       resortName: resort.resort_name,
     });
 
@@ -341,7 +341,7 @@ export class AdminService {
 
     const adminEmail = this.configService.get<string>('ADMIN_EMAIL', 'admin@livex.com');
 
-    this.notificationService.sendResortRejectedDocumentsAdmin(adminEmail, {
+    this.notificationService.sendResortRejectedDocumentsNotifyAdmin(adminEmail, {
       resortId: resort.resort_id,
       resortName: resort.resort_name,
       ownerEmail: resort.owner_email || "",
@@ -349,7 +349,7 @@ export class AdminService {
       rejectionReason: rejectionReason
     });
 
-    this.notificationService.sendResortRejectedDocumentsResort(resort.owner_email || "", {
+    this.notificationService.sendResortRejectedDocumentsNotifyOwnerResort(resort.owner_email || "", {
       resortName: resort.resort_name,
       rejectionReason: rejectionReason
     });

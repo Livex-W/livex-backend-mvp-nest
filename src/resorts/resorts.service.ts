@@ -91,7 +91,7 @@ export class ResortsService {
 
 
 
-      this.notificationService.sendResortCreatedAdmin(adminEmail, {
+      this.notificationService.sendResortCreatedNotifyAdmin(adminEmail, {
         resortId: resort.id,
         resortName: resort.name,
         ownerEmail: createResortDto.contact_email || "",
@@ -416,14 +416,14 @@ export class ResortsService {
 
     const adminEmail = this.configService.get<string>('ADMIN_EMAIL', 'admin@livex.com');
 
-    this.notificationService.sendResortCheckedInAdmin(adminEmail, {
+    this.notificationService.sendResortUnderReviewNotifyAdmin(adminEmail, {
       resortId: id,
       resortName: currentResort.name,
       ownerEmail: currentResort.contact_email || "",
       ownerName: currentResort.name,
     });
 
-    this.notificationService.sendResortCheckedInResort(currentResort.contact_email || "", {
+    this.notificationService.sendResortUnderReviewNotifyOwnerResort(currentResort.contact_email || "", {
       resortName: currentResort.name,
     });
 

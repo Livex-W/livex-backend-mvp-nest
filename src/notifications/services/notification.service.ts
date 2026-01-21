@@ -243,7 +243,7 @@ export class NotificationService implements OnModuleInit {
   }
 
 
-  sendResortCreatedAdmin(
+  sendResortCreatedNotifyAdmin(
     adminEmail: string,
     resortData: {
       resortId: string;
@@ -254,14 +254,14 @@ export class NotificationService implements OnModuleInit {
   ): string {
     return this.sendEmailNotification(
       adminEmail,
-      EmailTemplateType.RESORT_CREATED_ADMIN,
+      EmailTemplateType.RESORT_CREATED_NOTIFY_ADMIN,
       resortData,
       { priority: 'medium' }
     );
   }
 
 
-  sendResortCheckedInAdmin(
+  sendResortUnderReviewNotifyAdmin(
     adminEmail: string,
     resortData: {
       resortName: string;
@@ -272,13 +272,13 @@ export class NotificationService implements OnModuleInit {
   ): string {
     return this.sendEmailNotification(
       adminEmail,
-      EmailTemplateType.RESORT_CHECKED_IN_ADMIN,
+      EmailTemplateType.RESORT_UNDER_REVIEW_NOTIFY_ADMIN,
       resortData,
       { priority: 'medium' }
     );
   }
 
-  sendResortCheckedInResort(
+  sendResortUnderReviewNotifyOwnerResort(
     resortEmail: string,
     resortData: {
       resortName: string;
@@ -286,13 +286,13 @@ export class NotificationService implements OnModuleInit {
   ): string {
     return this.sendEmailNotification(
       resortEmail,
-      EmailTemplateType.RESORT_CHECKED_IN_RESORT,
+      EmailTemplateType.RESORT_UNDER_REVIEW_NOTIFY_OWNER_RESORT,
       resortData,
       { priority: 'medium' }
     );
   }
 
-  sendResortApprovedAdmin(
+  sendResortApprovedNotifyAdmin(
     adminEmail: string,
     resortData: {
       resortName: string;
@@ -303,13 +303,13 @@ export class NotificationService implements OnModuleInit {
   ): string {
     return this.sendEmailNotification(
       adminEmail,
-      EmailTemplateType.RESORT_APPROVED_ADMIN,
+      EmailTemplateType.RESORT_APPROVED_NOTIFY_ADMIN,
       resortData,
       { priority: 'medium' }
     );
   }
 
-  sendResortApprovedResort(
+  sendResortApprovedNotifyOwnerResort(
     resortEmail: string,
     resortData: {
       resortName: string;
@@ -317,13 +317,13 @@ export class NotificationService implements OnModuleInit {
   ): string {
     return this.sendEmailNotification(
       resortEmail,
-      EmailTemplateType.RESORT_APPROVED_RESORT,
+      EmailTemplateType.RESORT_APPROVED_NOTIFY_OWNER_RESORT,
       resortData,
       { priority: 'medium' }
     );
   }
 
-  sendResortRejectedAdmin(
+  sendResortRejectedNotifyAdmin(
     adminEmail: string,
     resortData: {
       resortName: string;
@@ -335,13 +335,13 @@ export class NotificationService implements OnModuleInit {
   ): string {
     return this.sendEmailNotification(
       adminEmail,
-      EmailTemplateType.RESORT_REJECTED_ADMIN,
+      EmailTemplateType.RESORT_REJECTED_NOTIFY_ADMIN,
       resortData,
       { priority: 'medium' }
     );
   }
 
-  sendResortRejectedResort(
+  sendResortRejectedNotifyOwnerResort(
     resortEmail: string,
     resortData: {
       resortName: string;
@@ -350,13 +350,13 @@ export class NotificationService implements OnModuleInit {
   ): string {
     return this.sendEmailNotification(
       resortEmail,
-      EmailTemplateType.RESORT_REJECTED_RESORT,
+      EmailTemplateType.RESORT_REJECTED_NOTIFY_OWNER_RESORT,
       resortData,
       { priority: 'medium' }
     );
   }
 
-  sendResortApprovedDocumentsAdmin(
+  sendResortApprovedDocumentsNotifyAdmin(
     adminEmail: string,
     resortData: {
       resortName: string;
@@ -367,13 +367,13 @@ export class NotificationService implements OnModuleInit {
   ): string {
     return this.sendEmailNotification(
       adminEmail,
-      EmailTemplateType.RESORT_APPROVED_DOCUMENTS_ADMIN,
+      EmailTemplateType.RESORT_APPROVED_DOCUMENTS_NOTIFY_ADMIN,
       resortData,
       { priority: 'medium' }
     );
   }
 
-  sendResortApprovedDocumentsResort(
+  sendResortApprovedDocumentsNotifyOwnerResort(
     resortEmail: string,
     resortData: {
       resortName: string;
@@ -381,13 +381,13 @@ export class NotificationService implements OnModuleInit {
   ): string {
     return this.sendEmailNotification(
       resortEmail,
-      EmailTemplateType.RESORT_APPROVED_DOCUMENTS_RESORT,
+      EmailTemplateType.RESORT_APPROVED_DOCUMENTS_NOTIFY_OWNER_RESORT,
       resortData,
       { priority: 'medium' }
     );
   }
 
-  sendResortRejectedDocumentsAdmin(
+  sendResortRejectedDocumentsNotifyAdmin(
     adminEmail: string,
     resortData: {
       resortName: string;
@@ -399,13 +399,13 @@ export class NotificationService implements OnModuleInit {
   ): string {
     return this.sendEmailNotification(
       adminEmail,
-      EmailTemplateType.RESORT_REJECTED_DOCUMENTS_ADMIN,
+      EmailTemplateType.RESORT_REJECTED_DOCUMENTS_NOTIFY_ADMIN,
       resortData,
       { priority: 'medium' }
     );
   }
 
-  sendResortRejectedDocumentsResort(
+  sendResortRejectedDocumentsNotifyOwnerResort(
     resortEmail: string,
     resortData: {
       resortName: string;
@@ -414,7 +414,7 @@ export class NotificationService implements OnModuleInit {
   ): string {
     return this.sendEmailNotification(
       resortEmail,
-      EmailTemplateType.RESORT_REJECTED_DOCUMENTS_RESORT,
+      EmailTemplateType.RESORT_REJECTED_DOCUMENTS_NOTIFY_OWNER_RESORT,
       resortData,
       { priority: 'medium' }
     );
@@ -719,56 +719,56 @@ export class NotificationService implements OnModuleInit {
         resortName: 'Resort de Prueba',
         rejectionReason: 'Documentación incompleta'
       },
-      [EmailTemplateType.RESORT_CREATED_ADMIN]: {
+      [EmailTemplateType.RESORT_CREATED_NOTIFY_ADMIN]: {
         resortId: 'test-resort-id',
         resortName: 'Resort de Prueba',
         ownerEmail: 'owner@test.com',
         ownerName: 'Owner de Prueba'
       },
 
-      [EmailTemplateType.RESORT_CHECKED_IN_ADMIN]: {
+      [EmailTemplateType.RESORT_UNDER_REVIEW_NOTIFY_ADMIN]: {
         resortName: 'Resort de Prueba',
         ownerName: 'Owner de Prueba'
       },
 
-      [EmailTemplateType.RESORT_CHECKED_IN_RESORT]: {
+      [EmailTemplateType.RESORT_UNDER_REVIEW_NOTIFY_OWNER_RESORT]: {
         resortName: 'Resort de Prueba',
         ownerName: 'Owner de Prueba'
       },
 
-      [EmailTemplateType.RESORT_APPROVED_ADMIN]: {
+      [EmailTemplateType.RESORT_APPROVED_NOTIFY_ADMIN]: {
         resortName: 'Resort de Prueba',
         ownerName: 'Owner de Prueba'
       },
 
-      [EmailTemplateType.RESORT_REJECTED_ADMIN]: {
+      [EmailTemplateType.RESORT_REJECTED_NOTIFY_ADMIN]: {
         resortName: 'Resort de Prueba',
         ownerName: 'Owner de Prueba'
       },
 
-      [EmailTemplateType.RESORT_APPROVED_RESORT]: {
+      [EmailTemplateType.RESORT_APPROVED_NOTIFY_OWNER_RESORT]: {
         resortName: 'Resort de Prueba',
         ownerName: 'Owner de Prueba'
       },
-      [EmailTemplateType.RESORT_REJECTED_RESORT]: {
+      [EmailTemplateType.RESORT_REJECTED_NOTIFY_OWNER_RESORT]: {
         resortName: 'Resort de Prueba',
         ownerName: 'Owner de Prueba',
         rejectionReason: 'Documentación incompleta'
       },
-      [EmailTemplateType.RESORT_APPROVED_DOCUMENTS_ADMIN]: {
+      [EmailTemplateType.RESORT_APPROVED_DOCUMENTS_NOTIFY_ADMIN]: {
         resortName: 'Resort de Prueba',
         ownerName: 'Owner de Prueba'
       },
-      [EmailTemplateType.RESORT_REJECTED_DOCUMENTS_ADMIN]: {
+      [EmailTemplateType.RESORT_REJECTED_DOCUMENTS_NOTIFY_ADMIN]: {
         resortName: 'Resort de Prueba',
         ownerName: 'Owner de Prueba',
         rejectionReason: 'Documentación incompleta'
       },
-      [EmailTemplateType.RESORT_APPROVED_DOCUMENTS_RESORT]: {
+      [EmailTemplateType.RESORT_APPROVED_DOCUMENTS_NOTIFY_OWNER_RESORT]: {
         resortName: 'Resort de Prueba',
         ownerName: 'Owner de Prueba'
       },
-      [EmailTemplateType.RESORT_REJECTED_DOCUMENTS_RESORT]: {
+      [EmailTemplateType.RESORT_REJECTED_DOCUMENTS_NOTIFY_OWNER_RESORT]: {
         resortName: 'Resort de Prueba',
         ownerName: 'Owner de Prueba',
         rejectionReason: 'Documentación incompleta'

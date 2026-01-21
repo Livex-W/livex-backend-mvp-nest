@@ -270,7 +270,7 @@ export class NotificationListener {
   @OnEvent('resort.approved')
   handleResortApproved(event: ResortApprovedEvent) {
     try {
-      this.notificationService.sendResortApprovedResort(
+      this.notificationService.sendResortApprovedNotifyOwnerResort(
         event.resortEmail,
         {
           resortName: event.resortName,
@@ -286,7 +286,7 @@ export class NotificationListener {
   @OnEvent('resort.rejected')
   handleResortRejected(event: ResortRejectedEvent) {
     try {
-      this.notificationService.sendResortRejectedResort(
+      this.notificationService.sendResortRejectedNotifyOwnerResort(
         event.resortEmail,
         {
           resortName: event.resortName,
@@ -305,7 +305,7 @@ export class NotificationListener {
     try {
       const adminEmail = this.configService.get<string>('ADMIN_EMAIL_FOR_RESORT_APPROVAL', 'admin@livex.com');
 
-      this.notificationService.sendResortCreatedAdmin(
+      this.notificationService.sendResortCreatedNotifyAdmin(
         adminEmail,
         {
           resortId: event.resortId,

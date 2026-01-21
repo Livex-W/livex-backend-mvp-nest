@@ -119,6 +119,6 @@
     "testEnvironment": "node"
   },
   "resolutions": {
-    "tar": "^7.5.3"
+    "tar": "^7.5.4"
   }
 }

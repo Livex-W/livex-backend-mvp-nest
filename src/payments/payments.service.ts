@@ -814,7 +814,7 @@ export class PaymentsService {
 
     //  Enviar notificación de reembolso procesado
     if (newStatus === 'processed') {
-      await this.sendRefundNotification(client, refund.id);
+      this.sendRefundNotification(client, refund.id);
     }
   }
 
@@ -860,55 +860,51 @@ export class PaymentsService {
           })
           : 'Fecha no disponible';
 
-        const notifications: string[] = [];
-
         // 1. Notify User
         const provider = data.provider?.toLowerCase();
 
         if (provider === EPaymentProvider.PAYPAL) {
-          notifications.push(this.notificationService.sendRefundProcessedPaypal(data.user_email, {
+          this.notificationService.sendRefundProcessedPaypal(data.user_email, {
             customerName: data.user_name,
             refundAmount: refundAmount,
             bookingCode: bookingCode,
-          }));
+          });
 
-          notifications.push(this.notificationService.sendBookingCancelledToAdminPaypal(adminEmail, {
+          this.notificationService.sendBookingCancelledToAdminPaypal(adminEmail, {
             resortName: data.resort_name,
             bookingCode: bookingCode,
             customerName: data.user_name,
             customerEmail: data.user_email,
             experienceName: data.experience_name,
             refundAmount: refundAmount,
-          }));
+          });
         } else if (provider === EPaymentProvider.WOMPI) {
-          notifications.push(this.notificationService.sendRefundProcessedWompi(data.user_email, {
+          this.notificationService.sendRefundProcessedWompi(data.user_email, {
             customerName: data.user_name,
             refundAmount: refundAmount,
             bookingCode: bookingCode,
-          }));
+          });
 
-          notifications.push(this.notificationService.sendBookingCancelledToAdminWompi(adminEmail, {
+          this.notificationService.sendBookingCancelledToAdminWompi(adminEmail, {
             resortName: data.resort_name,
             bookingCode: bookingCode,
             customerName: data.user_name,
             customerEmail: data.user_email,
             experienceName: data.experience_name,
             refundAmount: refundAmount,
-          }));
+          });
         }
 
         // 2. Notify Resort
-        notifications.push(this.notificationService.sendBookingCancelledToResort(data.resort_email, {
+        this.notificationService.sendBookingCancelledToResort(data.resort_email, {
           resortName: data.resort_name,
           customerName: data.user_name,
           experienceName: data.experience_name,
           bookingCode: bookingCode,
           bookingDate: bookingDate,
-        }));
+        });
 
 
-
-        await Promise.allSettled(notifications);
 
         this.logger.log(`Refund notifications sent for refund ${refundId}`);
       }
@@ -1164,36 +1160,33 @@ export class PaymentsService {
 
       const bookingTime = d.slot_time ? String(d.slot_time).substring(0, 5) : 'Hora por confirmar';
 
-      // Enviar en paralelo (más rápido)
-      await Promise.allSettled([
-        this.notificationService.sendPaymentConfirmation(d.email, {
-          customerName: d.full_name,
-          resortNetAmount, commissionAmount, bookingCode,
-          experienceName: d.experience_name,
+      this.notificationService.sendPaymentConfirmation(d.email, {
+        customerName: d.full_name,
+        resortNetAmount, commissionAmount, bookingCode,
+        experienceName: d.experience_name,
+        resortName: d.resort_name,
+        bookingDate, bookingTime, guestCount,
+        location: d.location
+      });
+      this.notificationService.sendBookingConfirmationToResort(d.resort_email, {
+        resortName: d.resort_name,
+        experienceName: d.experience_name,
+        customerName: d.full_name,
+        bookingDate, bookingTime, guestCount, bookingCode,
+        resortNetAmount,
+        childrenCount
+      });
+      this.notificationService.sendBookingConfirmationToAdmin(
+        this.configService.get('ADMIN_EMAIL', 'admin@livex.com'),
+        {
           resortName: d.resort_name,
+          experienceName: d.experience_name,
+          customerName: d.full_name,
           bookingDate, bookingTime, guestCount,
+          commissionAmount, bookingId,
           location: d.location
-        }),
-        this.notificationService.sendBookingConfirmationToResort(d.resort_email, {
-          resortName: d.resort_name,
-          experienceName: d.experience_name,
-          customerName: d.full_name,
-          bookingDate, bookingTime, guestCount, bookingCode,
-          resortNetAmount,
-          childrenCount
-        }),
-        this.notificationService.sendBookingConfirmationToAdmin(
-          this.configService.get('ADMIN_EMAIL', 'admin@livex.com'),
-          {
-            resortName: d.resort_name,
-            experienceName: d.experience_name,
-            customerName: d.full_name,
-            bookingDate, bookingTime, guestCount,
-            commissionAmount, bookingId,
-            location: d.location
-          }
-        )
-      ]);
+        }
+      );
 
       this.logger.log(`Payment confirmation emails sent for booking ${bookingId}`);
 
