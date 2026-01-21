@@ -421,11 +421,11 @@ export class ResortsService {
       resortName: currentResort.name,
       ownerEmail: currentResort.contact_email || "",
       ownerName: currentResort.name,
-    }),
+    });
 
     this.notificationService.sendResortCheckedInResort(currentResort.contact_email || "", {
       resortName: currentResort.name,
-    }),
+    });
 
     return result.rows[0] as Resort;
   }

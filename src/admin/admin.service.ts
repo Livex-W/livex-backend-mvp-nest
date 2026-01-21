@@ -127,11 +127,11 @@ export class AdminService {
       resortName: resort.name,
       ownerEmail: resort.contact_email || "",
       ownerName: resort.name,
-    }),
+    });
 
     this.notificationService.sendResortApprovedResort(resort.contact_email || "", {
       resortName: resort.name,
-    }),
+    });
 
 
     return result.rows[0] as Resort;
@@ -190,12 +190,12 @@ export class AdminService {
       ownerEmail: resort.contact_email || "",
       ownerName: resort.name,
       rejectionReason: rejectDto.rejection_reason
-    }),
+    });
 
     this.notificationService.sendResortRejectedResort(resort.contact_email || "", {
       resortName: resort.name,
       rejectionReason: rejectDto.rejection_reason
-    }),
+    });
 
     return result.rows[0] as Resort;
   }
@@ -269,11 +269,11 @@ export class AdminService {
       resortName: resort.resort_name,
       ownerEmail: resort.owner_email,
       ownerName: resort.owner_name,
-    }),
+    });
 
     this.notificationService.sendResortApprovedDocumentsResort(resort.owner_email || "", {
       resortName: resort.resort_name,
-    }),
+    });
 
 
     return result.rows[0];
@@ -347,12 +347,12 @@ export class AdminService {
       ownerEmail: resort.owner_email || "",
       ownerName: resort.owner_name,
       rejectionReason: rejectionReason
-    }),
+    });
 
     this.notificationService.sendResortRejectedDocumentsResort(resort.owner_email || "", {
       resortName: resort.resort_name,
       rejectionReason: rejectionReason
-    }),
+    });
 
     return result.rows[0];
   }
