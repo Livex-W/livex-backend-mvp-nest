@@ -73,6 +73,7 @@ export class UserRegisteredEvent implements NotificationEvent {
     public readonly userId: string,
     public readonly userEmail: string,
     public readonly userName: string,
+    public readonly role: string,
   ) { }
 }
 

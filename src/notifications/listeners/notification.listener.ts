@@ -203,13 +203,15 @@ export class NotificationListener {
   @OnEvent('user.registered')
   handleUserRegistered(event: UserRegisteredEvent) {
     try {
-      // 1. Welcome email to user
-      this.notificationService.sendWelcomeEmail(
-        event.userEmail,
-        {
-          userName: event.userName,
-        }
-      );
+      // 1. Welcome email to user (only for tourists)
+      if (event.role === 'tourist') {
+        this.notificationService.sendWelcomeEmail(
+          event.userEmail,
+          {
+            userName: event.userName,
+          }
+        );
+      }
 
       // 2. Notification to admin
       const adminEmail = this.configService.get<string>('ADMIN_EMAIL', 'admin@livex.com');
@@ -268,7 +270,7 @@ export class NotificationListener {
   @OnEvent('resort.approved')
   handleResortApproved(event: ResortApprovedEvent) {
     try {
-      this.notificationService.sendResortApproved(
+      this.notificationService.sendResortApprovedResort(
         event.resortEmail,
         {
           resortName: event.resortName,
@@ -284,7 +286,7 @@ export class NotificationListener {
   @OnEvent('resort.rejected')
   handleResortRejected(event: ResortRejectedEvent) {
     try {
-      this.notificationService.sendResortRejected(
+      this.notificationService.sendResortRejectedResort(
         event.resortEmail,
         {
           resortName: event.resortName,

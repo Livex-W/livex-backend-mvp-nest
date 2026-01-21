@@ -21,7 +21,7 @@ DO $$ BEGIN
         CREATE TYPE resort_status AS ENUM ('draft','under_review','approved','rejected');
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'resort_doc_type') THEN
-        CREATE TYPE resort_doc_type AS ENUM ('camara_comercio','rut_nit','rnt','other');
+        CREATE TYPE resort_doc_type AS ENUM ('camara_comercio','nit','rnt','other');
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'document_status') THEN
         CREATE TYPE document_status AS ENUM ('uploaded','under_review','approved','rejected');
@@ -435,7 +435,7 @@ CREATE TABLE IF NOT EXISTS referral_codes (
     
     commission_override_bps integer,
 
-    usage_count integer DEFAULT 0,
+    agent_commission_cents integer DEFAULT 0,
     
     is_active boolean DEFAULT true,
     usage_limit integer,
@@ -922,7 +922,7 @@ SELECT
     rc.code,
     rc.owner_user_id,
     rc.code_type,
-    rc.usage_count,
+    rc.agent_commission_cents,
     COUNT(DISTINCT b.id) as total_bookings,
     COUNT(DISTINCT CASE WHEN b.status = 'confirmed' THEN b.id END) as confirmed_bookings,
     COALESCE(SUM(CASE WHEN b.status = 'confirmed' THEN b.total_cents ELSE 0 END), 0) as total_revenue_cents,
@@ -932,7 +932,7 @@ SELECT
 FROM referral_codes rc
 LEFT JOIN bookings b ON b.referral_code_id = rc.id
 LEFT JOIN booking_referral_codes brc ON brc.referral_code_id = rc.id
-GROUP BY rc.id, rc.code, rc.owner_user_id, rc.code_type, rc.usage_count;
+GROUP BY rc.id, rc.code, rc.owner_user_id, rc.code_type, rc.agent_commission_cents;
 
 -- 9.3 Lógica de Ratings Automáticos
 CREATE OR REPLACE FUNCTION recalc_experience_rating(p_experience_id uuid)

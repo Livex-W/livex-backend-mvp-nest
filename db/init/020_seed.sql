@@ -166,10 +166,10 @@ r AS (
 bp_docs AS (
   INSERT INTO business_documents (business_profile_id, doc_type, file_url, status, reviewed_by, reviewed_at)
   VALUES
-    ((SELECT id FROM bp_resorts WHERE name='Mar y Sol Cartagena'), 'rut_nit'::resort_doc_type, 'https://files.example.com/marysol-rut.pdf', 'approved'::document_status, (SELECT id FROM u WHERE email='admin@livex.app'), now()),
+    ((SELECT id FROM bp_resorts WHERE name='Mar y Sol Cartagena'), 'nit'::resort_doc_type, 'https://files.example.com/marysol-rut.pdf', 'approved'::document_status, (SELECT id FROM u WHERE email='admin@livex.app'), now()),
     ((SELECT id FROM bp_resorts WHERE name='Mar y Sol Cartagena'), 'camara_comercio'::resort_doc_type, 'https://files.example.com/marysol-camara.pdf', 'approved'::document_status, (SELECT id FROM u WHERE email='admin@livex.app'), now()),
     ((SELECT id FROM bp_resorts WHERE name='Isla Brisa Resort'), 'rnt'::resort_doc_type, 'https://files.example.com/islabrisa-lic.pdf', 'approved'::document_status, (SELECT id FROM u WHERE email='admin@livex.app'), now()),
-    ((SELECT id FROM bp_resorts WHERE name='Isla Brisa Resort'), 'rut_nit'::resort_doc_type, 'https://files.example.com/islabrisa-rut.pdf', 'approved'::document_status, (SELECT id FROM u WHERE email='admin@livex.app'), now()),
+    ((SELECT id FROM bp_resorts WHERE name='Isla Brisa Resort'), 'nit'::resort_doc_type, 'https://files.example.com/islabrisa-rut.pdf', 'approved'::document_status, (SELECT id FROM u WHERE email='admin@livex.app'), now()),
     ((SELECT id FROM bp_resorts WHERE name='Náutica Bahía Club'), 'camara_comercio'::resort_doc_type, 'https://files.example.com/nautica-pola.pdf', 'approved'::document_status, (SELECT id FROM u WHERE email='admin@livex.app'), now())
   RETURNING business_profile_id
 ),
@@ -678,7 +678,7 @@ SELECT
 INSERT INTO business_documents (business_profile_id, doc_type, file_url, status, reviewed_by, reviewed_at)
 SELECT
   (SELECT id FROM business_profiles WHERE name='Carlos El Vendedor - Agente'),
-  'rut_nit'::resort_doc_type,
+  'nit'::resort_doc_type,
   'https://files.example.com/carlos-rut.pdf',
   'approved'::document_status,
   (SELECT id FROM users WHERE email='admin@livex.app'),
