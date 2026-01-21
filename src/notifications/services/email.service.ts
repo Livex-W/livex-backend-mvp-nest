@@ -406,7 +406,7 @@ export class EmailService {
         `,
         text: 'Tu código para restablecer contraseña es: {{token}}'
       },
-      [EmailTemplateType.RESORT_CREATED_ADMIN]: {
+      [EmailTemplateType.RESORT_CREATED_NOTIFY_ADMIN]: {
         subject: '🏨 Nuevo Prestador Registrado - LIVEX',
         html: `
           <h2>Nuevo prestador registrado</h2>
@@ -421,7 +421,7 @@ export class EmailService {
         text: 'Nuevo prestador registrado: {{resortName}} por {{ownerName}} ({{ownerEmail}}). ID: {{resortId}}'
       },
 
-      [EmailTemplateType.RESORT_CHECKED_IN_ADMIN]: {
+      [EmailTemplateType.RESORT_UNDER_REVIEW_NOTIFY_ADMIN]: {
         subject: '🏨 Nuevo Prestador Pendiente de aprobación - LIVEX',
         html: `
           <h2>Nuevo prestador pendiente de aprobación</h2>
@@ -437,7 +437,7 @@ export class EmailService {
         text: 'Nuevo prestador registrado: {{resortName}} por {{ownerName}} ({{ownerEmail}}). ID: {{resortId}}'
       },
 
-      [EmailTemplateType.RESORT_CHECKED_IN_RESORT]: {
+      [EmailTemplateType.RESORT_UNDER_REVIEW_NOTIFY_OWNER_RESORT]: {
         subject: '🏨 En revisión - LIVEX',
         html: `
           <p>Hola {{resortName}},</p>
@@ -446,7 +446,7 @@ export class EmailService {
         `,
         text: 'Tu estado como prestador está en revisión: {{resortName}} por {{ownerName}} ({{ownerEmail}}). ID: {{resortId}}'
       },
-      [EmailTemplateType.RESORT_APPROVED_ADMIN]: {
+      [EmailTemplateType.RESORT_APPROVED_NOTIFY_ADMIN]: {
         subject: '🏨 Nuevo Prestador Aprobado - LIVEX',
         html: `
           <h2>Nuevo prestador aprobado</h2>
@@ -461,7 +461,7 @@ export class EmailService {
         text: 'Nuevo prestador aprobado: {{resortName}} por {{ownerName}} ({{ownerEmail}}). ID: {{resortId}}'
       },
 
-      [EmailTemplateType.RESORT_REJECTED_ADMIN]: {
+      [EmailTemplateType.RESORT_REJECTED_NOTIFY_ADMIN]: {
         subject: '🏨 Nuevo Prestador Rechazado - LIVEX',
         html: `
           <h2>Nuevo prestador rechazado</h2>
@@ -476,7 +476,7 @@ export class EmailService {
         text: 'Nuevo prestador rechazado: {{resortName}} por {{ownerName}} ({{ownerEmail}}). ID: {{resortId}}'
       },
 
-      [EmailTemplateType.RESORT_APPROVED_RESORT]: {
+      [EmailTemplateType.RESORT_APPROVED_NOTIFY_OWNER_RESORT]: {
         subject: '🏨 Prestador Aprobado - LIVEX',
         html: `
           <h2>¡Hola {{resortName}}!</h2>
@@ -486,7 +486,7 @@ export class EmailService {
         text: 'Tu estado como prestador ha sido aprobado: {{resortName}} por {{ownerName}} ({{ownerEmail}}). ID: {{resortId}}'
       },
 
-      [EmailTemplateType.RESORT_REJECTED_RESORT]: {
+      [EmailTemplateType.RESORT_REJECTED_NOTIFY_OWNER_RESORT]: {
         subject: '🏨 Prestador Rechazado - LIVEX',
         html: `
           <h2>Hola {{resortName}}!</h2>
@@ -499,7 +499,7 @@ export class EmailService {
         text: 'Tu estado como prestador ha sido rechazado: {{resortName}} por {{ownerName}} ({{ownerEmail}}). ID: {{resortId}}'
       },
 
-      [EmailTemplateType.RESORT_APPROVED_DOCUMENTS_ADMIN]: {
+      [EmailTemplateType.RESORT_APPROVED_DOCUMENTS_NOTIFY_ADMIN]: {
         subject: '🏨 Prestador Aprobado - LIVEX',
         html: `
           <h2>El documento del resort ha sido aprobado</h2>
@@ -515,7 +515,7 @@ export class EmailService {
         text: 'El documento del resort ha sido aprobado'
       },
 
-      [EmailTemplateType.RESORT_REJECTED_DOCUMENTS_ADMIN]: {
+      [EmailTemplateType.RESORT_REJECTED_DOCUMENTS_NOTIFY_ADMIN]: {
         subject: '🏨 Prestador Rechazado - LIVEX',
         html: `
           <h2>El documento del resort ha sido rechazado</h2>
@@ -530,7 +530,7 @@ export class EmailService {
         text: 'El documento del resort ha sido rechazado'
       },
 
-      [EmailTemplateType.RESORT_APPROVED_DOCUMENTS_RESORT]: {
+      [EmailTemplateType.RESORT_APPROVED_DOCUMENTS_NOTIFY_OWNER_RESORT]: {
         subject: '🏨 Prestador Aprobado - LIVEX',
         html: `
           <h2>¡Hola {{resortName}}!</h2>
@@ -540,7 +540,7 @@ export class EmailService {
         text: 'Tu documento ha sido aprobado: {{resortName}} por {{ownerName}} ({{ownerEmail}}). ID: {{resortId}}'
       },
 
-      [EmailTemplateType.RESORT_REJECTED_DOCUMENTS_RESORT]: {
+      [EmailTemplateType.RESORT_REJECTED_DOCUMENTS_NOTIFY_OWNER_RESORT]: {
         subject: '🏨 Prestador Rechazado - LIVEX',
         html: `
           <h2>Hola {{resortName}}!</h2>
