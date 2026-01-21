@@ -416,19 +416,16 @@ export class ResortsService {
 
     const adminEmail = this.configService.get<string>('ADMIN_EMAIL', 'admin@livex.com');
 
-    await Promise.allSettled([
-      this.notificationService.sendResortCheckedInAdmin(adminEmail, {
-        resortId: id,
-        resortName: currentResort.name,
-        ownerEmail: currentResort.contact_email || "",
-        ownerName: currentResort.name,
-      }),
+    this.notificationService.sendResortCheckedInAdmin(adminEmail, {
+      resortId: id,
+      resortName: currentResort.name,
+      ownerEmail: currentResort.contact_email || "",
+      ownerName: currentResort.name,
+    }),
 
-      this.notificationService.sendResortCheckedInResort(currentResort.contact_email || "", {
-        resortName: currentResort.name,
-      }),
-
-    ]);
+    this.notificationService.sendResortCheckedInResort(currentResort.contact_email || "", {
+      resortName: currentResort.name,
+    }),
 
     return result.rows[0] as Resort;
   }
