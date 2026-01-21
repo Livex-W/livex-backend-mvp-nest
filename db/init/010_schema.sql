@@ -922,7 +922,7 @@ SELECT
     rc.code,
     rc.owner_user_id,
     rc.code_type,
-    rc.agent_commission_cents,
+    rc.usage_count,
     COUNT(DISTINCT b.id) as total_bookings,
     COUNT(DISTINCT CASE WHEN b.status = 'confirmed' THEN b.id END) as confirmed_bookings,
     COALESCE(SUM(CASE WHEN b.status = 'confirmed' THEN b.total_cents ELSE 0 END), 0) as total_revenue_cents,
@@ -932,7 +932,7 @@ SELECT
 FROM referral_codes rc
 LEFT JOIN bookings b ON b.referral_code_id = rc.id
 LEFT JOIN booking_referral_codes brc ON brc.referral_code_id = rc.id
-GROUP BY rc.id, rc.code, rc.owner_user_id, rc.code_type, rc.agent_commission_cents;
+GROUP BY rc.id, rc.code, rc.owner_user_id, rc.code_type, rc.usage_count;
 
 -- 9.3 Lógica de Ratings Automáticos
 CREATE OR REPLACE FUNCTION recalc_experience_rating(p_experience_id uuid)
