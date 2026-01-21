@@ -8,6 +8,8 @@ import { Experience } from '../experiences/entities/experience.entity';
 import { Resort } from '../resorts/entities/resort.entity';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { PaginatedResult, PaginationMeta } from '../common/interfaces/pagination.interface';
+import { NotificationService } from '../notifications/services/notification.service';
+import { ConfigService } from '@nestjs/config';
 
 interface PostgreSQLError extends Error {
   code?: string;
@@ -20,6 +22,9 @@ export class AdminService {
   constructor(
     @Inject(DATABASE_CLIENT) private readonly db: DatabaseClient,
     private readonly logger: CustomLoggerService,
+    private readonly notificationService: NotificationService,
+    private readonly configService: ConfigService,
+
   ) { }
 
   // ========== RESORT MANAGEMENT ==========
@@ -115,6 +120,20 @@ export class AdminService {
       { status: 'approved', approved_by: adminUserId, notes: approveDto.notes }
     );
 
+    const adminEmail = this.configService.get<string>('ADMIN_EMAIL', 'admin@livex.com');
+
+    this.notificationService.sendResortApprovedAdmin(adminEmail, {
+      resortId: resort.id,
+      resortName: resort.name,
+      ownerEmail: resort.contact_email || "",
+      ownerName: resort.name,
+    }),
+
+    this.notificationService.sendResortApprovedResort(resort.contact_email || "", {
+      resortName: resort.name,
+    }),
+
+
     return result.rows[0] as Resort;
   }
 
@@ -163,6 +182,21 @@ export class AdminService {
       { status: 'rejected', rejection_reason: rejectDto.rejection_reason }
     );
 
+    const adminEmail = this.configService.get<string>('ADMIN_EMAIL', 'admin@livex.com');
+
+    this.notificationService.sendResortRejectedAdmin(adminEmail, {
+      resortId: resort.id,
+      resortName: resort.name,
+      ownerEmail: resort.contact_email || "",
+      ownerName: resort.name,
+      rejectionReason: rejectDto.rejection_reason
+    }),
+
+    this.notificationService.sendResortRejectedResort(resort.contact_email || "", {
+      resortName: resort.name,
+      rejectionReason: rejectDto.rejection_reason
+    }),
+
     return result.rows[0] as Resort;
   }
 
@@ -180,6 +214,22 @@ export class AdminService {
     }
 
     const document = docResult.rows[0];
+
+    const resortQuery = await this.db.query(
+      `SELECT  
+        r.id as resort_id,
+        bp.name as resort_name,
+        u.full_name as owner_name,
+        u.email as owner_email
+      FROM resorts r
+      JOIN business_profiles bp on bp.id = r.business_profile_id
+      JOIN users u on u.id = r.owner_user_id
+      JOIN business_documents bd on bd.business_profile_id = bp.id
+      WHERE bd.id = $1`,
+      [document.id]
+    );
+
+    const resort = resortQuery.rows[0];
 
     // Update document status
     const result = await this.db.query(
@@ -211,6 +261,21 @@ export class AdminService {
       { status: 'approved', reviewed_by: adminUserId }
     );
 
+
+    const adminEmail = this.configService.get<string>('ADMIN_EMAIL', 'admin@livex.com');
+
+    this.notificationService.sendResortApprovedDocumentsAdmin(adminEmail, {
+      resortId: resort.resort_id,
+      resortName: resort.resort_name,
+      ownerEmail: resort.owner_email,
+      ownerName: resort.owner_name,
+    }),
+
+    this.notificationService.sendResortApprovedDocumentsResort(resort.owner_email || "", {
+      resortName: resort.resort_name,
+    }),
+
+
     return result.rows[0];
   }
 
@@ -226,6 +291,22 @@ export class AdminService {
     }
 
     const document = docResult.rows[0];
+
+    const resortQuery = await this.db.query(
+      `SELECT  
+        r.id as resort_id,
+        bp.name as resort_name,
+        u.full_name as owner_name,
+        u.email as owner_email
+      FROM resorts r
+      JOIN business_profiles bp on bp.id = r.business_profile_id
+      JOIN users u on u.id = r.owner_user_id
+      JOIN business_documents bd on bd.business_profile_id = bp.id
+      WHERE bd.id = $1`,
+      [document.id]
+    );
+
+    const resort = resortQuery.rows[0];
 
     // Update document status
     const result = await this.db.query(
@@ -257,6 +338,21 @@ export class AdminService {
       { status: document.status },
       { status: 'rejected', rejection_reason: rejectionReason }
     );
+
+    const adminEmail = this.configService.get<string>('ADMIN_EMAIL', 'admin@livex.com');
+
+    this.notificationService.sendResortRejectedDocumentsAdmin(adminEmail, {
+      resortId: resort.resort_id,
+      resortName: resort.resort_name,
+      ownerEmail: resort.owner_email || "",
+      ownerName: resort.owner_name,
+      rejectionReason: rejectionReason
+    }),
+
+    this.notificationService.sendResortRejectedDocumentsResort(resort.owner_email || "", {
+      resortName: resort.resort_name,
+      rejectionReason: rejectionReason
+    }),
 
     return result.rows[0];
   }

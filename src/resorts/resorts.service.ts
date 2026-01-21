@@ -1,5 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Inject } from '@nestjs/common';
 import { DatabaseClient } from '../database/database.client';
+import { ConfigService } from '@nestjs/config';
+
 import { DATABASE_CLIENT } from '../database/database.module';
 import { CustomLoggerService } from '../common/services/logger.service';
 import { UploadService } from '../upload/upload.service';
@@ -10,6 +12,7 @@ import { ResortProfileDto, ResortDocumentDto } from './dto/resort-profile.dto';
 import { Resort } from './entities/resort.entity';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { PaginatedResult, PaginationMeta } from '../common/interfaces/pagination.interface';
+import { NotificationService } from '../notifications/services/notification.service';
 
 interface PostgreSQLError extends Error {
   code?: string;
@@ -23,6 +26,10 @@ export class ResortsService {
     @Inject(DATABASE_CLIENT) private readonly db: DatabaseClient,
     private readonly logger: CustomLoggerService,
     private readonly uploadService: UploadService,
+    private readonly notificationService: NotificationService,
+    private readonly configService: ConfigService,
+
+
   ) { }
 
   async create(createResortDto: CreateResortDto, userId: string): Promise<Resort> {
@@ -73,12 +80,22 @@ export class ResortsService {
       );
 
       const resort = result.rows[0] as Resort;
+      const adminEmail = this.configService.get<string>('ADMIN_EMAIL', 'admin@livex.com');
 
       this.logger.logBusinessEvent('resort_created', {
         userId,
         resortId: resort.id,
         resortName: resort.name,
         businessProfileId,
+      });
+
+
+
+      this.notificationService.sendResortCreatedAdmin(adminEmail, {
+        resortId: resort.id,
+        resortName: resort.name,
+        ownerEmail: createResortDto.contact_email || "",
+        ownerName: createResortDto.name,
       });
 
       return resort;
@@ -235,7 +252,12 @@ export class ResortsService {
     };
   }
 
-  async update(id: string, updateResortDto: UpdateResortDto, userId: string, userRole: string): Promise<Resort> {
+  async update(
+    id: string,
+    updateResortDto: UpdateResortDto,
+    userId: string,
+    userRole: string
+  ): Promise<Resort> {
     // First check if resort exists and get current data
     const currentResort = await this.findOne(id);
 
@@ -249,56 +271,120 @@ export class ResortsService {
       throw new BadRequestException('Cannot update approved resort. Contact support for changes.');
     }
 
-    try {
-      const updateFields: string[] = [];
-      const updateValues: unknown[] = [];
-      let paramIndex = 1;
+    return await this.db.transaction(async (client) => {
+      try {
+        // 1. UPDATE tabla resorts
+        const resortUpdateFields: string[] = [];
+        const resortUpdateValues: unknown[] = [];
+        let paramIndex = 1;
 
-      // Build dynamic update query
-      Object.entries(updateResortDto).forEach(([key, value]) => {
-        if (value !== undefined) {
-          updateFields.push(`${key} = $${paramIndex}`);
-          updateValues.push(value);
-          paramIndex++;
+        // Campos que van en resorts
+        const resortFields = ['name', 'description', 'website', 'contact_email', 'contact_phone', 'address_line', 'city', 'country', 'latitude', 'longitude'];
+
+        resortFields.forEach(field => {
+          if (updateResortDto[field] !== undefined) {
+            resortUpdateFields.push(`${field} = $${paramIndex}`);
+            resortUpdateValues.push(updateResortDto[field]);
+            paramIndex++;
+          }
+        });
+
+        if (resortUpdateFields.length > 0) {
+          resortUpdateFields.push('updated_at = NOW()');
+          resortUpdateValues.push(id);
+
+          const resortQuery = `
+          UPDATE resorts 
+          SET ${resortUpdateFields.join(', ')} 
+          WHERE id = $${paramIndex}
+        `;
+
+          await client.query(resortQuery, resortUpdateValues);
         }
-      });
 
-      if (updateFields.length === 0) {
-        return currentResort;
+        // 2. UPDATE tabla business_profiles (si tiene business_profile_id)
+        if (currentResort.business_profile_id) {
+          const businessUpdateFields: string[] = [];
+          const businessUpdateValues: unknown[] = [];
+          let bParamIndex = 1;
+
+          // Campos que van en business_profiles
+          if (updateResortDto.nit !== undefined) {
+            businessUpdateFields.push(`nit = $${bParamIndex}`);
+            businessUpdateValues.push(updateResortDto.nit);
+            bParamIndex++;
+          }
+
+          if (updateResortDto.rnt !== undefined) {
+            businessUpdateFields.push(`rnt = $${bParamIndex}`);
+            businessUpdateValues.push(updateResortDto.rnt);
+            bParamIndex++;
+          }
+
+          // También actualizar contact_email y contact_phone en business_profiles
+          if (updateResortDto.contact_email !== undefined) {
+            businessUpdateFields.push(`contact_email = $${bParamIndex}`);
+            businessUpdateValues.push(updateResortDto.contact_email);
+            bParamIndex++;
+          }
+
+          if (updateResortDto.contact_phone !== undefined) {
+            businessUpdateFields.push(`contact_phone = $${bParamIndex}`);
+            businessUpdateValues.push(updateResortDto.contact_phone);
+            bParamIndex++;
+          }
+
+          if (updateResortDto.name !== undefined) {
+            businessUpdateFields.push(`name = $${bParamIndex}`);
+            businessUpdateValues.push(updateResortDto.name);
+            bParamIndex++;
+          }
+
+          if (businessUpdateFields.length > 0) {
+            businessUpdateFields.push('updated_at = NOW()');
+            businessUpdateValues.push(currentResort.business_profile_id);
+
+            const businessQuery = `
+            UPDATE business_profiles 
+            SET ${businessUpdateFields.join(', ')} 
+            WHERE id = $${bParamIndex}
+          `;
+
+            await client.query(businessQuery, businessUpdateValues);
+          }
+        }
+
+        // 3. Retornar resort actualizado
+        const result = await client.query(
+          `SELECT r.*, bp.nit, bp.rnt
+         FROM resorts r
+         LEFT JOIN business_profiles bp ON bp.id = r.business_profile_id
+         WHERE r.id = $1`,
+          [id]
+        );
+
+        this.logger.logBusinessEvent('resort_updated', {
+          userId,
+          resortId: id,
+          changes: updateResortDto
+        });
+
+        return result.rows[0] as Resort;
+      } catch (error: unknown) {
+        const pgError = error as PostgreSQLError;
+        this.logger.logError(error as Error, {
+          userId,
+          resortId: id,
+          updateData: updateResortDto
+        });
+
+        if (pgError.code === '23505') {
+          throw new BadRequestException('Resort with this name already exists');
+        }
+
+        throw error;
       }
-
-      updateFields.push(`updated_at = NOW()`);
-      updateValues.push(id);
-
-      const query = `
-        UPDATE resorts 
-        SET ${updateFields.join(', ')} 
-        WHERE id = $${paramIndex}
-        RETURNING *
-      `;
-
-      const result = await this.db.query(query, updateValues);
-
-      this.logger.logBusinessEvent('resort_updated', {
-        userId,
-        resortId: id,
-        changes: updateResortDto
-      });
-
-      return result.rows[0] as Resort;
-    } catch (error: unknown) {
-      const pgError = error as PostgreSQLError;
-      this.logger.logError(error as Error, {
-        userId,
-        resortId: id,
-        updateData: updateResortDto
-      });
-
-      if (pgError.code === '23505') {
-        throw new BadRequestException('Resort with this name already exists');
-      }
-      throw error;
-    }
+    });
   }
 
   async submitForReview(id: string, userId: string, userRole: string): Promise<Resort> {
@@ -327,6 +413,19 @@ export class ResortsService {
       resortId: id,
       resortName: currentResort.name
     });
+
+    const adminEmail = this.configService.get<string>('ADMIN_EMAIL', 'admin@livex.com');
+
+    this.notificationService.sendResortCheckedInAdmin(adminEmail, {
+      resortId: id,
+      resortName: currentResort.name,
+      ownerEmail: currentResort.contact_email || "",
+      ownerName: currentResort.name,
+    }),
+
+    this.notificationService.sendResortCheckedInResort(currentResort.contact_email || "", {
+      resortName: currentResort.name,
+    }),
 
     return result.rows[0] as Resort;
   }

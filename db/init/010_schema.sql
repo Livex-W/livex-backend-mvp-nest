@@ -21,7 +21,7 @@ DO $$ BEGIN
         CREATE TYPE resort_status AS ENUM ('draft','under_review','approved','rejected');
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'resort_doc_type') THEN
-        CREATE TYPE resort_doc_type AS ENUM ('camara_comercio','rut_nit','rnt','other');
+        CREATE TYPE resort_doc_type AS ENUM ('camara_comercio','nit','rnt','other');
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'document_status') THEN
         CREATE TYPE document_status AS ENUM ('uploaded','under_review','approved','rejected');
@@ -439,7 +439,6 @@ CREATE TABLE IF NOT EXISTS referral_codes (
     
     is_active boolean DEFAULT true,
     usage_limit integer,
-    usage_count integer DEFAULT 0,
     expires_at timestamptz,
     
     description text,

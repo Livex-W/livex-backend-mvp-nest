@@ -6,9 +6,10 @@ import { ReportsService } from './reports.service';
 import { CommonModule } from '../common/common.module';
 import { UploadModule } from '../upload/upload.module';
 import { DatabaseModule } from '../database/database.module';
+import { NotificationModule } from '../notifications/notification.module';
 
 @Module({
-  imports: [CommonModule, UploadModule, DatabaseModule],
+  imports: [CommonModule, UploadModule, DatabaseModule, NotificationModule],
   controllers: [ResortsController, AdminController],
   providers: [ResortsService, ReportsService],
   exports: [ResortsService],

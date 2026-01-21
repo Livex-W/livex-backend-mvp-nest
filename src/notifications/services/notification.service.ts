@@ -242,38 +242,7 @@ export class NotificationService implements OnModuleInit {
     );
   }
 
-  sendResortApproved(
-    resortEmail: string,
-    resortData: {
-      resortName: string;
-    }
-  ): string {
-    return this.sendEmailNotification(
-      resortEmail,
-      EmailTemplateType.RESORT_APPROVED,
-      resortData,
-      { priority: 'medium' }
-    );
-  }
 
-  sendResortRejected(
-    resortEmail: string,
-    resortData: {
-      resortName: string;
-      rejectionReason: string;
-    }
-  ): string {
-    return this.sendEmailNotification(
-      resortEmail,
-      EmailTemplateType.RESORT_REJECTED,
-      resortData,
-      { priority: 'medium' }
-    );
-  }
-
-  /**
-   * Notify admin when a new resort is created and needs approval
-   */
   sendResortCreatedAdmin(
     adminEmail: string,
     resortData: {
@@ -287,7 +256,167 @@ export class NotificationService implements OnModuleInit {
       adminEmail,
       EmailTemplateType.RESORT_CREATED_ADMIN,
       resortData,
-      { priority: 'high' }
+      { priority: 'medium' }
+    );
+  }
+
+
+  sendResortCheckedInAdmin(
+    adminEmail: string,
+    resortData: {
+      resortName: string;
+      ownerEmail: string;
+      ownerName: string;
+      resortId: string;
+    }
+  ): string {
+    return this.sendEmailNotification(
+      adminEmail,
+      EmailTemplateType.RESORT_CHECKED_IN_ADMIN,
+      resortData,
+      { priority: 'medium' }
+    );
+  }
+
+  sendResortCheckedInResort(
+    resortEmail: string,
+    resortData: {
+      resortName: string;
+    }
+  ): string {
+    return this.sendEmailNotification(
+      resortEmail,
+      EmailTemplateType.RESORT_CHECKED_IN_RESORT,
+      resortData,
+      { priority: 'medium' }
+    );
+  }
+
+  sendResortApprovedAdmin(
+    adminEmail: string,
+    resortData: {
+      resortName: string;
+      ownerEmail: string;
+      ownerName: string;
+      resortId: string;
+    }
+  ): string {
+    return this.sendEmailNotification(
+      adminEmail,
+      EmailTemplateType.RESORT_APPROVED_ADMIN,
+      resortData,
+      { priority: 'medium' }
+    );
+  }
+
+  sendResortApprovedResort(
+    resortEmail: string,
+    resortData: {
+      resortName: string;
+    }
+  ): string {
+    return this.sendEmailNotification(
+      resortEmail,
+      EmailTemplateType.RESORT_APPROVED_RESORT,
+      resortData,
+      { priority: 'medium' }
+    );
+  }
+
+  sendResortRejectedAdmin(
+    adminEmail: string,
+    resortData: {
+      resortName: string;
+      ownerEmail: string;
+      ownerName: string;
+      resortId: string;
+      rejectionReason?: string;
+    }
+  ): string {
+    return this.sendEmailNotification(
+      adminEmail,
+      EmailTemplateType.RESORT_REJECTED_ADMIN,
+      resortData,
+      { priority: 'medium' }
+    );
+  }
+
+  sendResortRejectedResort(
+    resortEmail: string,
+    resortData: {
+      resortName: string;
+      rejectionReason?: string;
+    }
+  ): string {
+    return this.sendEmailNotification(
+      resortEmail,
+      EmailTemplateType.RESORT_REJECTED_RESORT,
+      resortData,
+      { priority: 'medium' }
+    );
+  }
+
+  sendResortApprovedDocumentsAdmin(
+    adminEmail: string,
+    resortData: {
+      resortName: string;
+      ownerEmail: string;
+      ownerName: string;
+      resortId: string;
+    }
+  ): string {
+    return this.sendEmailNotification(
+      adminEmail,
+      EmailTemplateType.RESORT_APPROVED_DOCUMENTS_ADMIN,
+      resortData,
+      { priority: 'medium' }
+    );
+  }
+
+  sendResortApprovedDocumentsResort(
+    resortEmail: string,
+    resortData: {
+      resortName: string;
+    }
+  ): string {
+    return this.sendEmailNotification(
+      resortEmail,
+      EmailTemplateType.RESORT_APPROVED_DOCUMENTS_RESORT,
+      resortData,
+      { priority: 'medium' }
+    );
+  }
+
+  sendResortRejectedDocumentsAdmin(
+    adminEmail: string,
+    resortData: {
+      resortName: string;
+      ownerEmail: string;
+      ownerName: string;
+      resortId: string;
+      rejectionReason?: string;
+    }
+  ): string {
+    return this.sendEmailNotification(
+      adminEmail,
+      EmailTemplateType.RESORT_REJECTED_DOCUMENTS_ADMIN,
+      resortData,
+      { priority: 'medium' }
+    );
+  }
+
+  sendResortRejectedDocumentsResort(
+    resortEmail: string,
+    resortData: {
+      resortName: string;
+      rejectionReason?: string;
+    }
+  ): string {
+    return this.sendEmailNotification(
+      resortEmail,
+      EmailTemplateType.RESORT_REJECTED_DOCUMENTS_RESORT,
+      resortData,
+      { priority: 'medium' }
     );
   }
 
@@ -595,6 +724,54 @@ export class NotificationService implements OnModuleInit {
         resortName: 'Resort de Prueba',
         ownerEmail: 'owner@test.com',
         ownerName: 'Owner de Prueba'
+      },
+
+      [EmailTemplateType.RESORT_CHECKED_IN_ADMIN]: {
+        resortName: 'Resort de Prueba',
+        ownerName: 'Owner de Prueba'
+      },
+
+      [EmailTemplateType.RESORT_CHECKED_IN_RESORT]: {
+        resortName: 'Resort de Prueba',
+        ownerName: 'Owner de Prueba'
+      },
+
+      [EmailTemplateType.RESORT_APPROVED_ADMIN]: {
+        resortName: 'Resort de Prueba',
+        ownerName: 'Owner de Prueba'
+      },
+
+      [EmailTemplateType.RESORT_REJECTED_ADMIN]: {
+        resortName: 'Resort de Prueba',
+        ownerName: 'Owner de Prueba'
+      },
+
+      [EmailTemplateType.RESORT_APPROVED_RESORT]: {
+        resortName: 'Resort de Prueba',
+        ownerName: 'Owner de Prueba'
+      },
+      [EmailTemplateType.RESORT_REJECTED_RESORT]: {
+        resortName: 'Resort de Prueba',
+        ownerName: 'Owner de Prueba',
+        rejectionReason: 'Documentación incompleta'
+      },
+      [EmailTemplateType.RESORT_APPROVED_DOCUMENTS_ADMIN]: {
+        resortName: 'Resort de Prueba',
+        ownerName: 'Owner de Prueba'
+      },
+      [EmailTemplateType.RESORT_REJECTED_DOCUMENTS_ADMIN]: {
+        resortName: 'Resort de Prueba',
+        ownerName: 'Owner de Prueba',
+        rejectionReason: 'Documentación incompleta'
+      },
+      [EmailTemplateType.RESORT_APPROVED_DOCUMENTS_RESORT]: {
+        resortName: 'Resort de Prueba',
+        ownerName: 'Owner de Prueba'
+      },
+      [EmailTemplateType.RESORT_REJECTED_DOCUMENTS_RESORT]: {
+        resortName: 'Resort de Prueba',
+        ownerName: 'Owner de Prueba',
+        rejectionReason: 'Documentación incompleta'
       },
       [EmailTemplateType.EXPERIENCE_APPROVED]: {
         resortName: 'Resort de Prueba',

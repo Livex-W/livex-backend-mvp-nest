@@ -142,7 +142,8 @@ export class NotificationController {
         event = new UserRegisteredEvent(
           eventData.userId || 'test-user-001',
           eventData.userEmail,
-          eventData.userName || 'Usuario de Prueba'
+          eventData.userName || 'Usuario de Prueba',
+          eventData.userRole || 'Role de Prueba'
         );
         break;
 
@@ -208,6 +209,16 @@ export class NotificationController {
       [EmailTemplateType.RESORT_APPROVED]: 'Aprobación de prestador',
       [EmailTemplateType.RESORT_REJECTED]: 'Rechazo de prestador',
       [EmailTemplateType.RESORT_CREATED_ADMIN]: 'Notificación al admin de nuevo prestador',
+      [EmailTemplateType.RESORT_CHECKED_IN_ADMIN]: 'Notificación al admin de nuevo prestador',
+      [EmailTemplateType.RESORT_CHECKED_IN_RESORT]: 'Notificación al resort de nuevo prestador',
+      [EmailTemplateType.RESORT_APPROVED_ADMIN]: 'Notificación al admin de nuevo prestador',
+      [EmailTemplateType.RESORT_APPROVED_RESORT]: 'Notificación al resort de nuevo prestador',
+      [EmailTemplateType.RESORT_REJECTED_ADMIN]: 'Notificación al admin de nuevo prestador',
+      [EmailTemplateType.RESORT_REJECTED_RESORT]: 'Notificación al resort de nuevo prestador',
+      [EmailTemplateType.RESORT_APPROVED_DOCUMENTS_ADMIN]: 'Notificación al admin de nuevo prestador',
+      [EmailTemplateType.RESORT_APPROVED_DOCUMENTS_RESORT]: 'Notificación al resort de nuevo prestador',
+      [EmailTemplateType.RESORT_REJECTED_DOCUMENTS_ADMIN]: 'Notificación al admin de nuevo prestador',
+      [EmailTemplateType.RESORT_REJECTED_DOCUMENTS_RESORT]: 'Notificación al resort de nuevo prestador',
       [EmailTemplateType.EXPERIENCE_APPROVED]: 'Aprobación de experiencia',
       [EmailTemplateType.EXPERIENCE_REJECTED]: 'Rechazo de experiencia',
       [EmailTemplateType.WELCOME]: 'Email de bienvenida para nuevos usuarios',

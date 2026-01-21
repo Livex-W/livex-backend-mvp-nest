@@ -106,7 +106,7 @@ export class AuthService {
 
         this.eventEmitter.emit(
             'user.registered',
-            new UserRegisteredEvent(user.id, user.email, user.fullName || '')
+            new UserRegisteredEvent(user.id, user.email, user.fullName || '', user.role)
         );
 
         // If role is 'resort', create an associated resort with minimal data
@@ -134,16 +134,6 @@ export class AuthService {
                     resortName: createdResort.name,
                 });
 
-                // Emit event to notify admin about new resort needing approval
-                this.eventEmitter.emit(
-                    'resort.created',
-                    new ResortCreatedEvent(
-                        createdResort.id,
-                        createdResort.name,
-                        dto.email,
-                        dto.fullName || 'Unknown'
-                    )
-                );
             } catch (error) {
                 // Log the error but don't fail the registration
                 // The user can create the resort manually later
@@ -247,6 +237,12 @@ export class AuthService {
                     role: 'tourist',
                 });
                 this.logger.logSecurityEvent('user_registered_google', { userId: user.id, email });
+
+                // Emit event for welcome email (Google Registration)
+                this.eventEmitter.emit(
+                    'user.registered',
+                    new UserRegisteredEvent(user.id, user.email, user.fullName || '', user.role)
+                );
             }
         } else if (!user.avatar || !user.fullName) {
             // User exists but is missing some Google data, update it
