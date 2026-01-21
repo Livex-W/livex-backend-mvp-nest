@@ -122,18 +122,16 @@ export class AdminService {
 
     const adminEmail = this.configService.get<string>('ADMIN_EMAIL', 'admin@livex.com');
 
-    await Promise.allSettled([
-      this.notificationService.sendResortApprovedAdmin(adminEmail, {
-        resortId: resort.id,
-        resortName: resort.name,
-        ownerEmail: resort.contact_email || "",
-        ownerName: resort.name,
-      }),
+    this.notificationService.sendResortApprovedAdmin(adminEmail, {
+      resortId: resort.id,
+      resortName: resort.name,
+      ownerEmail: resort.contact_email || "",
+      ownerName: resort.name,
+    }),
 
-      this.notificationService.sendResortApprovedResort(resort.contact_email || "", {
-        resortName: resort.name,
-      }),
-    ]);
+    this.notificationService.sendResortApprovedResort(resort.contact_email || "", {
+      resortName: resort.name,
+    }),
 
 
     return result.rows[0] as Resort;
@@ -186,20 +184,18 @@ export class AdminService {
 
     const adminEmail = this.configService.get<string>('ADMIN_EMAIL', 'admin@livex.com');
 
-    await Promise.allSettled([
-      this.notificationService.sendResortRejectedAdmin(adminEmail, {
-        resortId: resort.id,
-        resortName: resort.name,
-        ownerEmail: resort.contact_email || "",
-        ownerName: resort.name,
-        rejectionReason: rejectDto.rejection_reason
-      }),
+    this.notificationService.sendResortRejectedAdmin(adminEmail, {
+      resortId: resort.id,
+      resortName: resort.name,
+      ownerEmail: resort.contact_email || "",
+      ownerName: resort.name,
+      rejectionReason: rejectDto.rejection_reason
+    }),
 
-      this.notificationService.sendResortRejectedResort(resort.contact_email || "", {
-        resortName: resort.name,
-        rejectionReason: rejectDto.rejection_reason
-      }),
-    ]);
+    this.notificationService.sendResortRejectedResort(resort.contact_email || "", {
+      resortName: resort.name,
+      rejectionReason: rejectDto.rejection_reason
+    }),
 
     return result.rows[0] as Resort;
   }
@@ -268,18 +264,16 @@ export class AdminService {
 
     const adminEmail = this.configService.get<string>('ADMIN_EMAIL', 'admin@livex.com');
 
-    await Promise.allSettled([
-      this.notificationService.sendResortApprovedDocumentsAdmin(adminEmail, {
-        resortId: resort.resort_id,
-        resortName: resort.resort_name,
-        ownerEmail: resort.owner_email,
-        ownerName: resort.owner_name,
-      }),
+    this.notificationService.sendResortApprovedDocumentsAdmin(adminEmail, {
+      resortId: resort.resort_id,
+      resortName: resort.resort_name,
+      ownerEmail: resort.owner_email,
+      ownerName: resort.owner_name,
+    }),
 
-      this.notificationService.sendResortApprovedDocumentsResort(resort.owner_email || "", {
-        resortName: resort.resort_name,
-      }),
-    ]);
+    this.notificationService.sendResortApprovedDocumentsResort(resort.owner_email || "", {
+      resortName: resort.resort_name,
+    }),
 
 
     return result.rows[0];
@@ -347,20 +341,18 @@ export class AdminService {
 
     const adminEmail = this.configService.get<string>('ADMIN_EMAIL', 'admin@livex.com');
 
-    await Promise.allSettled([
-      this.notificationService.sendResortRejectedDocumentsAdmin(adminEmail, {
-        resortId: resort.resort_id,
-        resortName: resort.resort_name,
-        ownerEmail: resort.owner_email || "",
-        ownerName: resort.owner_name,
-        rejectionReason: rejectionReason
-      }),
+    this.notificationService.sendResortRejectedDocumentsAdmin(adminEmail, {
+      resortId: resort.resort_id,
+      resortName: resort.resort_name,
+      ownerEmail: resort.owner_email || "",
+      ownerName: resort.owner_name,
+      rejectionReason: rejectionReason
+    }),
 
-      this.notificationService.sendResortRejectedDocumentsResort(resort.owner_email || "", {
-        resortName: resort.resort_name,
-        rejectionReason: rejectionReason
-      }),
-    ]);
+    this.notificationService.sendResortRejectedDocumentsResort(resort.owner_email || "", {
+      resortName: resort.resort_name,
+      rejectionReason: rejectionReason
+    }),
 
     return result.rows[0];
   }
