@@ -94,7 +94,25 @@ WITH u AS (
      'José Pérez', 
      '+573041234567', 
      'tourist', 
-     'PPT', '99887766')
+     'PPT', '99887766'),
+
+    -- 5. PARTNERS (Afiliados con códigos de referido)
+    
+    -- Partner con comisión porcentual (5%)
+    ('partner1@livex.app', 
+     '$2b$10$AUoDb4ExvjeUGT7r0kjkeuezbtKLalTUj.YRLcg0wHtMIdG4OxWye', 
+     'Partner Demo Porcentaje', 
+     '+573001234567', 
+     'partner', 
+     'CC', '5555555501'),
+
+    -- Partner con comisión fija ($50,000 COP)
+    ('partner2@livex.app', 
+     '$2b$10$AUoDb4ExvjeUGT7r0kjkeuezbtKLalTUj.YRLcg0wHtMIdG4OxWye', 
+     'Partner Demo Fijo', 
+     '+573009876543', 
+     'partner', 
+     'CC', '5555555502')
 
   RETURNING id, email, role
 ),
@@ -777,6 +795,92 @@ VALUES
 -- 5.7 Código de Influencer (No permite stacking)
 INSERT INTO referral_codes (owner_user_id, code, code_type, referral_type, discount_type, discount_value, description)
 VALUES ((SELECT id FROM users WHERE email='agente.carlos@gmail.com'), 'INFLUENCER20', 'discount', 'influencer', 'fixed', 2000000, 'Código de influencer - $20.000 descuento, uso exclusivo');
+
+-- ===========================
+-- 5.8 PARTNER REFERRAL CODES
+-- Códigos de referido para partners con comisiones
+-- ===========================
+
+-- Partner 1: Comisión Porcentual (5%)
+INSERT INTO referral_codes (owner_user_id, code, code_type, referral_type, agent_commission_type, agent_commission_cents, description)
+VALUES ((SELECT id FROM users WHERE email='partner1@livex.app'), 'PARTNER1VIP', 'commission', 'partner', 'percentage', 500, 'Partner 1 - Comisión 5% por reserva');
+
+-- Partner 1: Segundo código con 3%
+INSERT INTO referral_codes (owner_user_id, code, code_type, referral_type, agent_commission_type, agent_commission_cents, description)
+VALUES ((SELECT id FROM users WHERE email='partner1@livex.app'), 'PARTNER1LITE', 'commission', 'partner', 'percentage', 300, 'Partner 1 - Comisión 3% por reserva');
+
+-- Partner 2: Comisión Fija ($50,000 COP por reserva)
+INSERT INTO referral_codes (owner_user_id, code, code_type, referral_type, agent_commission_type, agent_commission_cents, description)
+VALUES ((SELECT id FROM users WHERE email='partner2@livex.app'), 'PARTNER2FIX', 'commission', 'partner', 'fixed', 5000000, 'Partner 2 - Comisión fija $50,000 COP');
+
+-- Partner 2: Segundo código con $30,000 fijo
+INSERT INTO referral_codes (owner_user_id, code, code_type, referral_type, agent_commission_type, agent_commission_cents, description)
+VALUES ((SELECT id FROM users WHERE email='partner2@livex.app'), 'PARTNER2BASIC', 'commission', 'partner', 'fixed', 3000000, 'Partner 2 - Comisión fija $30,000 COP');
+
+-- ===========================
+-- 5.9 BOOKINGS CON PARTNER CODES (Para estadísticas)
+-- ===========================
+
+-- Booking 1: Usando código de Partner 1 (Porcentaje)
+INSERT INTO bookings (
+  user_id, experience_id, slot_id, 
+  adults, children, subtotal_cents, tax_cents, commission_cents, resort_net_cents, total_cents, currency,
+  referral_code_id, status, created_at, updated_at
+)
+SELECT
+  (SELECT id FROM users WHERE email='sofia.turista@gmail.com'),
+  (SELECT id FROM experiences WHERE title='City Tour Histórico'),
+  (SELECT id FROM availability_slots WHERE experience_id=(SELECT id FROM experiences WHERE title='City Tour Histórico') LIMIT 1),
+  2, 1, 57000000, 0, 0, 57000000, 57000000, 'COP',
+  (SELECT id FROM referral_codes WHERE code='PARTNER1VIP'),
+  'confirmed', now() - INTERVAL '5 days', now() - INTERVAL '5 days';
+
+-- Booking 2: Usando código de Partner 1 (Porcentaje) - otra experiencia
+INSERT INTO bookings (
+  user_id, experience_id, slot_id, 
+  adults, children, subtotal_cents, tax_cents, commission_cents, resort_net_cents, total_cents, currency,
+  referral_code_id, status, created_at, updated_at
+)
+SELECT
+  (SELECT id FROM users WHERE email='john.doe@usmail.com'),
+  (SELECT id FROM experiences WHERE title='Sunset Sailing'),
+  (SELECT id FROM availability_slots WHERE experience_id=(SELECT id FROM experiences WHERE title='Sunset Sailing') LIMIT 1),
+  2, 0, 34000000, 0, 0, 34000000, 34000000, 'COP',
+  (SELECT id FROM referral_codes WHERE code='PARTNER1VIP'),
+  'confirmed', now() - INTERVAL '3 days', now() - INTERVAL '3 days';
+
+-- Booking 3: Usando código de Partner 2 (Fijo)
+INSERT INTO bookings (
+  user_id, experience_id, slot_id, 
+  adults, children, subtotal_cents, tax_cents, commission_cents, resort_net_cents, total_cents, currency,
+  referral_code_id, status, created_at, updated_at
+)
+SELECT
+  (SELECT id FROM users WHERE email='pierre.frances@gmail.com'),
+  (SELECT id FROM experiences WHERE title='Tours Islas + Playa Tranquila'),
+  (SELECT id FROM availability_slots WHERE experience_id=(SELECT id FROM experiences WHERE title='Tours Islas + Playa Tranquila') LIMIT 1),
+  3, 2, 92000000, 0, 0, 92000000, 92000000, 'COP',
+  (SELECT id FROM referral_codes WHERE code='PARTNER2FIX'),
+  'confirmed', now() - INTERVAL '7 days', now() - INTERVAL '7 days';
+
+-- Booking 4: Usando código de Partner 2 (Fijo) - pendiente
+INSERT INTO bookings (
+  user_id, experience_id, slot_id, 
+  adults, children, subtotal_cents, tax_cents, commission_cents, resort_net_cents, total_cents, currency,
+  referral_code_id, status, created_at, updated_at
+)
+SELECT
+  (SELECT id FROM users WHERE email='lucia.silva@uol.com.br'),
+  (SELECT id FROM experiences WHERE title='Palmarito Beach'),
+  (SELECT id FROM availability_slots WHERE experience_id=(SELECT id FROM experiences WHERE title='Palmarito Beach') LIMIT 1),
+  2, 1, 70000000, 0, 0, 70000000, 70000000, 'COP',
+  (SELECT id FROM referral_codes WHERE code='PARTNER2BASIC'),
+  'pending', now() - INTERVAL '1 day', now() - INTERVAL '1 day';
+
+-- Actualizar usage_count de los códigos de partner
+UPDATE referral_codes SET usage_count = 2 WHERE code = 'PARTNER1VIP';
+UPDATE referral_codes SET usage_count = 1 WHERE code = 'PARTNER2FIX';
+UPDATE referral_codes SET usage_count = 1 WHERE code = 'PARTNER2BASIC';
 
 -- ===========================
 -- BLOQUE 6: CUPONES DE USUARIO Y VIP

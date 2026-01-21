@@ -436,6 +436,7 @@ CREATE TABLE IF NOT EXISTS referral_codes (
     commission_override_bps integer,
 
     agent_commission_cents integer DEFAULT 0,
+    agent_commission_type text DEFAULT 'fixed' CHECK (agent_commission_type IN ('percentage', 'fixed')),
     
     is_active boolean DEFAULT true,
     usage_limit integer,
@@ -448,6 +449,8 @@ CREATE TABLE IF NOT EXISTS referral_codes (
 );
 
 COMMENT ON COLUMN referral_codes.referral_type IS 'standard: permite stacking con otros cupones. influencer/affiliate/partner: uso exclusivo, no permite stacking.';
+COMMENT ON COLUMN referral_codes.agent_commission_type IS 'Type of commission: percentage (value in basis points, e.g., 500 = 5%) or fixed (value in cents).';
+COMMENT ON COLUMN referral_codes.agent_commission_cents IS 'Commission value: basis points if type is percentage, cents if type is fixed.';
 CREATE INDEX IF NOT EXISTS idx_referral_codes_owner ON referral_codes(owner_user_id);
 CREATE INDEX IF NOT EXISTS idx_referral_codes_active ON referral_codes(code) WHERE is_active = true;
 CREATE TRIGGER trg_referral_codes_updated_at BEFORE UPDATE ON referral_codes FOR EACH ROW EXECUTE FUNCTION set_updated_at();

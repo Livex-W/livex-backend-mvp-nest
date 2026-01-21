@@ -689,4 +689,192 @@ export class AdminService {
       meta,
     };
   }
+
+  // ========== PARTNER MANAGEMENT ==========
+
+  async getPartners(paginationDto: PaginationDto): Promise<PaginatedResult<any>> {
+    const { page = 1, limit = 10, search } = paginationDto;
+    const offset = (page - 1) * limit;
+
+    let whereClause = "WHERE role = 'partner'";
+    const orderClause = 'ORDER BY created_at DESC';
+    const queryParams: unknown[] = [];
+
+    if (search) {
+      whereClause += ' AND (email ILIKE $1 OR full_name ILIKE $1 OR phone ILIKE $1)';
+      queryParams.push(`%${search}%`);
+    }
+
+    const countQuery = `SELECT COUNT(*) FROM users ${whereClause}`;
+    const countResult = await this.db.query(countQuery, queryParams);
+    const total = parseInt(countResult.rows[0].count as string);
+
+    const dataQuery = `
+      SELECT 
+        u.id, u.email, u.full_name, u.phone, u.created_at,
+        (SELECT COUNT(*) FROM referral_codes rc WHERE rc.owner_user_id = u.id) as codes_count,
+        (SELECT COALESCE(SUM(b.total_cents), 0) FROM bookings b 
+         JOIN referral_codes rc ON b.referral_code_id = rc.id 
+         WHERE rc.owner_user_id = u.id AND b.status = 'confirmed') as total_revenue_cents
+      FROM users u
+      ${whereClause}
+      ${orderClause}
+      LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}
+    `;
+
+    const dataResult = await this.db.query(dataQuery, [...queryParams, limit, offset]);
+
+    const meta: PaginationMeta = {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+      hasNextPage: page < Math.ceil(total / limit),
+      hasPreviousPage: page > 1,
+    };
+
+    return { data: dataResult.rows, meta };
+  }
+
+  async getPartnerById(partnerId: string): Promise<any> {
+    // Get partner info
+    const partnerResult = await this.db.query(
+      `SELECT id, email, full_name, phone, created_at
+       FROM users WHERE id = $1 AND role = 'partner'`,
+      [partnerId]
+    );
+
+    if (partnerResult.rows.length === 0) {
+      throw new NotFoundException('Partner not found');
+    }
+
+    const partner = partnerResult.rows[0];
+
+    // Get referral codes with stats
+    const codesResult = await this.db.query(
+      `SELECT 
+        rc.id, rc.code, rc.code_type, rc.agent_commission_type, rc.agent_commission_cents,
+        rc.discount_type, rc.discount_value, rc.is_active, rc.usage_count, rc.usage_limit,
+        rc.expires_at, rc.description, rc.created_at,
+        COALESCE(SUM(CASE WHEN b.status = 'confirmed' THEN b.total_cents ELSE 0 END), 0) as revenue_cents,
+        COUNT(b.id) as bookings_count
+      FROM referral_codes rc
+      LEFT JOIN bookings b ON b.referral_code_id = rc.id
+      WHERE rc.owner_user_id = $1
+      GROUP BY rc.id
+      ORDER BY rc.created_at DESC`,
+      [partnerId]
+    );
+
+    // Get stats summary
+    const statsResult = await this.db.query(
+      `SELECT 
+        COALESCE(SUM(b.total_cents), 0) as total_revenue,
+        COUNT(DISTINCT b.id) as total_bookings,
+        COUNT(DISTINCT CASE WHEN b.status = 'confirmed' THEN b.id END) as confirmed_bookings
+      FROM bookings b
+      JOIN referral_codes rc ON b.referral_code_id = rc.id
+      WHERE rc.owner_user_id = $1`,
+      [partnerId]
+    );
+
+    return {
+      ...partner,
+      referralCodes: codesResult.rows,
+      stats: statsResult.rows[0],
+    };
+  }
+
+  async createPartner(data: { email: string; password: string; fullName: string; phone?: string }): Promise<any> {
+    // Check if email already exists
+    const existingUser = await this.db.query('SELECT id FROM users WHERE email = $1', [data.email]);
+    if (existingUser.rows.length > 0) {
+      throw new BadRequestException('Email already registered');
+    }
+
+    // Hash password using scrypt (same as PasswordHashService)
+    const { scryptSync, randomBytes } = await import('crypto');
+    const salt = randomBytes(16);
+    const derivedKey = scryptSync(data.password, salt, 64);
+    const hashedPassword = `${salt.toString('hex')}:${derivedKey.toString('hex')}`;
+
+    // Create user with partner role
+    const result = await this.db.query(
+      `INSERT INTO users (email, password_hash, full_name, phone, role, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, 'partner', NOW(), NOW())
+       RETURNING id, email, full_name, phone, role, created_at`,
+      [data.email, hashedPassword, data.fullName, data.phone || null]
+    );
+
+    this.logger.logBusinessEvent('partner_created', {
+      partnerId: result.rows[0].id,
+      email: data.email,
+    });
+
+    return result.rows[0];
+  }
+
+  async createPartnerReferralCode(partnerId: string, data: {
+    code: string;
+    commissionType: 'percentage' | 'fixed';
+    commissionValue: number;
+    codeType?: string;
+    discountType?: string;
+    discountValue?: number;
+    usageLimit?: number;
+    expiresAt?: string;
+    description?: string;
+    isActive?: boolean;
+  }): Promise<any> {
+    // Verify partner exists
+    const partnerResult = await this.db.query(
+      "SELECT id FROM users WHERE id = $1 AND role = 'partner'",
+      [partnerId]
+    );
+
+    if (partnerResult.rows.length === 0) {
+      throw new NotFoundException('Partner not found');
+    }
+
+    // Check if code already exists
+    const existingCode = await this.db.query(
+      'SELECT id FROM referral_codes WHERE code = $1',
+      [data.code.toUpperCase()]
+    );
+
+    if (existingCode.rows.length > 0) {
+      throw new BadRequestException('Code already exists');
+    }
+
+    // Create referral code
+    const result = await this.db.query(
+      `INSERT INTO referral_codes (
+        code, code_type, referral_type, agent_commission_type, agent_commission_cents,
+        discount_type, discount_value, usage_limit, expires_at, description,
+        is_active, owner_user_id, created_at, updated_at
+      ) VALUES ($1, $2, 'partner', $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
+      RETURNING *`,
+      [
+        data.code.toUpperCase(),
+        data.codeType || 'commission',
+        data.commissionType,
+        data.commissionValue,
+        data.discountType || null,
+        data.discountValue || 0,
+        data.usageLimit || null,
+        data.expiresAt || null,
+        data.description || null,
+        data.isActive !== false,
+        partnerId,
+      ]
+    );
+
+    this.logger.logBusinessEvent('partner_code_created', {
+      partnerId,
+      codeId: result.rows[0].id,
+      code: data.code,
+    });
+
+    return result.rows[0];
+  }
 }

@@ -32,6 +32,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { ExchangeRatesModule } from './exchange-rates/exchange-rates.module';
 import { UserPreferencesModule } from './user-preferences/user-preferences.module';
 import { PdfModule } from './pdf/pdf.module';
+import { PartnerModule } from './partner/partner.module';
 
 
 
@@ -61,6 +62,7 @@ import { PdfModule } from './pdf/pdf.module';
     ExchangeRatesModule,
     UserPreferencesModule,
     PdfModule,
+    PartnerModule,
   ],
   controllers: [AppController],
   providers: [

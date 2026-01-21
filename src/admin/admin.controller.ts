@@ -15,6 +15,8 @@ import {
 import { AdminService } from './admin.service';
 import { ApproveExperienceDto, RejectExperienceDto } from './dto/approve-experience.dto';
 import { ApproveResortDto, RejectResortDto } from '../resorts/dto/approve-resort.dto';
+import { CreatePartnerDto } from './dto/create-partner.dto';
+import { CreatePartnerCodeDto } from './dto/create-partner-code.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -311,5 +313,84 @@ export class AdminController {
     });
 
     return this.adminService.getAuditLogs(paginationDto);
+  }
+
+  // ========== PARTNER MANAGEMENT ==========
+
+  @Get('partners')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  async getPartners(
+    @Query() paginationDto: PaginationDto,
+    @Request() req: AuthenticatedRequest
+  ) {
+    this.logger.logRequest({
+      method: 'GET',
+      url: '/v1/admin/partners',
+      userId: req.user.id,
+      role: req.user.role,
+      query: paginationDto
+    });
+
+    return this.adminService.getPartners(paginationDto);
+  }
+
+  @Get('partners/:id')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  async getPartnerById(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Request() req: AuthenticatedRequest
+  ) {
+    this.logger.logRequest({
+      method: 'GET',
+      url: '/v1/admin/partners/:id',
+      userId: req.user.id,
+      role: req.user.role,
+      partnerId: id
+    });
+
+    return this.adminService.getPartnerById(id);
+  }
+
+  @Post('partners')
+  @HttpCode(HttpStatus.CREATED)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  async createPartner(
+    @Body() createPartnerDto: CreatePartnerDto,
+    @Request() req: AuthenticatedRequest
+  ) {
+    this.logger.logRequest({
+      method: 'POST',
+      url: '/v1/admin/partners',
+      userId: req.user.id,
+      role: req.user.role,
+      email: createPartnerDto.email
+    });
+
+    return this.adminService.createPartner({
+      email: createPartnerDto.email,
+      password: createPartnerDto.password,
+      fullName: createPartnerDto.fullName,
+      phone: createPartnerDto.phone,
+    });
+  }
+
+  @Post('partners/:id/referral-codes')
+  @HttpCode(HttpStatus.CREATED)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  async createPartnerReferralCode(
+    @Param('id', ParseUUIDPipe) partnerId: string,
+    @Body() createCodeDto: CreatePartnerCodeDto,
+    @Request() req: AuthenticatedRequest
+  ) {
+    this.logger.logRequest({
+      method: 'POST',
+      url: '/v1/admin/partners/:id/referral-codes',
+      userId: req.user.id,
+      role: req.user.role,
+      partnerId,
+      code: createCodeDto.code
+    });
+
+    return this.adminService.createPartnerReferralCode(partnerId, createCodeDto);
   }
 }
