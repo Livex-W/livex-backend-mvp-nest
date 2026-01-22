@@ -160,10 +160,31 @@ export class AgentsService {
             ${search ? 'AND (u.email ILIKE $2 OR u.full_name ILIKE $2)' : ''}
         `;
 
+        // Enhanced data query with additional agent info
         const dataQuery = `
-            SELECT u.id, u.email, u.full_name, u.avatar 
+            SELECT 
+                u.id, 
+                u.email, 
+                u.full_name, 
+                u.avatar,
+                u.phone,
+                u.created_at,
+                (SELECT COUNT(*) FROM resort_agents ra2 WHERE ra2.user_id = u.id AND ra2.status = 'approved') as approved_resorts_count,
+                (SELECT COUNT(*) FROM resort_agents ra3 WHERE ra3.user_id = u.id AND ra3.status = 'rejected') as rejected_resorts_count,
+                (SELECT COUNT(*) FROM resort_agents ra4 WHERE ra4.user_id = u.id AND ra4.status = 'draft') as pending_resorts_count,
+                (SELECT COUNT(*) FROM resort_agents ra5 WHERE ra5.user_id = u.id) as total_resorts_count,
+                (SELECT COUNT(*) FROM bookings b WHERE b.agent_id = u.id AND b.status = 'confirmed') as total_bookings,
+                bp.nit,
+                bp.rnt,
+                bp.status as business_status
             FROM users u
             LEFT JOIN resort_agents ra ON u.id = ra.user_id AND ra.resort_id = $1
+            LEFT JOIN business_profiles bp ON bp.id = (
+                SELECT ra_bp.business_profile_id 
+                FROM resort_agents ra_bp 
+                WHERE ra_bp.user_id = u.id AND ra_bp.business_profile_id IS NOT NULL 
+                LIMIT 1
+            )
             WHERE ra.id IS NULL 
             AND u.role = 'agent'
             ${search ? 'AND (u.email ILIKE $2 OR u.full_name ILIKE $2)' : ''}
