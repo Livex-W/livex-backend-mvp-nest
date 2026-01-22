@@ -756,10 +756,11 @@ export class AdminService {
         rc.id, rc.code, rc.code_type, rc.agent_commission_type, rc.agent_commission_cents,
         rc.discount_type, rc.discount_value, rc.is_active, rc.usage_count, rc.usage_limit,
         rc.expires_at, rc.description, rc.created_at,
-        COALESCE(SUM(CASE WHEN b.status = 'confirmed' THEN b.total_cents ELSE 0 END), 0) as revenue_cents,
-        COUNT(b.id) as bookings_count
+        COALESCE(SUM(CASE WHEN b.status = 'confirmed' THEN brc.discount_applied_cents ELSE 0 END), 0) as revenue_cents,
+        COUNT(DISTINCT b.id) as bookings_count
       FROM referral_codes rc
-      LEFT JOIN bookings b ON b.referral_code_id = rc.id
+      LEFT JOIN booking_referral_codes brc ON brc.referral_code_id = rc.id
+      LEFT JOIN bookings b ON b.id = brc.booking_id
       WHERE rc.owner_user_id = $1
       GROUP BY rc.id
       ORDER BY rc.created_at DESC`,
@@ -769,11 +770,12 @@ export class AdminService {
     // Get stats summary
     const statsResult = await this.db.query(
       `SELECT 
-        COALESCE(SUM(b.total_cents), 0) as total_revenue,
+        COALESCE(SUM(brc.discount_applied_cents), 0) as total_revenue,
         COUNT(DISTINCT b.id) as total_bookings,
         COUNT(DISTINCT CASE WHEN b.status = 'confirmed' THEN b.id END) as confirmed_bookings
-      FROM bookings b
-      JOIN referral_codes rc ON b.referral_code_id = rc.id
+      FROM booking_referral_codes brc
+      JOIN bookings b ON b.id = brc.booking_id
+      JOIN referral_codes rc ON brc.referral_code_id = rc.id
       WHERE rc.owner_user_id = $1`,
       [partnerId]
     );

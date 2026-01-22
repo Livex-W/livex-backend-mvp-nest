@@ -283,20 +283,8 @@ export class CouponsService {
             return { isValid: false, errorMessage: 'Código agotado' };
         }
 
-        // Verificar si este usuario ya usó este código en una reserva completada
-        const userUsageResult = await this.db.query(
-            `SELECT COUNT(*) as count 
-             FROM booking_referral_codes brc
-             JOIN bookings b ON b.id = brc.booking_id
-             WHERE brc.referral_code_id = $1 
-               AND b.user_id = $2
-               AND b.status = 'confirmed'`,
-            [refCode.id, userId],
-        );
-
-        if (userUsageResult.rows[0]?.count > 0) {
-            return { isValid: false, errorMessage: 'Ya utilizaste este código anteriormente' };
-        }
+        // Note: Users CAN use the same referral code on multiple bookings
+        // The only limit is the global usage_limit of the code (if set)
 
         if (refCode.expires_at && new Date(refCode.expires_at) < new Date()) {
             return { isValid: false, errorMessage: 'Código expirado' };
@@ -693,33 +681,50 @@ export class CouponsService {
         // Está bien, por ahora solo insertamos en `booking_coupons`.
 
         for (const applied of calculation.appliedCoupons) {
-            // Buscar ID del cupón si es de usuario
-            if (applied.type !== 'referral_standard' && applied.type !== 'vip_subscription') {
+            // Skip VIP subscription - it's auto-applied, no tracking needed in junction tables
+            if (applied.type === 'vip_subscription') {
+                continue;
+            }
+
+            // Handle referral codes (all types: standard, partner, influencer, affiliate)
+            if (applied.type.startsWith('referral_')) {
+                const refRes = await this.db.query<{ id: string }>(
+                    `SELECT id FROM referral_codes WHERE UPPER(code) = UPPER($1)`,
+                    [applied.code],
+                );
+
+                if (refRes.rows.length > 0) {
+                    const referralCodeId = refRes.rows[0].id;
+
+                    // Insert into booking_referral_codes
+                    await this.db.query(
+                        `INSERT INTO booking_referral_codes (booking_id, referral_code_id, discount_applied_cents)
+                         VALUES ($1, $2, $3)
+                         ON CONFLICT (booking_id, referral_code_id) DO UPDATE 
+                         SET discount_applied_cents = EXCLUDED.discount_applied_cents`,
+                        [bookingId, referralCodeId, applied.discountApplied],
+                    );
+
+                    // Increment usage_count for the referral code
+                    await this.db.query(
+                        `UPDATE referral_codes SET usage_count = usage_count + 1 WHERE id = $1`,
+                        [referralCodeId],
+                    );
+                }
+            } else {
+                // Handle user coupons (user_earned, promotional, etc.)
                 const couponRes = await this.db.query<CouponIdRow>(
-                    `SELECT id FROM user_coupons WHERE user_id = $1 AND code = $2`,
+                    `SELECT id FROM user_coupons WHERE user_id = $1 AND UPPER(code) = UPPER($2)`,
                     [userId, applied.code],
                 );
 
                 if (couponRes.rows.length > 0) {
                     await this.db.query(
                         `INSERT INTO booking_coupons (booking_id, user_coupon_id, discount_applied_cents)
-                         VALUES ($1, $2, $3)`,
-                        [bookingId, couponRes.rows[0].id, applied.discountApplied],
-                    );
-                }
-            } else if (applied.type === 'referral_standard') {
-                const refRes = await this.db.query<{ id: string }>(
-                    `SELECT id FROM referral_codes WHERE code = $1`,
-                    [applied.code],
-                );
-
-                if (refRes.rows.length > 0) {
-                    await this.db.query(
-                        `INSERT INTO booking_referral_codes (booking_id, referral_code_id, discount_applied_cents)
                          VALUES ($1, $2, $3)
-                         ON CONFLICT (booking_id, referral_code_id) DO UPDATE 
+                         ON CONFLICT (booking_id, user_coupon_id) DO UPDATE
                          SET discount_applied_cents = EXCLUDED.discount_applied_cents`,
-                        [bookingId, refRes.rows[0].id, applied.discountApplied],
+                        [bookingId, couponRes.rows[0].id, applied.discountApplied],
                     );
                 }
             }

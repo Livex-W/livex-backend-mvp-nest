@@ -100,14 +100,15 @@ export class PartnerService {
             };
         }
 
-        // Get booking statistics
+        // Get booking statistics using booking_referral_codes junction table
         const bookingsResult = await this.db.query(
             `SELECT 
-         COUNT(*) FILTER (WHERE status = 'confirmed') as confirmed_count,
-         COUNT(*) FILTER (WHERE status = 'pending') as pending_count,
-         COALESCE(SUM(CASE WHEN status = 'confirmed' THEN total_cents ELSE 0 END), 0) as total_revenue
-       FROM bookings
-       WHERE referral_code_id = ANY($1::uuid[])`,
+         COUNT(*) FILTER (WHERE b.status = 'confirmed') as confirmed_count,
+         COUNT(*) FILTER (WHERE b.status = 'pending') as pending_count,
+         COALESCE(SUM(CASE WHEN b.status = 'confirmed' THEN b.total_cents ELSE 0 END), 0) as total_revenue
+       FROM booking_referral_codes brc
+       JOIN bookings b ON b.id = brc.booking_id
+       WHERE brc.referral_code_id = ANY($1::uuid[])`,
             [codeIds],
         );
 
@@ -115,8 +116,9 @@ export class PartnerService {
         let totalCommissions = 0;
         for (const code of codesResult.rows) {
             const codeBookings = await this.db.query(
-                `SELECT total_cents FROM bookings 
-         WHERE referral_code_id = $1 AND status = 'confirmed'`,
+                `SELECT b.total_cents FROM booking_referral_codes brc
+         JOIN bookings b ON b.id = brc.booking_id
+         WHERE brc.referral_code_id = $1 AND b.status = 'confirmed'`,
                 [code.id],
             );
 
@@ -252,28 +254,30 @@ export class PartnerService {
             throw new ForbiddenException('You do not own this referral code');
         }
 
-        // Get booking statistics
+        // Get booking statistics using booking_referral_codes junction table
         const statsResult = await this.db.query(
             `SELECT 
          COUNT(*) as total_bookings,
-         COUNT(*) FILTER (WHERE status = 'confirmed') as confirmed_bookings,
-         COUNT(*) FILTER (WHERE status = 'pending') as pending_bookings,
-         COUNT(*) FILTER (WHERE status = 'cancelled') as cancelled_bookings,
-         COALESCE(SUM(CASE WHEN status = 'confirmed' THEN total_cents ELSE 0 END), 0) as total_revenue,
-         MIN(created_at) as first_use,
-         MAX(created_at) as last_use
-       FROM bookings
-       WHERE referral_code_id = $1`,
+         COUNT(*) FILTER (WHERE b.status = 'confirmed') as confirmed_bookings,
+         COUNT(*) FILTER (WHERE b.status = 'pending') as pending_bookings,
+         COUNT(*) FILTER (WHERE b.status = 'cancelled') as cancelled_bookings,
+         COALESCE(SUM(CASE WHEN b.status = 'confirmed' THEN b.total_cents ELSE 0 END), 0) as total_revenue,
+         MIN(brc.created_at) as first_use,
+         MAX(brc.created_at) as last_use
+       FROM booking_referral_codes brc
+       JOIN bookings b ON b.id = brc.booking_id
+       WHERE brc.referral_code_id = $1`,
             [codeId],
         );
 
         const stats = statsResult.rows[0];
 
-        // Calculate total commissions
+        // Calculate total commissions from confirmed bookings
         let totalCommissions = 0;
         const confirmedBookings = await this.db.query(
-            `SELECT total_cents FROM bookings 
-       WHERE referral_code_id = $1 AND status = 'confirmed'`,
+            `SELECT b.total_cents FROM booking_referral_codes brc
+       JOIN bookings b ON b.id = brc.booking_id
+       WHERE brc.referral_code_id = $1 AND b.status = 'confirmed'`,
             [codeId],
         );
 
@@ -366,8 +370,9 @@ export class PartnerService {
         // Get total count
         const countResult = await this.db.query(
             `SELECT COUNT(*) as total 
-       FROM bookings b
-       JOIN referral_codes rc ON b.referral_code_id = rc.id
+       FROM booking_referral_codes brc
+       JOIN bookings b ON b.id = brc.booking_id
+       JOIN referral_codes rc ON brc.referral_code_id = rc.id
        WHERE ${whereClause}`,
             params,
         );
@@ -382,8 +387,9 @@ export class PartnerService {
          r.name as resort_name,
          rc.code as referral_code, rc.id as referral_code_id,
          u.full_name as user_full_name
-       FROM bookings b
-       JOIN referral_codes rc ON b.referral_code_id = rc.id
+       FROM booking_referral_codes brc
+       JOIN bookings b ON b.id = brc.booking_id
+       JOIN referral_codes rc ON brc.referral_code_id = rc.id
        JOIN experiences e ON b.experience_id = e.id
        JOIN resorts r ON e.resort_id = r.id
        JOIN users u ON b.user_id = u.id
