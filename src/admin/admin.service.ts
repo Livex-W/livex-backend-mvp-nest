@@ -11,12 +11,6 @@ import { PaginatedResult, PaginationMeta } from '../common/interfaces/pagination
 import { NotificationService } from '../notifications/services/notification.service';
 import { ConfigService } from '@nestjs/config';
 
-interface PostgreSQLError extends Error {
-  code?: string;
-  detail?: string;
-  constraint?: string;
-}
-
 @Injectable()
 export class AdminService {
   constructor(
