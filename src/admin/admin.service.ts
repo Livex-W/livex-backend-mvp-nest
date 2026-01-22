@@ -847,6 +847,9 @@ export class AdminService {
     }
 
     // Create referral code
+    const hasDiscount = data.discountType && data.discountType !== 'none' && data.discountValue && data.discountValue > 0;
+    const codeType = hasDiscount ? 'both' : 'commission';
+
     const result = await this.db.query(
       `INSERT INTO referral_codes (
         code, code_type, referral_type, agent_commission_type, agent_commission_cents,
@@ -856,11 +859,11 @@ export class AdminService {
       RETURNING *`,
       [
         data.code.toUpperCase(),
-        data.codeType || 'commission',
+        codeType,
         data.commissionType,
         data.commissionValue,
-        data.discountType || null,
-        data.discountValue || 0,
+        hasDiscount ? data.discountType : null,
+        hasDiscount ? data.discountValue : 0,
         data.usageLimit || null,
         data.expiresAt || null,
         data.description || null,
