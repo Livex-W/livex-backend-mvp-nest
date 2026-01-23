@@ -487,7 +487,7 @@ export class AgentsService {
             `SELECT r.id, r.name, r.city, r.country
              FROM resorts r
              INNER JOIN resort_agents ra ON ra.resort_id = r.id
-             WHERE ra.user_id = $1 AND ra.is_active = true
+             WHERE ra.user_id = $1 AND ra.is_active = true AND ra.status = 'approved'
              ORDER BY r.name ASC`,
             [userId],
         );

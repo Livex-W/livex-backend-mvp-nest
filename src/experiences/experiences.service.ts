@@ -513,9 +513,9 @@ export class ExperiencesService {
       }
       resortId = resortResult.rows[0].id;
     } else if (user.role === 'agent') {
-      // Find resort associated with agent
+      // Find resort associated with agent - only approved agreements can see experiences
       const agentResult = await this.db.query<{ resort_id: string }>(
-        'SELECT resort_id FROM resort_agents WHERE user_id = $1 AND is_active = true',
+        `SELECT resort_id FROM resort_agents WHERE user_id = $1 AND is_active = true AND status = 'approved'`,
         [user.sub],
       );
 
