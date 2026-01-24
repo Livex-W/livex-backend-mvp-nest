@@ -116,7 +116,13 @@ export class NotificationController {
           eventData.bookingTime || '10:00 AM',
           eventData.guestCount || 2,
           eventData.totalAmount || 150000,
-          eventData.bookingCode || 'LVX-TEST-001'
+          eventData.bookingCode || 'LVX-TEST-001',
+          eventData.resortEmail || 'test-resort-001',
+          eventData.resortName || 'Resort de Prueba',
+          eventData.resortNetAmount || 150000,
+          eventData.commissionAmount || 25000,
+          eventData.childrenCount || 2,
+          eventData.location || 'Ubicación de Prueba',
         );
         break;
 
@@ -151,7 +157,8 @@ export class NotificationController {
         event = new ResortApprovedEvent(
           eventData.resortId || 'test-resort-001',
           eventData.resortEmail,
-          eventData.resortName || 'Resort de Prueba'
+          eventData.resortName || 'Resort de Prueba',
+          eventData.ownerEmail,
         );
         break;
 
@@ -219,8 +226,11 @@ export class NotificationController {
       [EmailTemplateType.RESORT_APPROVED_DOCUMENTS_NOTIFY_OWNER_RESORT]: 'Notificación al resort de nuevo prestador',
       [EmailTemplateType.RESORT_REJECTED_DOCUMENTS_NOTIFY_ADMIN]: 'Notificación al admin de nuevo prestador',
       [EmailTemplateType.RESORT_REJECTED_DOCUMENTS_NOTIFY_OWNER_RESORT]: 'Notificación al resort de nuevo prestador',
-      [EmailTemplateType.EXPERIENCE_APPROVED]: 'Aprobación de experiencia',
-      [EmailTemplateType.EXPERIENCE_REJECTED]: 'Rechazo de experiencia',
+      [EmailTemplateType.EXPERIENCE_APPROVED_NOTIFY_ADMIN]: 'Aprobación de experiencia',
+      [EmailTemplateType.EXPERIENCE_APPROVED_NOTIFY_OWNER_EXPERIENCE]: 'Aprobación de experiencia',
+      [EmailTemplateType.EXPERIENCE_REJECTED_NOTIFY_ADMIN]: 'Rechazo de experiencia',
+      [EmailTemplateType.EXPERIENCE_REJECTED_NOTIFY_OWNER_EXPERIENCE]: 'Rechazo de experiencia',
+      [EmailTemplateType.EXPERIENCE_UNDER_REVIEW_NOTIFY_OWNER_EXPERIENCE]: 'Rechazo de experiencia',
       [EmailTemplateType.WELCOME]: 'Email de bienvenida para nuevos usuarios',
       [EmailTemplateType.PASSWORD_RESET]: 'Enlace para restablecer contraseña',
       [EmailTemplateType.BOOKING_CONFIRMED_RESORT]: 'Notificación de nueva reserva al resort',
@@ -228,7 +238,7 @@ export class NotificationController {
       [EmailTemplateType.PAYMENT_FAILED_ADMIN]: 'Notificación de pago fallido al admin',
       [EmailTemplateType.REFUND_PROCESSED_RESORT]: 'Notificación de reembolso al resort',
       [EmailTemplateType.REFUND_PROCESSED_ADMIN]: 'Notificación de reembolso al admin',
-      [EmailTemplateType.EXPERIENCE_CREATED_ADMIN]: 'Notificación de nueva experiencia al admin',
+      [EmailTemplateType.EXPERIENCE_CREATED_NOTIFY_ADMIN]: 'Notificación de nueva experiencia al admin',
       [EmailTemplateType.USER_REGISTERED_ADMIN]: 'Notificación de nuevo usuario al admin',
       [EmailTemplateType.EMAIL_CONFIRMATION]: 'Confirmación de correo electrónico',
       [EmailTemplateType.MONTHLY_REPORT_RESORT]: 'Reporte mensual para resort',

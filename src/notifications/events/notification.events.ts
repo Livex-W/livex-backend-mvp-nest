@@ -11,6 +11,12 @@ export class BookingConfirmedEvent implements NotificationEvent {
     public readonly guestCount: number,
     public readonly totalAmount: number,
     public readonly bookingCode: string,
+    public readonly resortEmail: string,
+    public readonly resortName?: string,
+    public readonly resortNetAmount?: number,
+    public readonly commissionAmount?: number,
+    public readonly childrenCount?: number,
+    public readonly location?: string,
   ) { }
 }
 
@@ -54,6 +60,8 @@ export class BookingCancelledEvent implements NotificationEvent {
     public readonly resortEmail: string,
     public readonly bookingDate: string,
     public readonly refundAmount?: number,
+    public readonly paymentMethod?: 'paypal' | 'wompi',
+
   ) { }
 }
 
@@ -65,6 +73,9 @@ export class RefundProcessedEvent implements NotificationEvent {
     public readonly customerName: string,
     public readonly refundAmount: number,
     public readonly bookingCode: string,
+    public readonly resortEmail?: string,
+    public readonly resortName?: string,
+    public readonly paymentMethod?: 'paypal' | 'wompi',
   ) { }
 }
 
@@ -89,7 +100,8 @@ export class PasswordResetRequestedEvent implements NotificationEvent {
 export class ResortApprovedEvent implements NotificationEvent {
   constructor(
     public readonly resortId: string,
-    public readonly resortEmail: string,
+    public readonly ownerEmail: string,
+    public readonly ownerName: string,
     public readonly resortName: string,
   ) { }
 }
@@ -98,6 +110,7 @@ export class ResortRejectedEvent implements NotificationEvent {
   constructor(
     public readonly resortId: string,
     public readonly resortEmail: string,
+    public readonly ownerName: string,
     public readonly resortName: string,
     public readonly rejectionReason: string,
   ) { }
@@ -153,6 +166,9 @@ export class ExperienceCreatedEvent implements NotificationEvent {
     public readonly experienceId: string,
     public readonly resortName: string,
     public readonly experienceName: string,
+    public readonly ownerEmail: string,
+    public readonly ownerName: string,
+    public readonly resortId: string,
   ) { }
 }
 
@@ -174,5 +190,84 @@ export class EmailConfirmationRequestedEvent implements NotificationEvent {
     public readonly userEmail: string,
     public readonly userName: string,
     public readonly confirmationToken: string,
+  ) { }
+}
+
+
+export class ResortUnderReviewEvent implements NotificationEvent {
+  constructor(
+    public readonly resortId: string,
+    public readonly resortName: string,
+    public readonly resortEmail: string,
+    public readonly ownerEmail: string,
+    public readonly ownerName: string,
+  ) { }
+}
+
+
+export class ResortApprovedDocumentsEvent implements NotificationEvent {
+  constructor(
+    public readonly resortId: string,
+    public readonly resortName: string,
+    public readonly resortEmail: string,
+    public readonly ownerEmail: string,
+    public readonly ownerName: string,
+  ) { }
+}
+
+export class ResortRejectedDocumentsEvent implements NotificationEvent {
+  constructor(
+    public readonly resortId: string,
+    public readonly resortName: string,
+    public readonly resortEmail: string,
+    public readonly ownerEmail: string,
+    public readonly ownerName: string,
+    public readonly rejectionReason?: string,
+  ) { }
+}
+
+export class ExperienceUnderReviewEvent implements NotificationEvent {
+  constructor(
+    public readonly experienceId: string,
+    public readonly resortId: string,
+    public readonly resortEmail: string,
+    public readonly resortName: string,
+    public readonly experienceName: string,
+  ) { }
+}
+
+export class ResortApprovedNotifyAdminEvent implements NotificationEvent {
+  constructor(
+    public readonly resortId: string,
+    public readonly resortName: string,
+    public readonly ownerEmail: string,
+    public readonly ownerName: string,
+  ) { }
+}
+
+export class ResortRejectedNotifyAdminEvent implements NotificationEvent {
+  constructor(
+    public readonly resortId: string,
+    public readonly resortName: string,
+    public readonly ownerEmail: string,
+    public readonly ownerName: string,
+    public readonly rejectionReason?: string,
+  ) { }
+}
+
+export class ExperienceApprovedNotifyAdminEvent implements NotificationEvent {
+  constructor(
+    public readonly experienceId: string,
+    public readonly resortName: string,
+    public readonly experienceName: string,
+  ) { }
+}
+
+export class ExperienceRejectedNotifyAdminEvent implements NotificationEvent {
+  constructor(
+    public readonly experienceId: string,
+    public readonly resortName: string,
+    public readonly experienceName: string,
+    public readonly rejectionReason: string,
   ) { }
 }

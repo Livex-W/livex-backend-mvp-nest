@@ -18,7 +18,17 @@ import {
   ExperienceCreatedEvent,
   EmailConfirmationRequestedEvent,
   BookingReminderEvent,
+  ResortApprovedDocumentsEvent,
+  ResortRejectedDocumentsEvent,
+  ExperienceUnderReviewEvent,
+  ResortApprovedNotifyAdminEvent,
+  ResortUnderReviewEvent,
+  ResortRejectedNotifyAdminEvent,
+  ExperienceApprovedNotifyAdminEvent,
+  ExperienceRejectedNotifyAdminEvent,
+  MonthlyReportEvent,
 } from '../events/notification.events';
+import { EPaymentProvider } from '../../payments/providers/payment-provider.factory';
 
 @Injectable()
 export class NotificationListener {
@@ -45,6 +55,36 @@ export class NotificationListener {
         }
       );
 
+      this.notificationService.sendBookingConfirmationToResort(
+        event.resortEmail,
+        {
+          resortName: event.resortName || '',
+          experienceName: event.experienceName,
+          customerName: event.customerName,
+          bookingDate: event.bookingDate,
+          bookingTime: event.bookingTime,
+          guestCount: event.guestCount,
+          bookingCode: event.bookingCode,
+          resortNetAmount: event.resortNetAmount || 0,
+          childrenCount: event.childrenCount || 0,
+        }
+      );
+
+      const adminEmail = this.configService.get<string>('ADMIN_EMAIL', 'admin@livex.com');
+      this.notificationService.sendBookingConfirmationToAdmin(
+        adminEmail,
+        {
+          resortName: event.resortName || '',
+          experienceName: event.experienceName,
+          customerName: event.customerName,
+          bookingDate: event.bookingDate,
+          bookingTime: event.bookingTime,
+          guestCount: event.guestCount,
+          commissionAmount: event.commissionAmount || 0,
+          bookingId: event.bookingId,
+          location: event.location || '',
+        }
+      );
       this.logger.log(`Booking confirmation sent for booking ${event.bookingId}`);
     } catch (error) {
       this.logger.error(`Failed to send booking confirmation for ${event.bookingId}:`, error);
@@ -88,6 +128,17 @@ export class NotificationListener {
         }
       );
 
+      const adminEmail = this.configService.get<string>('ADMIN_EMAIL', 'admin@livex.com');
+      this.notificationService.sendPaymentFailedToAdmin(
+        adminEmail,
+        {
+          customerName: event.customerName,
+          customerEmail: event.customerEmail,
+          bookingCode: event.bookingCode,
+          reason: event.reason || 'Unknown error',
+        }
+      );
+
       this.logger.log(`Payment failed notification sent for payment ${event.paymentId}`);
     } catch (error) {
       this.logger.error(`Failed to send payment failed notification for ${event.paymentId}:`, error);
@@ -105,6 +156,7 @@ export class NotificationListener {
           experienceName: event.experienceName,
           bookingCode: event.bookingCode,
           refundAmount: event.refundAmount,
+          paymentMethod: event.paymentMethod,
         }
       );
 
@@ -120,6 +172,8 @@ export class NotificationListener {
             bookingDate: event.bookingDate,
           }
         );
+
+
       }
 
       // 3. Notify Admin
@@ -137,6 +191,28 @@ export class NotificationListener {
         }
       );
 
+      if (event.paymentMethod === EPaymentProvider.WOMPI) {
+        this.notificationService.sendBookingCancelledToAdminWompi(adminEmail, {
+          resortName: event.resortName,
+          customerName: event.customerName,
+          customerEmail: event.customerEmail,
+          bookingCode: event.bookingCode,
+          experienceName: event.experienceName,
+          refundAmount: event.refundAmount,
+        });
+
+      } else {
+        this.notificationService.sendBookingCancelledToAdminPaypal(adminEmail, {
+          resortName: event.resortName,
+          customerName: event.customerName,
+          customerEmail: event.customerEmail,
+          bookingCode: event.bookingCode,
+          experienceName: event.experienceName,
+          refundAmount: event.refundAmount,
+        }
+        );
+      }
+
       this.logger.log(`Booking cancellation notification sent for booking ${event.bookingId}`);
     } catch (error) {
       this.logger.error(`Failed to send booking cancellation notification for ${event.bookingId}:`, error);
@@ -152,6 +228,25 @@ export class NotificationListener {
           customerName: event.customerName,
           refundAmount: event.refundAmount,
           bookingCode: event.bookingCode,
+        }
+      );
+
+      if (event.resortEmail && event.resortName) {
+        this.notificationService.sendRefundProcessedToResort(
+          event.resortEmail,
+          {
+            resortName: event.resortName,
+            bookingCode: event.bookingCode,
+          }
+        );
+      }
+
+      const adminEmail = this.configService.get<string>('ADMIN_EMAIL', 'admin@livex.com');
+      this.notificationService.sendRefundProcessedToAdmin(
+        adminEmail,
+        {
+          bookingCode: event.bookingCode,
+          refundAmount: event.refundAmount,
         }
       );
 
@@ -173,18 +268,37 @@ export class NotificationListener {
         }
       );
 
+      if (event.resortEmail && event.resortName) {
+        this.notificationService.sendRefundProcessedToResort(
+          event.resortEmail,
+          {
+            resortName: event.resortName,
+            bookingCode: event.bookingCode,
+          }
+        );
+      }
+
+      const adminEmail = this.configService.get<string>('ADMIN_EMAIL', 'admin@livex. com');
+      this.notificationService.sendRefundProcessedToAdmin(
+        adminEmail,
+        {
+          bookingCode: event.bookingCode,
+          refundAmount: event.refundAmount,
+        }
+      );
+
       this.logger.log(`Refund processed notification sent for refund ${event.refundId}`);
     } catch (error) {
       this.logger.error(`Failed to send refund processed notification for ${event.refundId}:`, error);
     }
   }
 
-  @OnEvent('experience.created')
+  @OnEvent('experience.created.to.admin')
   handleExperienceCreated(event: ExperienceCreatedEvent) {
     try {
       const adminEmail = this.configService.get<string>('ADMIN_EMAIL', 'admin@livex.com');
 
-      this.notificationService.sendExperienceCreatedToAdmin(
+      this.notificationService.sendExperienceCreatedNotifyToAdmin(
         adminEmail,
         {
           resortName: event.resortName,
@@ -267,13 +381,13 @@ export class NotificationListener {
     }
   }
 
-  @OnEvent('resort.approved')
+  @OnEvent('resort.approved.to.resort')
   handleResortApproved(event: ResortApprovedEvent) {
     try {
       this.notificationService.sendResortApprovedNotifyOwnerResort(
-        event.resortEmail,
+        event.ownerEmail,
         {
-          resortName: event.resortName,
+          resortName: event.resortName
         }
       );
 
@@ -283,7 +397,7 @@ export class NotificationListener {
     }
   }
 
-  @OnEvent('resort.rejected')
+  @OnEvent('resort.rejected.to.resort')
   handleResortRejected(event: ResortRejectedEvent) {
     try {
       this.notificationService.sendResortRejectedNotifyOwnerResort(
@@ -321,10 +435,10 @@ export class NotificationListener {
     }
   }
 
-  @OnEvent('experience.approved')
+  @OnEvent('experience.approved.to.resort')
   handleExperienceApproved(event: ExperienceApprovedEvent) {
     try {
-      this.notificationService.sendExperienceApproved(
+      this.notificationService.sendExperienceApprovedNotifyToResort(
         event.resortEmail,
         {
           resortName: event.resortName,
@@ -338,10 +452,10 @@ export class NotificationListener {
     }
   }
 
-  @OnEvent('experience.rejected')
+  @OnEvent('experience.rejected.to.resort')
   handleExperienceRejected(event: ExperienceRejectedEvent) {
     try {
-      this.notificationService.sendExperienceRejected(
+      this.notificationService.sendExperienceRejectedNotifyToResort(
         event.resortEmail,
         {
           resortName: event.resortName,
@@ -377,4 +491,224 @@ export class NotificationListener {
       this.logger.error(`Failed to schedule booking reminder for ${event.bookingId}:`, error);
     }
   }
+
+  @OnEvent('resort.under.review')
+  handleResortUnderReview(event: ResortUnderReviewEvent) {
+    try {
+      // Notificar al propietario del resort
+      this.notificationService.sendResortUnderReviewNotifyOwnerResort(
+        event.resortEmail,
+        {
+          resortName: event.resortName,
+        }
+      );
+
+      // Notificar al admin
+      const adminEmail = this.configService.get<string>('ADMIN_EMAIL', 'admin@livex.com');
+      this.notificationService.sendResortUnderReviewNotifyAdmin(
+        adminEmail,
+        {
+          resortName: event.resortName,
+          ownerEmail: event.ownerEmail,
+          ownerName: event.ownerName,
+          resortId: event.resortId,
+        }
+      );
+
+      this.logger.log(`Resort under review notifications sent for resort ${event.resortId}`);
+    } catch (error) {
+      this.logger.error(`Failed to send resort under review notifications for ${event.resortId}: `, error);
+    }
+  }
+
+
+  @OnEvent('resort.documents.approved')
+  handleResortDocumentsApproved(event: ResortApprovedDocumentsEvent) {
+    try {
+      // Notificar al propietario del resort
+      this.notificationService.sendResortApprovedDocumentsNotifyOwnerResort(
+        event.resortEmail,
+        {
+          resortName: event.resortName,
+        }
+      );
+
+      // Notificar al admin
+      const adminEmail = this.configService.get<string>('ADMIN_EMAIL', 'admin@livex.com');
+      this.notificationService.sendResortApprovedDocumentsNotifyAdmin(
+        adminEmail,
+        {
+          resortName: event.resortName,
+          ownerEmail: event.ownerEmail,
+          ownerName: event.ownerName,
+          resortId: event.resortId,
+        }
+      );
+
+      this.logger.log(`Resort documents approved notifications sent for resort ${event.resortId}`);
+    } catch (error) {
+      this.logger.error(`Failed to send resort documents approved notifications for ${event.resortId}:`, error);
+    }
+  }
+
+
+  @OnEvent('resort.documents.rejected')
+  handleResortDocumentsRejected(event: ResortRejectedDocumentsEvent) {
+    try {
+      // Notificar al propietario del resort
+      this.notificationService.sendResortRejectedDocumentsNotifyOwnerResort(
+        event.resortEmail,
+        {
+          resortName: event.resortName,
+          rejectionReason: event.rejectionReason,
+        }
+      );
+
+      // Notificar al admin
+      const adminEmail = this.configService.get<string>('ADMIN_EMAIL', 'admin@livex.com');
+      this.notificationService.sendResortRejectedDocumentsNotifyAdmin(
+        adminEmail,
+        {
+          resortName: event.resortName,
+          ownerEmail: event.ownerEmail,
+          ownerName: event.ownerName,
+          resortId: event.resortId,
+          rejectionReason: event.rejectionReason,
+        }
+      );
+
+      this.logger.log(`Resort documents rejected notifications sent for resort ${event.resortId}`);
+    } catch (error) {
+      this.logger.error(`Failed to send resort documents rejected notifications for ${event.resortId}: `, error);
+    }
+  }
+
+
+  @OnEvent('experience.under.review')
+  handleExperienceUnderReview(event: ExperienceUnderReviewEvent) {
+    try {
+      this.notificationService.sendExperienceUnderReviewNotifyToResort(
+        event.resortEmail,
+        {
+          resortName: event.resortName,
+          experienceName: event.experienceName,
+        }
+      );
+
+      this.logger.log(`Experience under review notification sent for experience ${event.experienceId}`);
+    } catch (error) {
+      this.logger.error(`Failed to send experience under review notification for ${event.experienceId}:`, error);
+    }
+  }
+
+  @OnEvent('resort.approved.notify.admin')
+  handleResortApprovedNotifyAdmin(event: ResortApprovedNotifyAdminEvent) {
+    try {
+      const adminEmail = this.configService.get<string>('ADMIN_EMAIL', 'admin@livex.com');
+
+      this.notificationService.sendResortApprovedNotifyAdmin(
+        adminEmail,
+        {
+          resortName: event.resortName,
+          ownerEmail: event.ownerEmail,
+          ownerName: event.ownerName,
+          resortId: event.resortId,
+        }
+      );
+
+      this.logger.log(`Resort approved notification sent to admin for resort ${event.resortId}`);
+    } catch (error) {
+      this.logger.error(`Failed to send resort approved notification to admin for ${event.resortId}:`, error);
+    }
+  }
+
+  @OnEvent('resort.rejected.notify.admin')
+  handleResortRejectedNotifyAdmin(event: ResortRejectedNotifyAdminEvent) {
+    try {
+      const adminEmail = this.configService.get<string>('ADMIN_EMAIL', 'admin@livex. com');
+
+      this.notificationService.sendResortRejectedNotifyAdmin(
+        adminEmail,
+        {
+          resortName: event.resortName,
+          ownerEmail: event.ownerEmail,
+          ownerName: event.ownerName,
+          resortId: event.resortId,
+          rejectionReason: event.rejectionReason,
+        }
+      );
+
+      this.logger.log(`Resort rejected notification sent to admin for resort ${event.resortId}`);
+    } catch (error) {
+      this.logger.error(`Failed to send resort rejected notification to admin for ${event.resortId}:`, error);
+    }
+  }
+
+
+  @OnEvent('experience.approved.notify.admin')
+  handleExperienceApprovedNotifyAdmin(event: ExperienceApprovedNotifyAdminEvent) {
+    try {
+      const adminEmail = this.configService.get<string>('ADMIN_EMAIL', 'admin@livex.com');
+
+      this.notificationService.sendExperienceApprovedNotifyToAdmin(
+        adminEmail,
+        {
+          resortName: event.resortName,
+          experienceName: event.experienceName,
+          experienceId: event.experienceId,
+        }
+      );
+
+      this.logger.log(`Experience approved notification sent to admin for experience ${event.experienceId}`);
+    } catch (error) {
+      this.logger.error(`Failed to send experience approved notification to admin for ${event.experienceId}:`, error);
+    }
+  }
+
+
+  @OnEvent('experience.rejected.notify.admin')
+  handleExperienceRejectedNotifyAdmin(event: ExperienceRejectedNotifyAdminEvent) {
+    try {
+      const adminEmail = this.configService.get<string>('ADMIN_EMAIL', 'admin@livex.com');
+
+      this.notificationService.sendExperienceRejectedNotifyToAdmin(
+        adminEmail,
+        {
+          resortName: event.resortName,
+          experienceName: event.experienceName,
+          experienceId: event.experienceId,
+          rejectionReason: event.rejectionReason,
+        }
+      );
+
+      this.logger.log(`Experience rejected notification sent to admin for experience ${event.experienceId}`);
+    } catch (error) {
+      this.logger.error(`Failed to send experience rejected notification to admin for ${event.experienceId}:`, error);
+    }
+  }
+
+  @OnEvent('monthly.report.generate')
+  handleMonthlyReport(event: MonthlyReportEvent) {
+    try {
+      if (event.resortEmail && event.resortName) {
+        const month = event.reportDate.toLocaleDateString('es-ES', { year: 'numeric', month: 'long' });
+
+        this.notificationService.sendMonthlyReportToResort(
+          event.resortEmail,
+          {
+            month: month,
+            resortName: event.resortName,
+            totalBookings: event.totalBookings,
+            totalRevenue: event.totalRevenue,
+          }
+        );
+
+        this.logger.log(`Monthly report sent to resort ${event.resortId}`);
+      }
+    } catch (error) {
+      this.logger.error(`Failed to send monthly report: `, error);
+    }
+  }
+
+
 }

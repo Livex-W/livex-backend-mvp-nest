@@ -420,7 +420,24 @@ export class NotificationService implements OnModuleInit {
     );
   }
 
-  sendExperienceApproved(
+  sendExperienceCreatedNotifyToAdmin(
+    adminEmail: string,
+    data: {
+      resortName: string;
+      experienceName: string;
+      experienceId: string;
+      adminLink?: string;
+    }
+  ): string {
+    return this.sendEmailNotification(
+      adminEmail,
+      EmailTemplateType.EXPERIENCE_CREATED_NOTIFY_ADMIN,
+      data,
+      { priority: 'medium' }
+    );
+  }
+
+  sendExperienceUnderReviewNotifyToResort(
     resortEmail: string,
     experienceData: {
       resortName: string;
@@ -429,23 +446,70 @@ export class NotificationService implements OnModuleInit {
   ): string {
     return this.sendEmailNotification(
       resortEmail,
-      EmailTemplateType.EXPERIENCE_APPROVED,
+      EmailTemplateType.EXPERIENCE_UNDER_REVIEW_NOTIFY_OWNER_EXPERIENCE,
       experienceData,
       { priority: 'low' }
     );
   }
 
-  sendExperienceRejected(
+  sendExperienceApprovedNotifyToResort(
     resortEmail: string,
     experienceData: {
       resortName: string;
       experienceName: string;
-      rejectionReason: string;
     }
   ): string {
     return this.sendEmailNotification(
       resortEmail,
-      EmailTemplateType.EXPERIENCE_REJECTED,
+      EmailTemplateType.EXPERIENCE_APPROVED_NOTIFY_OWNER_EXPERIENCE,
+      experienceData,
+      { priority: 'low' }
+    );
+  }
+
+  sendExperienceApprovedNotifyToAdmin(
+    adminEmail: string,
+    experienceData: {
+      resortName: string;
+      experienceName: string;
+      experienceId: string;
+    }
+  ): string {
+    return this.sendEmailNotification(
+      adminEmail,
+      EmailTemplateType.EXPERIENCE_APPROVED_NOTIFY_ADMIN,
+      experienceData,
+      { priority: 'low' }
+    );
+  }
+  sendExperienceRejectedNotifyToAdmin(
+    resortEmail: string,
+    experienceData: {
+      resortName: string;
+      experienceName: string;
+      experienceId: string;
+      rejectionReason?: string;
+    }
+  ): string {
+    return this.sendEmailNotification(
+      resortEmail,
+      EmailTemplateType.EXPERIENCE_REJECTED_NOTIFY_ADMIN,
+      experienceData,
+      { priority: 'low' }
+    );
+  }
+
+  sendExperienceRejectedNotifyToResort(
+    resortEmail: string,
+    experienceData: {
+      resortName: string;
+      experienceName: string;
+      rejectionReason?: string;
+    }
+  ): string {
+    return this.sendEmailNotification(
+      resortEmail,
+      EmailTemplateType.EXPERIENCE_REJECTED_NOTIFY_OWNER_EXPERIENCE,
       experienceData,
       { priority: 'low' }
     );
@@ -571,22 +635,6 @@ export class NotificationService implements OnModuleInit {
     );
   }
 
-  sendExperienceCreatedToAdmin(
-    adminEmail: string,
-    data: {
-      resortName: string;
-      experienceName: string;
-      experienceId: string;
-      adminLink: string;
-    }
-  ): string {
-    return this.sendEmailNotification(
-      adminEmail,
-      EmailTemplateType.EXPERIENCE_CREATED_ADMIN,
-      data,
-      { priority: 'medium' }
-    );
-  }
 
   sendUserRegisteredToAdmin(
     adminEmail: string,
@@ -773,15 +821,38 @@ export class NotificationService implements OnModuleInit {
         ownerName: 'Owner de Prueba',
         rejectionReason: 'Documentación incompleta'
       },
-      [EmailTemplateType.EXPERIENCE_APPROVED]: {
+      [EmailTemplateType.EXPERIENCE_APPROVED_NOTIFY_OWNER_EXPERIENCE]: {
         resortName: 'Resort de Prueba',
         experienceName: 'Experiencia de Prueba'
       },
-      [EmailTemplateType.EXPERIENCE_REJECTED]: {
+      [EmailTemplateType.EXPERIENCE_REJECTED_NOTIFY_OWNER_EXPERIENCE]: {
         resortName: 'Resort de Prueba',
         experienceName: 'Experiencia de Prueba',
         rejectionReason: 'Descripción insuficiente'
       },
+
+      [EmailTemplateType.EXPERIENCE_APPROVED_NOTIFY_ADMIN]: {
+        resortName: 'Resort de Prueba',
+        experienceName: 'Experiencia de Prueba'
+      },
+      [EmailTemplateType.EXPERIENCE_REJECTED_NOTIFY_ADMIN]: {
+        resortName: 'Resort de Prueba',
+        experienceName: 'Experiencia de Prueba',
+        rejectionReason: 'Descripción insuficiente'
+      },
+
+      [EmailTemplateType.EXPERIENCE_CREATED_NOTIFY_ADMIN]: {
+        resortName: 'Resort de Prueba',
+        experienceName: 'Experiencia de Prueba',
+        experienceId: 'exp-123',
+        adminLink: 'http://admin.livex.com'
+      },
+      [EmailTemplateType.EXPERIENCE_UNDER_REVIEW_NOTIFY_OWNER_EXPERIENCE]: {
+        resortName: 'Resort de Prueba',
+        experienceName: 'Experiencia de Prueba',
+        rejectionReason: 'Descripción insuficiente'
+      },
+
       [EmailTemplateType.BOOKING_CONFIRMED_RESORT]: {
         resortName: 'Resort de Prueba',
         experienceName: 'Experiencia Test',
@@ -812,12 +883,6 @@ export class NotificationService implements OnModuleInit {
       [EmailTemplateType.REFUND_PROCESSED_ADMIN]: {
         bookingCode: 'LVX-REFUND-001',
         refundAmount: 50000
-      },
-      [EmailTemplateType.EXPERIENCE_CREATED_ADMIN]: {
-        resortName: 'Resort Creador',
-        experienceName: 'Nueva Experiencia',
-        experienceId: 'exp-123',
-        adminLink: 'http://admin.livex.com'
       },
       [EmailTemplateType.USER_REGISTERED_ADMIN]: {
         userName: 'Nuevo Usuario',

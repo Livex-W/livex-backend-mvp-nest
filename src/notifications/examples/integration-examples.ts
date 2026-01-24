@@ -54,6 +54,12 @@ export class IntegrationExamples {
         guestCount: number;
         totalAmount: number;
         code: string;
+        resortEmail?: string;
+        resortName?: string;
+        resortNetAmount?: number;
+        commissionAmount?: number;
+        childrenCount?: number;
+        location?: string;
     }) {
         // Emitir evento para notificación inmediata
         this.eventEmitter.emit('booking.confirmed', new BookingConfirmedEvent(
@@ -65,7 +71,13 @@ export class IntegrationExamples {
             bookingData.time,
             bookingData.guestCount,
             bookingData.totalAmount,
-            bookingData.code
+            bookingData.code,
+            bookingData.resortEmail || '',
+            bookingData.resortName || '',
+            bookingData.resortNetAmount || 0,
+            bookingData.commissionAmount || 0,
+            bookingData.childrenCount || 0,
+            bookingData.location || '',
         ));
 
         // Programar recordatorio 24 horas antes
@@ -146,13 +158,15 @@ export class IntegrationExamples {
         email: string;
         name: string;
         status: 'approved' | 'rejected';
+        resortName: string;
         rejectionReason?: string;
     }) {
         if (resortData.status === 'approved') {
             this.eventEmitter.emit('resort.approved', new ResortApprovedEvent(
                 resortData.id,
                 resortData.email,
-                resortData.name
+                resortData.name,
+                resortData.resortName,
             ));
         } else {
             this.eventEmitter.emit('resort.rejected', {

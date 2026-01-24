@@ -418,17 +418,28 @@ export class AdminService {
       throw new BadRequestException('Only experiences under review can be approved');
     }
 
-    // Update experience status
     const result = await this.db.query(
       `UPDATE experiences 
-       SET status = 'active', 
-           approved_by = $1, 
-           approved_at = NOW(),
-           rejection_reason = NULL,
-           updated_at = NOW()
-       WHERE id = $2 
-       RETURNING *`,
+      SET status = 'active', 
+      approved_by = $1, 
+      approved_at = NOW(),
+      rejection_reason = NULL,
+      updated_at = NOW()
+      WHERE id = $2 
+      RETURNING *`,
       [adminUserId, id]
+    );
+
+    const resortQuery = await this.db.query(
+      `SELECT 
+          r.name as resort_name,
+          r.contact_email as email_resort,
+          e.id as experience_id,
+          e.title as experience_name
+      FROM resorts r
+      JOIN experiences e on e.resort_id  = r.id
+      WHERE e.id = $1`,
+      [experience.id]
     );
 
     // Log the action
@@ -449,6 +460,20 @@ export class AdminService {
       { status: 'active', approved_by: adminUserId, notes: approveDto.notes }
     );
 
+    const resort = resortQuery.rows[0];
+    const adminEmail = this.configService.get<string>('ADMIN_EMAIL', 'admin@livex.com');
+
+    this.notificationService.sendExperienceApprovedNotifyToAdmin(adminEmail, {
+      resortName: resort.resort_name,
+      experienceName: resort.experience_name,
+      experienceId: resort.experience_id,
+    });
+
+    this.notificationService.sendExperienceApprovedNotifyToResort(resort.email_resort, {
+      resortName: resort.resort_name,
+      experienceName: resort.experience_name,
+    });
+
     return result.rows[0] as Experience;
   }
 
@@ -460,11 +485,13 @@ export class AdminService {
       throw new NotFoundException('Experience not found');
     }
 
+
     const experience = experienceResult.rows[0] as Experience;
 
     if (experience.status !== 'under_review') {
       throw new BadRequestException('Only experiences under review can be rejected');
     }
+
 
     // Update experience status
     const result = await this.db.query(
@@ -477,6 +504,18 @@ export class AdminService {
        WHERE id = $3 
        RETURNING *`,
       [adminUserId, rejectDto.rejection_reason, id]
+    );
+
+    const resortQuery = await this.db.query(
+      `SELECT 
+	        r.name as resort_name,
+          r.contact_email as email_resort,
+          e.id as experience_id,
+	        e.title as experience_name
+      FROM resorts r
+      JOIN experiences e on e.resort_id  = r.id
+      WHERE e.id = $1`,
+      [experience.id]
     );
 
     // Log the action
@@ -496,6 +535,20 @@ export class AdminService {
       { status: experience.status },
       { status: 'rejected', rejection_reason: rejectDto.rejection_reason }
     );
+
+    const resort = resortQuery.rows[0];
+    const adminEmail = this.configService.get<string>('ADMIN_EMAIL', 'admin@livex.com');
+
+    this.notificationService.sendExperienceRejectedNotifyToAdmin(adminEmail, {
+      resortName: resort.resort_name,
+      experienceName: resort.experience_name,
+      experienceId: resort.experience_id,
+    });
+
+    this.notificationService.sendExperienceRejectedNotifyToResort(resort.email_resort, {
+      resortName: resort.resort_name,
+      experienceName: resort.experience_name,
+    });
 
     return result.rows[0] as Experience;
   }

@@ -18,6 +18,13 @@ export enum ExperienceCategory {
   ISLANDS = 'islands',
   NAUTICAL = 'nautical',
   CITY_TOUR = 'city_tour',
+  SUN_BEACH = 'sun_beach',
+  CULTURAL = 'cultural',
+  GASTRONOMIC = 'gastronomic',
+  ADVENTURE = 'adventure',
+  RELIGIOUS = 'religious',
+  EDUCATIONAL = 'educational',
+  ECOTOURISM = 'ecotourism',
 }
 
 export enum ExperienceStatus {
