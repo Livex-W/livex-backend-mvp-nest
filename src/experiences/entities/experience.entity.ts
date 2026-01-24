@@ -6,7 +6,18 @@ export interface Experience {
   title: string;
   slug: string;
   description?: string;
-  category: 'islands' | 'nautical' | 'city_tour';
+  category:
+  | 'islands'
+  | 'nautical'
+  | 'city_tour'
+  | 'sun_beach'
+  | 'cultural'
+  | 'adventure'
+  | 'ecotourism'
+  | 'agrotourism'
+  | 'gastronomic'
+  | 'religious'
+  | 'educational';
   // Moneda (los precios van en availability_slots)
   currency: string;
   // Configuración de niños
