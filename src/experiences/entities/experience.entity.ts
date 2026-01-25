@@ -2,6 +2,7 @@ export type ExperienceStatus = 'draft' | 'under_review' | 'active' | 'rejected';
 
 export interface Experience {
   id: string;
+  code: string;
   resort_id: string;
   title: string;
   slug: string;
