@@ -362,24 +362,60 @@ export class EmailService {
         `,
         text: 'Tu solicitud como prestador no fue aprobada. Motivo: {{rejectionReason}}'
       },
-      [EmailTemplateType.EXPERIENCE_APPROVED]: {
+      [EmailTemplateType.EXPERIENCE_CREATED_NOTIFY_ADMIN]: {
+        subject: '✅ Experiencia Creada - LIVEX',
+        html: `
+          <h2>¡Nueva experiencia creada!</h2>
+          <p>El resort: {{resortName}},</p>
+          <p>Ha creado la experiencia <strong>{{experienceName}}</strong>.</p>
+          <p>Se ha enviado la experiencia para su aprobación.</p>
+        `,
+        text: 'El resort: {{resortName}}, ha creado la experiencia <strong>{{experienceName}}</strong>. Se ha enviado la experiencia para su aprobación.'
+      },
+      [EmailTemplateType.EXPERIENCE_UNDER_REVIEW_NOTIFY_OWNER_EXPERIENCE]: {
+        subject: 'Experiencia En Revisión - LIVEX',
+        html: `
+          <h2>Experiencia En Revisión</h2>
+          <p>Hola {{resortName}},</p>
+          <p>Se ha enviado la experiencia <strong>{{experienceName}}</strong> para su aprobación.</p>
+          <p>Recibirás un correo con el resultado de la aprobación.</p>
+        `,
+        text: 'Tu experiencia {{experienceName}} ha sido enviada para su aprobación'
+      },
+      [EmailTemplateType.EXPERIENCE_APPROVED_NOTIFY_ADMIN]: {
         subject: '✅ Experiencia Aprobada - LIVEX',
         html: `
           <h2>¡Experiencia aprobada!</h2>
-          <p>Hola {{resortName}},</p>
+
+          <p>Se ha aprobado la experiencia <strong>{{experienceName}}</strong> con id <strong>{{experienceId}}</strong> al resort <strong>{{resortName}}</strong> y ya está visible para los usuarios.</p>
+        `,
+        text: 'Se ha aprobado la experiencia <strong>{{experienceName}}</strong> al resort <strong>{{resortName}}</strong> y ya está visible para los usuarios.'
+      },
+      [EmailTemplateType.EXPERIENCE_APPROVED_NOTIFY_OWNER_EXPERIENCE]: {
+        subject: '✅ Experiencia Aprobada - LIVEX',
+        html: `
+          <h2>Hola {{resortName}}!</h2>
           <p>Tu experiencia <strong>{{experienceName}}</strong> ha sido aprobada y ya está visible para los usuarios.</p>
         `,
         text: 'Tu experiencia {{experienceName}} ha sido aprobada'
       },
-      [EmailTemplateType.EXPERIENCE_REJECTED]: {
+      [EmailTemplateType.EXPERIENCE_REJECTED_NOTIFY_OWNER_EXPERIENCE]: {
         subject: '❌ Experiencia Rechazada - LIVEX',
         html: `
           <h2>Experiencia no aprobada</h2>
           <p>Hola {{resortName}},</p>
-          <p>Tu experiencia <strong>{{experienceName}}</strong> no ha sido aprobada.</p>
+          <p>Tu experiencia <strong>{{experienceName}}</strong> ha sido rechazada.</p>
           <p><strong>Motivo:</strong> {{rejectionReason}}</p>
         `,
-        text: 'Tu experiencia {{experienceName}} no fue aprobada. Motivo: {{rejectionReason}}'
+        text: 'Tu experiencia {{experienceName}} ha sido rechazada'
+      },
+      [EmailTemplateType.EXPERIENCE_REJECTED_NOTIFY_ADMIN]: {
+        subject: '❌ Experiencia Rechazada - LIVEX',
+        html: `
+          <h2>Experiencia no aprobada</h2>
+          <p>Se ha rechazado la experiencia <strong>{{experienceName}}</strong>. con id <strong>{{experienceId}}</strong> al resort <strong>{{resortName}}</strong>.</p>
+        `,
+        text: 'Experiencia {{experienceName}} no fue aprobada. Motivo: {{rejectionReason}}'
       },
       [EmailTemplateType.WELCOME]: {
         subject: '🎉 ¡Bienvenido a LIVEX!',
@@ -500,7 +536,7 @@ export class EmailService {
       },
 
       [EmailTemplateType.RESORT_APPROVED_DOCUMENTS_NOTIFY_ADMIN]: {
-        subject: '🏨 Prestador Aprobado - LIVEX',
+        subject: '🏨 Documento Aprobado - LIVEX',
         html: `
           <h2>El documento del resort ha sido aprobado</h2>
           <p>Se ha aprobado el documento del resort:</p>
@@ -516,7 +552,7 @@ export class EmailService {
       },
 
       [EmailTemplateType.RESORT_REJECTED_DOCUMENTS_NOTIFY_ADMIN]: {
-        subject: '🏨 Prestador Rechazado - LIVEX',
+        subject: '🏨 Doccumento Rechazado - LIVEX',
         html: `
           <h2>El documento del resort ha sido rechazado</h2>
           <p>Se ha rechazado el documento del resort:</p>
@@ -531,7 +567,7 @@ export class EmailService {
       },
 
       [EmailTemplateType.RESORT_APPROVED_DOCUMENTS_NOTIFY_OWNER_RESORT]: {
-        subject: '🏨 Prestador Aprobado - LIVEX',
+        subject: '🏨 Documento Aprobado - LIVEX',
         html: `
           <h2>¡Hola {{resortName}}!</h2>
           <p>Tu documento ha sido aprobado:</p>
@@ -541,7 +577,7 @@ export class EmailService {
       },
 
       [EmailTemplateType.RESORT_REJECTED_DOCUMENTS_NOTIFY_OWNER_RESORT]: {
-        subject: '🏨 Prestador Rechazado - LIVEX',
+        subject: '🏨 Documento Rechazado - LIVEX',
         html: `
           <h2>Hola {{resortName}}!</h2>
           <p>Tu documento ha sido rechazado:</p>
@@ -620,16 +656,6 @@ export class EmailService {
           </ul>
         `,
         text: 'Reembolso procesado ${{refundAmount}} para {{bookingCode}}'
-      },
-      [EmailTemplateType.EXPERIENCE_CREATED_ADMIN]: {
-        subject: '🌟 [ADMIN] Nueva Experiencia Creada',
-        html: `
-           <h2>Nueva experiencia pendiente de revisión</h2>
-           <p>El resort <strong>{{resortName}}</strong> ha creado la experiencia: <strong>{{experienceName}}</strong></p>
-           <p>ID: {{experienceId}}</p>
-           <p><a href="{{adminLink}}">Ir al panel de administración para aprobar/rechazar</a></p>
-        `,
-        text: 'Nueva experiencia creada por {{resortName}}: {{experienceName}}. ID: {{experienceId}}'
       },
       [EmailTemplateType.USER_REGISTERED_ADMIN]: {
         subject: '👤 [ADMIN] Nuevo Usuario Registrado',

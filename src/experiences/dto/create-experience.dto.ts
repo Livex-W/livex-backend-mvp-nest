@@ -15,17 +15,17 @@ import {
 import { Transform } from 'class-transformer';
 
 export enum ExperienceCategory {
-  ISLANDS = 'islands',
+   ISLANDS = 'islands',
   NAUTICAL = 'nautical',
   CITY_TOUR = 'city_tour',
   SUN_BEACH = 'sun_beach',
   CULTURAL = 'cultural',
-  ADVENTURE = 'adventure',
-  ECOTOURISM = 'ecotourism',
-  AGROTOURISM = 'agrotourism',
   GASTRONOMIC = 'gastronomic',
+  ADVENTURE = 'adventure',
   RELIGIOUS = 'religious',
   EDUCATIONAL = 'educational',
+  ECOTOURISM = 'ecotourism',
+  AGROTOURISM = 'agrotourism',
 }
 
 export enum ExperienceStatus {

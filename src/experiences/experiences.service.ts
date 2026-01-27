@@ -20,6 +20,8 @@ import { UserPreferencesService } from '../user-preferences/user-preferences.ser
 import { ExchangeRatesService } from '../exchange-rates/exchange-rates.service';
 // import { convertPrice } from '../common/utils/price-converter';
 import type { JwtPayload } from '../common/interfaces/jwt-payload.interface';
+import { NotificationService } from '../notifications/services/notification.service';
+import { ConfigService } from '@nestjs/config';
 
 
 // Interface for PostgreSQL error objects
@@ -47,6 +49,8 @@ export class ExperiencesService {
     private readonly logger: CustomLoggerService,
     private readonly userPreferencesService: UserPreferencesService,
     private readonly exchangeRatesService: ExchangeRatesService,
+    private readonly notificationsService: NotificationService,
+    private readonly configService: ConfigService,
   ) { }
 
   async create(createExperienceDto: CreateExperienceDto, user?: JwtPayload): Promise<Experience> {
@@ -112,6 +116,20 @@ export class ExperiencesService {
         category: experience.category,
         // Price no longer in experience
       });
+
+      const adminEmail = this.configService.get<string>('ADMIN_EMAIL', "admin@livex.com");
+
+      this.notificationsService.sendExperienceCreatedNotifyToAdmin(adminEmail, {
+        resortName: user?.fullName || "",
+        experienceName: experience.title,
+        experienceId: experience.id,
+      });
+
+      this.notificationsService.sendExperienceUnderReviewNotifyToResort(user?.email || "", {
+        resortName: user?.fullName || "",
+        experienceName: experience.title,
+      });
+
 
       return experience;
     } catch (error: unknown) {
