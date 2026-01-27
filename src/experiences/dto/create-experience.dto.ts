@@ -25,6 +25,7 @@ export enum ExperienceCategory {
   RELIGIOUS = 'religious',
   EDUCATIONAL = 'educational',
   ECOTOURISM = 'ecotourism',
+  AGROTOURISM = 'agrotourism',
 }
 
 export enum ExperienceStatus {

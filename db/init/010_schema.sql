@@ -321,6 +321,7 @@ CREATE TABLE IF NOT EXISTS experiences (
     'sun_beach','cultural','adventure','ecotourism',
     'agrotourism','gastronomic','religious','educational'
   )),
+  code           varchar(10) UNIQUE,
   
   -- Moneda para esta experiencia (los precios van en availability_slots)
   currency        text NOT NULL DEFAULT 'COP',
@@ -576,6 +577,7 @@ CREATE TABLE IF NOT EXISTS bookings (
   user_id        uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   experience_id  uuid NOT NULL REFERENCES experiences(id) ON DELETE CASCADE,
   slot_id        uuid NOT NULL REFERENCES availability_slots(id) ON DELETE CASCADE,
+  code           varchar(10) UNIQUE,
   
   -- Origen de la reserva
   booking_source booking_source NOT NULL DEFAULT 'app',

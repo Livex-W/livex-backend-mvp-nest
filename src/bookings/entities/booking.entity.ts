@@ -4,6 +4,7 @@
  */
 export interface Booking {
     id: string;
+    code: string;
     user_id: string;
     experience_id: string;
     slot_id: string;

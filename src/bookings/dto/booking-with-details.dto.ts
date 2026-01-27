@@ -66,6 +66,10 @@ export class BookingWithDetailsDto {
     @IsUUID()
     id!: string;
 
+    @IsOptional()
+    @IsString()
+    code!: string;
+
     @IsUUID()
     user_id!: string;
 

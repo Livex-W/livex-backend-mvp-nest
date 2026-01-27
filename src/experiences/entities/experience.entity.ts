@@ -2,11 +2,23 @@ export type ExperienceStatus = 'draft' | 'under_review' | 'active' | 'rejected';
 
 export interface Experience {
   id: string;
+  code: string;
   resort_id: string;
   title: string;
   slug: string;
   description?: string;
-  category: 'islands' | 'nautical' | 'city_tour';
+  category:
+  | 'islands'
+  | 'nautical'
+  | 'city_tour'
+  | 'sun_beach'
+  | 'cultural'
+  | 'adventure'
+  | 'ecotourism'
+  | 'agrotourism'
+  | 'gastronomic'
+  | 'religious'
+  | 'educational';
   // Moneda (los precios van en availability_slots)
   currency: string;
   // Configuración de niños

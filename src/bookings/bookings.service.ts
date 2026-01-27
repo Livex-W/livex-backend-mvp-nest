@@ -70,6 +70,7 @@ export class BookingsService {
     const query = `
       SELECT 
         b.id,
+        b.code,
         b.user_id,
         b.experience_id,
         b.slot_id,
@@ -180,6 +181,7 @@ export class BookingsService {
     const query = `
       SELECT 
         b.id,
+        b.code,
         b.user_id,
         b.agent_id,
         b.experience_id,
@@ -277,6 +279,7 @@ export class BookingsService {
     const query = `
       SELECT 
         b.id,
+        b.code,
         b.user_id,
         b.agent_id,
         b.experience_id,
