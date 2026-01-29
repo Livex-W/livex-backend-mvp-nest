@@ -553,7 +553,7 @@ export class ResortsService {
 
     // Get agents with user info
     const agentsResult = await this.db.query(
-      `SELECT ra.id, ra.resort_id, ra.user_id, ra.commission_bps, ra.is_active, ra.created_at, ra.updated_at,
+      `SELECT ra.id, ra.resort_id, ra.user_id, ra.is_active, ra.created_at, ra.updated_at,
               u.email as agent_email, u.full_name as agent_name
        FROM resort_agents ra
        LEFT JOIN users u ON ra.user_id = u.id
@@ -603,7 +603,6 @@ export class ResortsService {
         id: agent.id as string,
         resort_id: agent.resort_id as string | undefined,
         user_id: agent.user_id as string,
-        commission_bps: agent.commission_bps as number,
         is_active: agent.is_active as boolean,
         agent_email: agent.agent_email as string | undefined,
         agent_name: agent.agent_name as string | undefined,

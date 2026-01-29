@@ -48,9 +48,6 @@ export class ResortAgentDto {
     @IsUUID()
     user_id: string;
 
-    @IsNumber()
-    commission_bps: number;
-
     @IsBoolean()
     is_active: boolean;
 

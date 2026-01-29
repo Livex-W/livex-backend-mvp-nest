@@ -702,13 +702,12 @@ SELECT
   (SELECT id FROM users WHERE email='admin@livex.app'),
   now();
 
--- 4.2 Acuerdo Comercial (15% Comisión para Carlos con Mar y Sol)
-INSERT INTO resort_agents (resort_id, user_id, business_profile_id, commission_bps, is_active)
+-- 4.2 Acuerdo Comercial (Carlos con Mar y Sol)
+INSERT INTO resort_agents (resort_id, user_id, business_profile_id, is_active)
 SELECT 
   (SELECT id FROM resorts WHERE name='Mar y Sol Cartagena'),
   (SELECT id FROM users WHERE email='agente.carlos@gmail.com'),
   (SELECT id FROM business_profiles WHERE name='Carlos El Vendedor - Agente'),
-  1500, -- 15%
   true;
 
 -- 4.3 Crear Reserva por Agente (Confirmada)

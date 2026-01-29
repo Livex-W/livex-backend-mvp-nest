@@ -9,7 +9,6 @@ import {
 import { DatabaseClient } from '../database/database.client';
 import { DATABASE_CLIENT } from '../database/database.module';
 import { CreateAgentAgreementDto } from './dto/create-agent-agreement.dto';
-import { UpdateAgentCommissionDto } from './dto/update-agent-commission.dto';
 import { UpdateAgentProfileDto } from './dto/update-agent-profile.dto';
 import { CreateReferralCodeDto } from './dto/create-referral-code.dto';
 import { AddCodeRestrictionDto } from './dto/add-code-restriction.dto';
@@ -78,21 +77,19 @@ export class AgentsService {
 
         // 5. Create resort_agents relationship with business_profile reference and status='draft'
         await this.db.query(
-            `INSERT INTO resort_agents (resort_id, user_id, business_profile_id, commission_bps, commission_fixed_cents, status)
-                VALUES ($1, $2, $3, $4, $5, 'draft')
+            `INSERT INTO resort_agents (resort_id, user_id, business_profile_id, status)
+                VALUES ($1, $2, $3, 'draft')
                 ON CONFLICT (resort_id, user_id) DO UPDATE SET
                     business_profile_id = EXCLUDED.business_profile_id,
                     status = 'draft',
                     updated_at = NOW()`,
-            [resortId, newUser.id, businessProfileId, dto.commissionBps || 0, dto.commissionFixedCents || 0],
+            [resortId, newUser.id, businessProfileId],
         );
 
         return {
             ...newUser,
             resortId,
             businessProfileId,
-            commissionBps: dto.commissionBps || 0,
-            commissionFixedCents: dto.commissionFixedCents || 0,
         };
     }
 
@@ -133,10 +130,10 @@ export class AgentsService {
 
         try {
             const result = await this.db.query(
-                `INSERT INTO resort_agents (resort_id, user_id, commission_bps, commission_fixed_cents, status)
-         VALUES ($1, $2, $3, $4, 'draft')
+                `INSERT INTO resort_agents (resort_id, user_id, status)
+         VALUES ($1, $2, 'draft')
          RETURNING *`,
-                [resortId, dto.userId, dto.commissionBps, dto.commissionFixedCents || 0],
+                [resortId, dto.userId],
             );
             return result.rows[0];
         } catch (error) {
@@ -306,26 +303,7 @@ export class AgentsService {
         return result.rows[0];
     }
 
-    async updateCommission(resortId: string, userId: string, dto: UpdateAgentCommissionDto, requesterId: string) {
-        const isOwner = await this.checkResortOwnership(resortId, requesterId);
-        if (!isOwner) {
-            throw new ConflictException('You do not have permission to manage agents for this resort');
-        }
 
-        const result = await this.db.query(
-            `UPDATE resort_agents
-       SET commission_bps = $1, updated_at = NOW()
-       WHERE resort_id = $2 AND user_id = $3
-       RETURNING *`,
-            [dto.commissionBps, resortId, userId],
-        );
-
-        if (result.rows.length === 0) {
-            throw new NotFoundException('Agent agreement not found');
-        }
-
-        return result.rows[0];
-    }
 
     async getAgentCommissions(agentId: string) {
         const result = await this.db.query(
@@ -357,7 +335,7 @@ export class AgentsService {
     async getProfile(userId: string) {
         // Get agent profile via resort_agents and business_profile data
         const result = await this.db.query(
-            `SELECT ra.id, ra.user_id, ra.business_profile_id, ra.commission_bps, ra.commission_fixed_cents,
+            `SELECT ra.id, ra.user_id, ra.business_profile_id,
                     u.full_name, u.email, u.phone,
                     bp.nit, 
                     bp.rnt,

@@ -1,5 +1,4 @@
-import { IsEmail, IsInt, IsOptional, IsString, IsUUID, Max, Min, MinLength, IsIn, Matches } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsEmail, IsOptional, IsString, IsUUID, MinLength, IsIn, Matches } from 'class-validator';
 
 export class CreateAgentDto {
     @IsEmail()
@@ -37,17 +36,5 @@ export class CreateAgentDto {
     @IsOptional()
     @IsUUID()
     resortId?: string | null;
-
-    @IsOptional()
-    @Type(() => Number)
-    @IsInt()
-    @Min(0)
-    @Max(10000)
-    commissionBps?: number;
-
-    @IsOptional()
-    @Type(() => Number)
-    @IsInt()
-    @Min(0)
-    commissionFixedCents?: number;
 }
+

@@ -1,9 +1,8 @@
--- 1. Tabla para definir la relación entre un Agente (Usuario) y un Resort, con su % de comisión
+-- 1. Tabla para definir la relación entre un Agente (Usuario) y un Resort
 CREATE TABLE resort_agents (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     resort_id uuid NOT NULL REFERENCES resorts(id),
     user_id uuid NOT NULL REFERENCES users(id),
-    commission_bps integer NOT NULL CHECK (commission_bps >= 0 AND commission_bps <= 10000), -- Basis Points (1500 = 15%)
     is_active boolean DEFAULT true,
     created_at timestamptz DEFAULT now(),
     updated_at timestamptz DEFAULT now(),

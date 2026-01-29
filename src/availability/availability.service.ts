@@ -83,6 +83,7 @@ export class AvailabilityService {
           AND DATE(s.start_time AT TIME ZONE 'UTC') <= $3::date
       `;
 
+
       const conditions: string[] = [];
       const params: unknown[] = [experienceId, fromDate, toDate];
       let paramIndex = 4;
@@ -161,8 +162,9 @@ export class AvailabilityService {
         `INSERT INTO availability_slots (
           experience_id, start_time, end_time, capacity,
           price_per_adult_cents, price_per_child_cents,
-          commission_per_adult_cents, commission_per_child_cents
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
+          commission_per_adult_cents, commission_per_child_cents,
+          agent_commission_per_adult_cents, agent_commission_per_child_cents
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) 
         RETURNING *`,
         [
           createSlotDto.experience_id,
@@ -173,8 +175,11 @@ export class AvailabilityService {
           createSlotDto.price_per_child_cents ?? 0,
           createSlotDto.commission_per_adult_cents ?? 0,
           createSlotDto.commission_per_child_cents ?? 0,
+          createSlotDto.agent_commission_per_adult_cents ?? 0,
+          createSlotDto.agent_commission_per_child_cents ?? 0,
         ],
       );
+
 
       const slot = result.rows[0];
 

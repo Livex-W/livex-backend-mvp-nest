@@ -17,6 +17,7 @@ export enum AgentPaymentType {
 /**
  * DTO for creating a booking from Livex-BNG (agent panel).
  * No online payment - all payments are physical.
+ * Agent commission is automatically read from the slot configuration.
  */
 export class CreateAgentBookingDto {
     @IsUUID()
@@ -34,17 +35,6 @@ export class CreateAgentBookingDto {
     @IsInt()
     @Min(0)
     children: number = 0;
-
-    // Agent commission per person (agent decides this)
-    @Type(() => Number)
-    @IsInt()
-    @Min(0)
-    agentCommissionPerAdultCents!: number;
-
-    @Type(() => Number)
-    @IsInt()
-    @Min(0)
-    agentCommissionPerChildCents: number = 0;
 
     // Payment type and distribution
     @IsEnum(AgentPaymentType)
@@ -72,3 +62,4 @@ export class CreateAgentBookingDto {
     @IsString()
     clientEmail?: string;
 }
+

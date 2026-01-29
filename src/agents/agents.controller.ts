@@ -3,7 +3,6 @@ import {
     Get,
     Post,
     Body,
-    Patch,
     Param,
     Delete,
     Query,
@@ -17,7 +16,6 @@ import {
 import type { FastifyRequest } from 'fastify';
 import { AgentsService } from './agents.service';
 import { CreateAgentAgreementDto } from './dto/create-agent-agreement.dto';
-import { UpdateAgentCommissionDto } from './dto/update-agent-commission.dto';
 import { UpdateAgentProfileDto } from './dto/update-agent-profile.dto';
 import { CreateReferralCodeDto } from './dto/create-referral-code.dto';
 import { AddCodeRestrictionDto } from './dto/add-code-restriction.dto';
@@ -102,16 +100,6 @@ export class AgentsController {
         @CurrentUser() user: User,
     ) {
         return this.agentsService.rejectAgent(resortId, userId, reason, user.id);
-    }
-
-    @Patch('resorts/:resortId/users/:userId')
-    updateCommission(
-        @Param('resortId', ParseUUIDPipe) resortId: string,
-        @Param('userId', ParseUUIDPipe) userId: string,
-        @Body() dto: UpdateAgentCommissionDto,
-        @CurrentUser() user: User,
-    ) {
-        return this.agentsService.updateCommission(resortId, userId, dto, user.id);
     }
 
     @Get('commissions')

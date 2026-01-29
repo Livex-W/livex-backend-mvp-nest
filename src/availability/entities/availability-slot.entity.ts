@@ -4,14 +4,17 @@ export interface AvailabilitySlot {
   start_time: Date;
   end_time: Date;
   capacity: number;
-  // Precios de temporada (null/undefined = usar precio base de experiencia)
+  // Precios de temporada
   price_per_adult_cents?: number | null;
   price_per_child_cents?: number | null;
+  // Comisión (para app móvil y agentes BNG)
   commission_per_adult_cents?: number | null;
   commission_per_child_cents?: number | null;
   created_at: Date;
   updated_at: Date;
 }
+
+
 
 export interface AvailabilitySlotWithRemaining extends AvailabilitySlot {
   remaining: number;
