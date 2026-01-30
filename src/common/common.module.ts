@@ -12,7 +12,7 @@ import { PaginationService } from './services/pagination.service';
       {
         name: 'default',
         ttl: 60000, // 1 minute
-        limit: 1000, // Increased from 200 to 1000 requests per minute
+        limit: 5000, // Increased to 5000 requests per minute
       },
       {
         name: 'auth',

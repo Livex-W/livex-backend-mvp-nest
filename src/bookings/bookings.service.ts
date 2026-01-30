@@ -94,8 +94,9 @@ export class BookingsService {
           'slug', e.slug,
           'main_image_url', COALESCE(
             (SELECT ei.url FROM experience_images ei 
-             WHERE ei.experience_id = e.id AND ei.image_type = 'hero' 
-             ORDER BY ei.sort_order ASC LIMIT 1),
+             WHERE ei.experience_id = e.id 
+             ORDER BY (ei.image_type = 'hero') DESC, ei.sort_order ASC, ei.created_at ASC 
+             LIMIT 1),
             ''
           ),
           'category', e.category,
@@ -210,8 +211,9 @@ export class BookingsService {
           'slug', e.slug,
           'main_image_url', COALESCE(
             (SELECT ei.url FROM experience_images ei 
-             WHERE ei.experience_id = e.id AND ei.image_type = 'hero' 
-             ORDER BY ei.sort_order ASC LIMIT 1),
+             WHERE ei.experience_id = e.id 
+             ORDER BY (CASE WHEN ei.image_type = 'hero' THEN 0 ELSE 1 END) ASC, ei.sort_order ASC, ei.created_at ASC 
+             LIMIT 1),
             ''
           ),
           'category', e.category,
@@ -309,8 +311,9 @@ export class BookingsService {
           'slug', e.slug,
           'main_image_url', COALESCE(
             (SELECT ei.url FROM experience_images ei 
-             WHERE ei.experience_id = e.id AND ei.image_type = 'hero' 
-             ORDER BY ei.sort_order ASC LIMIT 1),
+             WHERE ei.experience_id = e.id 
+             ORDER BY (CASE WHEN ei.image_type = 'hero' THEN 0 ELSE 1 END) ASC, ei.sort_order ASC, ei.created_at ASC 
+             LIMIT 1),
             ''
           ),
           'category', e.category,

@@ -14,7 +14,7 @@ export class UserPreferencesService {
     async create(userId: string, dto: CreatePreferenceDto): Promise<UserPreference> {
         try {
             const language = dto.language || 'es';
-            const currency = dto.currency || 'USD';
+            const currency = dto.currency || 'COP';
 
             const result = await this.db.query(
                 `INSERT INTO user_preferences (user_id, language, currency, created_at, updated_at)
@@ -117,7 +117,7 @@ export class UserPreferencesService {
                 return {
                     userId,
                     language: 'es',
-                    currency: 'USD',
+                    currency: 'COP',
                     createdAt: new Date(),
                     updatedAt: new Date(),
                 };

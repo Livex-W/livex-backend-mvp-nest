@@ -201,9 +201,27 @@ export class ExperiencesService {
     }
 
     if (queryDto.category) {
-      conditions.push(`e.category = $${paramIndex}`);
-      params.push(queryDto.category);
-      paramIndex++;
+      // Check if category is a UUID (v4)
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(queryDto.category);
+
+      if (isUUID) {
+        // Resolve UUID to category slug/name which is stored in experiences table
+        // We assume the categories table has 'slug' or 'name' that matches the enum values
+        // Note: The schema for categories says 'slug' and 'name'. 
+        // We need to map the ID to the text value stored in experiences.category.
+        // Assuming 'slug' in categories table matches the enum values.
+
+        // We can do a subquery or separate query. Subquery is cleaner but params index mgmt is tricky if dynamic.
+        // Let's use a subquery directly in the WHERE clause:
+        conditions.push(`e.category = (SELECT slug FROM categories WHERE id = $${paramIndex})`);
+        params.push(queryDto.category);
+        paramIndex++;
+      } else {
+        // Treat as slug/enum
+        conditions.push(`e.category = $${paramIndex}`);
+        params.push(queryDto.category);
+        paramIndex++;
+      }
     }
 
     if (queryDto.status) {
@@ -247,10 +265,51 @@ export class ExperiencesService {
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
+    // Handle sort_by and sort_order from DTO
+    if (queryDto.sort_by) {
+      let sortField = queryDto.sort_by as string;
+      const sortOrder = queryDto.sort_order || 'ASC';
+
+      switch (queryDto.sort_by) {
+        case 'price':
+          sortField = 'display_price_per_adult';
+          break;
+        case 'rating':
+          sortField = 'rating_avg';
+          break;
+        case 'bookings':
+          sortField = 'rating_count'; // Proxy for bookings/popularity
+          break;
+        case 'created_at':
+          sortField = 'e.created_at'; // Explicitly qualify to avoid ambiguity if needed, though alias usually works
+          break;
+      }
+
+      // Initialize sort array if empty
+      if (!queryDto.sort) {
+        queryDto.sort = [];
+      } else if (typeof queryDto.sort === 'string') {
+        // Ensure it's an array (sometimes single query param comes as string)
+        queryDto.sort = [queryDto.sort];
+      }
+
+      // Add to sort options (prepend to take precedence)
+      queryDto.sort.unshift(`${sortField}:${sortOrder}`);
+    }
+
     // Build sort options
     const sortOptions = this.paginationService.parseSortOptions(
       queryDto.sort,
-      ['title', 'category', 'rating_avg', 'rating_count', 'created_at', 'updated_at'],
+      [
+        'title',
+        'category',
+        'rating_avg',
+        'rating_count',
+        'created_at',
+        'e.created_at', // Allow qualified
+        'updated_at',
+        'display_price_per_adult'
+      ],
     );
     const orderByClause = this.paginationService.buildOrderByClause(
       sortOptions,
