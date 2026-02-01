@@ -41,6 +41,6 @@ export class UserPreferencesController {
     @Get()
     @HttpCode(HttpStatus.OK)
     async findMine(@CurrentUser() user: JwtPayload) {
-        return this.preferencesService.findByUserId(user.sub);
+        return this.preferencesService.getOrCreateDefault(user.sub);
     }
 }
