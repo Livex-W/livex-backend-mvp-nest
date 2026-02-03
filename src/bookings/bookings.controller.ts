@@ -71,14 +71,12 @@ export class BookingsController {
       slotId: dto.slotId,
     });
 
-    // Convert to agent booking DTO with zero commission (resort direct booking)
+    // Convert to agent booking DTO - commission is read from slot
     const agentDto = {
       slotId: dto.slotId,
       experienceId: dto.experienceId,
       adults: dto.adults,
       children: dto.children,
-      agentCommissionPerAdultCents: 0,
-      agentCommissionPerChildCents: 0,
       agentPaymentType: 'full_at_resort' as const,
       amountPaidToAgentCents: 0,
       clientUserId: dto.clientUserId,

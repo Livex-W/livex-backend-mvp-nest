@@ -32,6 +32,17 @@ export class CreateAvailabilitySlotDto {
   @IsInt()
   @Min(0)
   commission_per_child_cents: number;
+
+  // Comisión del agente (para reservas BNG)
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  agent_commission_per_adult_cents?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  agent_commission_per_child_cents?: number;
 }
 
 export class BulkCreateAvailabilityDto {
@@ -68,6 +79,17 @@ export class BulkCreateAvailabilityDto {
   @IsInt()
   @Min(0)
   commission_per_child_cents: number;
+
+  // Comisión del agente (para reservas BNG)
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  agent_commission_per_adult_cents?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  agent_commission_per_child_cents?: number;
 
   // Time slots configuration
   @IsArray({ message: 'slots must be an array' })
@@ -139,6 +161,17 @@ export class AvailabilityBlockConfig {
   @IsInt()
   @Min(0)
   commission_per_child_cents: number;
+
+  // Comisión del agente (para reservas BNG)
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  agent_commission_per_adult_cents?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  agent_commission_per_child_cents?: number;
 
   @IsArray({ message: 'slots must be an array' })
   @ValidateNested({ each: true })

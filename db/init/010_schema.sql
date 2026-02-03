@@ -281,8 +281,6 @@ CREATE TABLE IF NOT EXISTS resort_agents (
     resort_id uuid REFERENCES resorts(id), -- Nullable for global agents/influencers
     user_id uuid NOT NULL REFERENCES users(id),
     business_profile_id uuid REFERENCES business_profiles(id) ON DELETE SET NULL, -- Agent's business docs
-    commission_bps integer NOT NULL DEFAULT 0 CHECK (commission_bps >= 0 AND commission_bps <= 10000), 
-    commission_fixed_cents integer NOT NULL DEFAULT 0 CHECK (commission_fixed_cents >= 0),
     is_active boolean DEFAULT true,
     
     -- Estado y Aprobación (igual que resorts)
@@ -400,8 +398,12 @@ CREATE TABLE IF NOT EXISTS availability_slots (
   -- Precios por temporada (obligatorios)
   price_per_adult_cents      integer NOT NULL DEFAULT 0 CHECK (price_per_adult_cents >= 0),
   price_per_child_cents      integer NOT NULL DEFAULT 0 CHECK (price_per_child_cents >= 0),
+  -- Comisión LIVEX (para reservas app)
   commission_per_adult_cents integer NOT NULL DEFAULT 0 CHECK (commission_per_adult_cents >= 0),
   commission_per_child_cents integer NOT NULL DEFAULT 0 CHECK (commission_per_child_cents >= 0),
+  -- Comisión Agente (para reservas BNG)
+  agent_commission_per_adult_cents integer NOT NULL DEFAULT 0 CHECK (agent_commission_per_adult_cents >= 0),
+  agent_commission_per_child_cents integer NOT NULL DEFAULT 0 CHECK (agent_commission_per_child_cents >= 0),
   created_at     timestamptz NOT NULL DEFAULT now(),
   updated_at     timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT slot_time_range CHECK (start_time < end_time)
@@ -411,6 +413,8 @@ COMMENT ON COLUMN availability_slots.price_per_adult_cents IS 'Precio por adulto
 COMMENT ON COLUMN availability_slots.price_per_child_cents IS 'Precio por niño para esta temporada. 0 si niños no pagan.';
 COMMENT ON COLUMN availability_slots.commission_per_adult_cents IS 'Comisión LIVEX por adulto para esta temporada.';
 COMMENT ON COLUMN availability_slots.commission_per_child_cents IS 'Comisión LIVEX por niño para esta temporada.';
+COMMENT ON COLUMN availability_slots.agent_commission_per_adult_cents IS 'Comisión del agente por adulto para reservas BNG.';
+COMMENT ON COLUMN availability_slots.agent_commission_per_child_cents IS 'Comisión del agente por niño para reservas BNG.';
 CREATE INDEX IF NOT EXISTS idx_slots_experience ON availability_slots(experience_id);
 CREATE INDEX IF NOT EXISTS idx_slots_start ON availability_slots(start_time);
 CREATE TRIGGER trg_slots_updated_at BEFORE UPDATE ON availability_slots FOR EACH ROW EXECUTE FUNCTION set_updated_at();

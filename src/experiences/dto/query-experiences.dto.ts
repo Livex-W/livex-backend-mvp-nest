@@ -1,7 +1,7 @@
 import { IsOptional, IsEnum, IsUUID, IsInt, Min, Max } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { PaginationDto } from '../../common/dto/pagination.dto';
-import { ExperienceCategory, ExperienceStatus } from './create-experience.dto';
+import { ExperienceStatus } from './create-experience.dto';
 
 export class QueryExperiencesDto extends PaginationDto {
   @IsOptional()
@@ -9,8 +9,7 @@ export class QueryExperiencesDto extends PaginationDto {
   resort_id?: string;
 
   @IsOptional()
-  @IsEnum(ExperienceCategory)
-  category?: ExperienceCategory;
+  category?: string;
 
   @IsOptional()
   @IsEnum(ExperienceStatus)
@@ -67,4 +66,16 @@ export class QueryExperiencesDto extends PaginationDto {
    */
   @IsOptional()
   include_all_statuses?: boolean;
+
+  @IsOptional()
+  @IsEnum(['price', 'rating', 'bookings', 'created_at'], {
+    message: 'sort_by must be one of: price, rating, bookings, created_at',
+  })
+  sort_by?: 'price' | 'rating' | 'bookings' | 'created_at';
+
+  @IsOptional()
+  @IsEnum(['ASC', 'DESC', 'asc', 'desc'], {
+    message: 'sort_order must be one of: ASC, DESC',
+  })
+  sort_order?: 'ASC' | 'DESC' | 'asc' | 'desc';
 }

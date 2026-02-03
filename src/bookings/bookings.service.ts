@@ -94,8 +94,9 @@ export class BookingsService {
           'slug', e.slug,
           'main_image_url', COALESCE(
             (SELECT ei.url FROM experience_images ei 
-             WHERE ei.experience_id = e.id AND ei.image_type = 'hero' 
-             ORDER BY ei.sort_order ASC LIMIT 1),
+             WHERE ei.experience_id = e.id 
+             ORDER BY (ei.image_type = 'hero') DESC, ei.sort_order ASC, ei.created_at ASC 
+             LIMIT 1),
             ''
           ),
           'category', e.category,
@@ -210,8 +211,9 @@ export class BookingsService {
           'slug', e.slug,
           'main_image_url', COALESCE(
             (SELECT ei.url FROM experience_images ei 
-             WHERE ei.experience_id = e.id AND ei.image_type = 'hero' 
-             ORDER BY ei.sort_order ASC LIMIT 1),
+             WHERE ei.experience_id = e.id 
+             ORDER BY (CASE WHEN ei.image_type = 'hero' THEN 0 ELSE 1 END) ASC, ei.sort_order ASC, ei.created_at ASC 
+             LIMIT 1),
             ''
           ),
           'category', e.category,
@@ -309,8 +311,9 @@ export class BookingsService {
           'slug', e.slug,
           'main_image_url', COALESCE(
             (SELECT ei.url FROM experience_images ei 
-             WHERE ei.experience_id = e.id AND ei.image_type = 'hero' 
-             ORDER BY ei.sort_order ASC LIMIT 1),
+             WHERE ei.experience_id = e.id 
+             ORDER BY (CASE WHEN ei.image_type = 'hero' THEN 0 ELSE 1 END) ASC, ei.sort_order ASC, ei.created_at ASC 
+             LIMIT 1),
             ''
           ),
           'category', e.category,
@@ -1341,7 +1344,7 @@ export class BookingsService {
 
   /**
    * Create a booking from BNG (agent panel) - No online payment.
-   * The agent defines their commission per adult/child.
+   * Agent commission is automatically read from the slot configuration.
    */
   async createAgentBooking(
     agentId: string,
@@ -1351,8 +1354,6 @@ export class BookingsService {
       experienceId: string;
       adults: number;
       children: number;
-      agentCommissionPerAdultCents: number;
-      agentCommissionPerChildCents: number;
       agentPaymentType: 'full_at_resort' | 'deposit_to_agent' | 'commission_to_agent';
       amountPaidToAgentCents: number;
       clientUserId?: string;
@@ -1362,14 +1363,18 @@ export class BookingsService {
     },
   ): Promise<Booking> {
     return await this.db.transaction(async (client) => {
-      // 1. Get slot info and calculate resort net (base price)
+      // 1. Get slot info including commission (used for agent)
       const slotResult = await client.query<{
         price_per_adult_cents: number;
         price_per_child_cents: number;
+        commission_per_adult_cents: number;
+        commission_per_child_cents: number;
         currency: string;
         capacity: number;
       }>(
-        `SELECT s.price_per_adult_cents, s.price_per_child_cents, e.currency, s.capacity
+        `SELECT s.price_per_adult_cents, s.price_per_child_cents, 
+                s.commission_per_adult_cents, s.commission_per_child_cents,
+                e.currency, s.capacity
          FROM availability_slots s
          JOIN experiences e ON e.id = s.experience_id
          WHERE s.id = $1`,
@@ -1393,14 +1398,18 @@ export class BookingsService {
         throw new BadRequestException('Insufficient capacity');
       }
 
-      // 3. Calculate amounts
+      // 3. Calculate amounts (agent commission from slot configuration)
       const resortNetCents =
         slot.price_per_adult_cents * dto.adults +
         slot.price_per_child_cents * dto.children;
 
+      // Commission from slot is used as agent commission for BNG bookings
+      const agentCommissionPerAdultCents = slot.commission_per_adult_cents;
+      const agentCommissionPerChildCents = slot.commission_per_child_cents;
       const agentCommissionCents =
-        dto.agentCommissionPerAdultCents * dto.adults +
-        dto.agentCommissionPerChildCents * dto.children;
+        agentCommissionPerAdultCents * dto.adults +
+        agentCommissionPerChildCents * dto.children;
+
 
       const totalCents = resortNetCents + agentCommissionCents;
 
@@ -1473,8 +1482,8 @@ export class BookingsService {
           0, // tax
           0, // LIVEX commission (0 for BNG)
           resortNetCents,
-          dto.agentCommissionPerAdultCents,
-          dto.agentCommissionPerChildCents,
+          agentCommissionPerAdultCents,
+          agentCommissionPerChildCents,
           agentCommissionCents,
           dto.agentPaymentType,
           dto.amountPaidToAgentCents,
