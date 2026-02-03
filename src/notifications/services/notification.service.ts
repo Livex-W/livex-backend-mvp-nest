@@ -6,6 +6,7 @@ import {
   EmailTemplateType,
   EmailTemplateData
 } from '../interfaces/email-template.interface';
+import { Exception } from 'handlebars';
 
 @Injectable()
 export class NotificationService implements OnModuleInit {
@@ -652,6 +653,212 @@ export class NotificationService implements OnModuleInit {
     );
   }
 
+  sendAgentCreatedNotifyAdmin(
+    adminEmail: string,
+    data: {
+      resortName: string;
+      agentName: string;
+    }
+  ): string {
+    return this.sendEmailNotification(
+      adminEmail,
+      EmailTemplateType.AGENT_CREATED_NOTIFY_ADMIN,
+      data,
+      { priority: 'low' }
+    );
+  }
+
+  sendAgentCreatedNotifyAgent(
+    agentEmail: string,
+    data: {
+      resortName: string;
+      agentName: string;
+      agentEmail: string;
+      agentPassword: string;
+    }
+  ): string {
+    return this.sendEmailNotification(
+      agentEmail,
+      EmailTemplateType.AGENT_CREATED_NOTIFY_AGENT,
+      data,
+      { priority: 'low' }
+    );
+  }
+
+  sendAgentVinculatedNotifyAdmin(
+    adminEmail: string,
+    data: {
+      resortName: string;
+      agentName: string;
+    }
+  ): string {
+    return this.sendEmailNotification(
+      adminEmail,
+      EmailTemplateType.AGENT_VINCULATED_NOTIFY_ADMIN,
+      data,
+      { priority: 'low' }
+    );
+  }
+
+  sendAgentVinculatedNotifyAgent(
+    agentEmail: string,
+    data: {
+      resortName: string;
+      agentName: string;
+    }
+  ): string {
+    return this.sendEmailNotification(
+      agentEmail,
+      EmailTemplateType.AGENT_VINCULATED_NOTIFY_AGENT,
+      data,
+      { priority: 'low' }
+    );
+  }
+
+  sendAgentUnderReviewNotifytoResort(
+    resortEmail: string,
+    data: {
+      resortName: string;
+      agentName: string;
+    }
+  ): string {
+    if (!resortEmail) {
+      throw new Error('Resort email is required');
+    }
+    return this.sendEmailNotification(
+      resortEmail,
+      EmailTemplateType.AGENT_UNDER_REVIEW_DOCUMENTS_NOTIFY_OWNER_RESORT,
+      data,
+      { priority: 'low' }
+    );
+  }
+
+  sendAgentApprovedNotifyAdmin(
+    adminEmail: string,
+    data: {
+      resortName: string;
+      agentName: string;
+    }
+  ): string {
+    return this.sendEmailNotification(
+      adminEmail,
+      EmailTemplateType.AGENT_APPROVED_NOTIFY_ADMIN,
+      data,
+      { priority: 'low' }
+    );
+  }
+
+  sendAgentApprovedNotifyAgent(
+    agentEmail: string,
+    data: {
+      resortName: string;
+      agentName: string;
+    }
+  ): string {
+    return this.sendEmailNotification(
+      agentEmail,
+      EmailTemplateType.AGENT_APPROVED_NOTIFY_AGENT,
+      data,
+      { priority: 'low' }
+    );
+  }
+
+
+  sendAgentRejectedNotifyAdmin(
+    resortEmail: string,
+    data: {
+      resortName: string;
+      agentName: string;
+      reason: string;
+    }
+  ): string {
+    return this.sendEmailNotification(
+      resortEmail,
+      EmailTemplateType.AGENT_REJECTED_NOTIFY_ADMIN,
+      data,
+      { priority: 'low' }
+    );
+  }
+
+  sendAgentRejectedNotifyAgent(
+    agentEmail: string,
+    data: {
+      resortName: string;
+      agentName: string;
+      reason: string;
+    }
+  ): string {
+    return this.sendEmailNotification(
+      agentEmail,
+      EmailTemplateType.AGENT_REJECTED_NOTIFY_AGENT,
+      data,
+      { priority: 'low' }
+    );
+  }
+
+  sendAgentApprovedDocumentsNotifyAgent(
+    agentEmail: string,
+    data: {
+      agentName: string;
+    }
+  ): string {
+    if (!agentEmail) {
+      throw new Error('agent email is required');
+    }
+    return this.sendEmailNotification(
+      agentEmail,
+      EmailTemplateType.AGENT_APPROVED_DOCUMENTS_NOTIFY_AGENT,
+      data,
+      { priority: 'low' }
+    );
+  }
+
+  sendAgentApprovedDocumentsNotifyAdmin(
+    adminEmail: string,
+    data: {
+      resortName: string;
+      agentName: string;
+    }
+  ): string {
+    return this.sendEmailNotification(
+      adminEmail,
+      EmailTemplateType.AGENT_APPROVED_DOCUMENTS_NOTIFY_ADMIN,
+      data,
+      { priority: 'low' }
+    );
+  }
+
+  sendAgentRejectedDocumentsNotifyAgent(
+    agentEmail: string,
+    data: {
+      agentName: string;
+      reason: string;
+    }
+  ): string {
+    return this.sendEmailNotification(
+      agentEmail,
+      EmailTemplateType.AGENT_REJECTED_DOCUMENTS_NOTIFY_AGENT,
+      data,
+      { priority: 'low' }
+    );
+  }
+
+  sendAgentRejectedDocumentsNotifyAdmin(
+    adminEmail: string,
+    data: {
+      resortName: string;
+      agentName: string;
+      reason: string;
+    }
+  ): string {
+    return this.sendEmailNotification(
+      adminEmail,
+      EmailTemplateType.AGENT_REJECTED_DOCUMENTS_NOTIFY_ADMIN,
+      data,
+      { priority: 'low' }
+    );
+  }
+
   sendEmailConfirmation(
     userEmail: string,
     data: {
@@ -666,6 +873,7 @@ export class NotificationService implements OnModuleInit {
       data,
       { priority: 'high' }
     );
+
   }
 
   sendMonthlyReportToResort(
@@ -926,7 +1134,73 @@ export class NotificationService implements OnModuleInit {
         customerEmail: 'fail@test.com',
         bookingCode: 'LVX-TEST-004',
         refundAmount: 180000
-      }
+      },
+      [EmailTemplateType.AGENT_CREATED_NOTIFY_ADMIN]: {
+        agentName: 'Agente de Prueba',
+        bookingCode: 'LVX-TEST-004',
+        refundAmount: 180000
+      },
+      [EmailTemplateType.AGENT_UNDER_REVIEW_DOCUMENTS_NOTIFY_OWNER_RESORT]: {
+        agentName: 'Agente de Prueba',
+        bookingCode: 'LVX-TEST-004',
+        refundAmount: 180000
+      },
+      [EmailTemplateType.AGENT_CREATED_NOTIFY_AGENT]: {
+        agentName: 'Agente de Prueba',
+        bookingCode: 'LVX-TEST-004',
+        refundAmount: 180000
+      },
+      [EmailTemplateType.AGENT_APPROVED_NOTIFY_ADMIN]: {
+        agentName: 'Agente de Prueba',
+        bookingCode: 'LVX-TEST-004',
+        refundAmount: 180000
+      },
+      [EmailTemplateType.AGENT_APPROVED_NOTIFY_AGENT]: {
+        agentName: 'Agente de Prueba',
+        bookingCode: 'LVX-TEST-004',
+        refundAmount: 180000
+      },
+      [EmailTemplateType.AGENT_REJECTED_DOCUMENTS_NOTIFY_ADMIN]: {
+        agentName: 'Agente de Prueba',
+        bookingCode: 'LVX-TEST-004',
+        refundAmount: 180000
+      },
+      [EmailTemplateType.AGENT_REJECTED_NOTIFY_ADMIN]: {
+        agentName: 'Agente de Prueba',
+        bookingCode: 'LVX-TEST-004',
+        refundAmount: 180000
+      },
+      [EmailTemplateType.AGENT_REJECTED_NOTIFY_AGENT]: {
+        agentName: 'Agente de Prueba',
+        bookingCode: 'LVX-TEST-004',
+        refundAmount: 180000
+      },
+      [EmailTemplateType.AGENT_APPROVED_DOCUMENTS_NOTIFY_ADMIN]: {
+        agentName: 'Agente de Prueba',
+        bookingCode: 'LVX-TEST-004',
+        refundAmount: 180000
+      },
+      [EmailTemplateType.AGENT_APPROVED_DOCUMENTS_NOTIFY_AGENT]: {
+        agentName: 'Agente de Prueba',
+        bookingCode: 'LVX-TEST-004',
+        refundAmount: 180000
+      },
+      [EmailTemplateType.AGENT_REJECTED_DOCUMENTS_NOTIFY_AGENT]: {
+        agentName: 'Agente de Prueba',
+        bookingCode: 'LVX-TEST-004',
+        refundAmount: 180000
+      },
+      [EmailTemplateType.AGENT_VINCULATED_NOTIFY_ADMIN]: {
+        agentName: 'Agente de Prueba',
+        bookingCode: 'LVX-TEST-004',
+        refundAmount: 180000
+      },
+      [EmailTemplateType.AGENT_VINCULATED_NOTIFY_AGENT]: {
+        agentName: 'Agente de Prueba',
+        bookingCode: 'LVX-TEST-004',
+        refundAmount: 180000
+      },
+
     };
 
     return testDataMap[templateType] || { test: true };

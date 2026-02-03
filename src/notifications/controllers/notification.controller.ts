@@ -243,6 +243,20 @@ export class NotificationController {
       [EmailTemplateType.EMAIL_CONFIRMATION]: 'Confirmación de correo electrónico',
       [EmailTemplateType.MONTHLY_REPORT_RESORT]: 'Reporte mensual para resort',
       [EmailTemplateType.MONTHLY_REPORT_ADMIN]: 'Reporte mensual para admin',
+      [EmailTemplateType.AGENT_CREATED_NOTIFY_ADMIN]: 'Notificación al admin de nuevo agente',
+      [EmailTemplateType.AGENT_CREATED_NOTIFY_AGENT]: 'Notificación al agente de nuevo agente',
+      [EmailTemplateType.AGENT_UNDER_REVIEW_DOCUMENTS_NOTIFY_OWNER_RESORT]: 'Notificación al propietario de nuevo agente',
+      [EmailTemplateType.AGENT_APPROVED_DOCUMENTS_NOTIFY_AGENT]: 'Notificación al agente de nuevo prestador',
+      [EmailTemplateType.AGENT_REJECTED_DOCUMENTS_NOTIFY_AGENT]: 'Notificación al agente de nuevo prestador',
+      [EmailTemplateType.AGENT_APPROVED_DOCUMENTS_NOTIFY_ADMIN]: 'Notificación al admin de nuevo prestador',
+      [EmailTemplateType.AGENT_REJECTED_DOCUMENTS_NOTIFY_ADMIN]: 'Notificación al admin de nuevo prestador',
+      [EmailTemplateType.AGENT_APPROVED_NOTIFY_AGENT]: 'Notificación al agente de nuevo prestador',
+      [EmailTemplateType.AGENT_REJECTED_NOTIFY_AGENT]: 'Notificación al agente de nuevo prestador',
+      [EmailTemplateType.AGENT_APPROVED_NOTIFY_ADMIN]: 'Notificación al admin de nuevo prestador',
+      [EmailTemplateType.AGENT_REJECTED_NOTIFY_ADMIN]: 'Notificación al admin de nuevo prestador',
+      [EmailTemplateType.AGENT_VINCULATED_NOTIFY_ADMIN]: 'Notificación al admin de nuevo prestador',
+      [EmailTemplateType.AGENT_VINCULATED_NOTIFY_AGENT]: 'Notificación al agente de nuevo prestador',
+
     };
 
     return descriptions[templateType] || 'Descripción no disponible';

@@ -27,6 +27,18 @@ import {
   ExperienceApprovedNotifyAdminEvent,
   ExperienceRejectedNotifyAdminEvent,
   MonthlyReportEvent,
+  AgentRejectedDocumentsNotifyAgentEvent,
+  AgentRejectedDocumentsNotifyAdminEvent,
+  AgentApprovedDocumentsNotifyAdminEvent,
+  AgentApprovedDocumentsNotifyAgentEvent,
+  AgentApprovedNotifyAdminEvent,
+  AgentApprovedNotifyAgentEvent,
+  AgentCreatedNotifyAgentEvent,
+  AgentRejectedNotifyAdminEvent,
+  AgentRejectedNotifyAgentEvent,
+  AgentUnderReviewNotifyResortEvent,
+  AgentVinculatedNotifyAdminEvent,
+  AgentVinculatedNotifyAgentEvent,
 } from '../events/notification.events';
 import { EPaymentProvider } from '../../payments/providers/payment-provider.factory';
 
@@ -687,6 +699,174 @@ export class NotificationListener {
     }
   }
 
+  @OnEvent('agent.created.notify.agent')
+  handleAgentCreatedNotifyAgent(event: AgentCreatedNotifyAgentEvent) {
+    try {
+      this.notificationService.sendAgentCreatedNotifyAgent(
+        event.agentEmail,
+        {
+          resortName: event.resortName,
+          agentName: event.agentName,
+          agentEmail: event.agentEmail,
+          agentPassword: event.agentPassword,
+        }
+      );
+      this.logger.log(`Agent created notification sent to agent ${event.agentId}`);
+    } catch (error) {
+      this.logger.error(`Failed to send agent created notification to agent ${event.agentId}:`, error);
+    }
+  }
+
+  @OnEvent('agent.under.documents.review.notify.owner.resort')
+  handleAgentUnderReviewNotifyResort(event: AgentUnderReviewNotifyResortEvent) {
+    try {
+      this.notificationService.sendAgentUnderReviewNotifytoResort(
+        event.resortEmail,
+        {
+          resortName: event.resortName,
+          agentName: event.agentName,
+        }
+      );
+      this.logger.log(`Agent under review notification sent to resort ${event.resortId}`);
+    } catch (error) {
+      this.logger.error(`Failed to send agent under review notification to resort ${event.resortId}:`, error);
+    }
+  }
+
+  @OnEvent('agent.approved.notify.admin')
+  handleAgentApprovedNotifyAdmin(event: AgentApprovedNotifyAdminEvent) {
+    try {
+      const adminEmail = this.configService.get('ADMIN_EMAIL', 'admin@livex.com');
+      this.notificationService.sendAgentApprovedNotifyAdmin(
+        adminEmail,
+        {
+          resortName: event.resortName,
+          agentName: event.agentName,
+        }
+      );
+      this.logger.log(`Agent approved notification sent to admin for agent ${event.agentId}`);
+    } catch (error) {
+      this.logger.error(`Failed to send agent approved notification to admin for ${event.agentId}:`, error);
+    }
+  }
+
+  @OnEvent('agent.approved.notify.agent')
+  handleAgentApprovedNotifyAgent(event: AgentApprovedNotifyAgentEvent) {
+    try {
+      this.notificationService.sendAgentApprovedNotifyAgent(
+        event.agentEmail,
+        {
+          resortName: event.resortName,
+          agentName: event.agentName,
+        }
+      );
+      this.logger.log(`Agent approved notification sent to agent ${event.agentId}`);
+    } catch (error) {
+      this.logger.error(`Failed to send agent approved notification to agent ${event.agentId}:`, error);
+    }
+  }
+
+  @OnEvent('agent.rejected.notify.admin')
+  handleAgentRejectedNotifyAdmin(event: AgentRejectedNotifyAdminEvent) {
+    try {
+      const adminEmail = this.configService.get('ADMIN_EMAIL', 'admin@livex.com');
+      this.notificationService.sendAgentRejectedNotifyAdmin(
+        adminEmail,
+        {
+          resortName: event.resortName,
+          agentName: event.agentName,
+          reason: event.reason,
+        }
+      );
+      this.logger.log(`Agent rejected notification sent to admin for agent ${event.agentId}`);
+    } catch (error) {
+      this.logger.error(`Failed to send agent rejected notification to admin for ${event.agentId}:`, error);
+    }
+  }
+
+  @OnEvent('agent.rejected.notify.agent')
+  handleAgentRejectedNotifyAgent(event: AgentRejectedNotifyAgentEvent) {
+    try {
+      this.notificationService.sendAgentRejectedNotifyAgent(
+        event.agentEmail,
+        {
+          resortName: event.resortName,
+          agentName: event.agentName,
+          reason: event.reason,
+        }
+      );
+      this.logger.log(`Agent rejected notification sent to agent ${event.agentId}`);
+    } catch (error) {
+      this.logger.error(`Failed to send agent rejected notification to agent ${event.agentId}:`, error);
+    }
+  }
+
+  @OnEvent('agent.approved.documents.notify.agent')
+  handleAgentApprovedDocumentsNotifyAgent(event: AgentApprovedDocumentsNotifyAgentEvent) {
+    try {
+      this.notificationService.sendAgentApprovedDocumentsNotifyAgent(
+        event.agentEmail,
+        {
+          agentName: event.agentName,
+        }
+      );
+      this.logger.log(`Agent documents approved notification sent to agent ${event.agentId}`);
+    } catch (error) {
+      this.logger.error(`Failed to send agent documents approved notification to agent ${event.agentId}:`, error);
+    }
+  }
+
+  @OnEvent('agent.approved.documents.notify.admin')
+  handleAgentApprovedDocumentsNotifyAdmin(event: AgentApprovedDocumentsNotifyAdminEvent) {
+    try {
+      const adminEmail = this.configService.get('ADMIN_EMAIL', 'admin@livex.com');
+      this.notificationService.sendAgentApprovedDocumentsNotifyAdmin(
+        adminEmail,
+        {
+          resortName: event.resortName,
+          agentName: event.agentName,
+        }
+      );
+      this.logger.log(`Agent documents approved notification sent to admin for agent ${event.agentId}`);
+    } catch (error) {
+      this.logger.error(`Failed to send agent documents approved notification to admin for ${event.agentId}:`, error);
+    }
+  }
+
+  @OnEvent('agent.rejected.documents.notify.agent')
+  handleAgentRejectedDocumentsNotifyAgent(event: AgentRejectedDocumentsNotifyAgentEvent) {
+    try {
+      this.notificationService.sendAgentRejectedDocumentsNotifyAgent(
+        event.agentEmail,
+        {
+          agentName: event.agentName,
+          reason: event.reason,
+        }
+      );
+      this.logger.log(`Agent documents rejected notification sent to agent ${event.agentId}`);
+    } catch (error) {
+      this.logger.error(`Failed to send agent documents rejected notification to agent ${event.agentId}:`, error);
+    }
+  }
+
+  @OnEvent('agent.rejected.documents.notify.admin')
+  handleAgentRejectedDocumentsNotifyAdmin(event: AgentRejectedDocumentsNotifyAdminEvent) {
+    try {
+      const adminEmail = this.configService.get('ADMIN_EMAIL', 'admin@livex.com');
+      this.notificationService.sendAgentRejectedDocumentsNotifyAdmin(
+        adminEmail,
+        {
+          resortName: event.resortName,
+          agentName: event.agentName,
+          reason: event.reason,
+        }
+      );
+      this.logger.log(`Agent documents rejected notification sent to admin for agent ${event.agentId}`);
+    } catch (error) {
+      this.logger.error(`Failed to send agent documents rejected notification to admin for ${event.agentId}:`, error);
+    }
+  }
+
   @OnEvent('monthly.report.generate')
   handleMonthlyReport(event: MonthlyReportEvent) {
     try {
@@ -707,6 +887,39 @@ export class NotificationListener {
       }
     } catch (error) {
       this.logger.error(`Failed to send monthly report: `, error);
+    }
+  }
+
+  @OnEvent('agent.vinculated.notify.admin')
+  handleAgentVinculatedNotifyAdmin(event: AgentVinculatedNotifyAdminEvent) {
+    try {
+      const adminEmail = this.configService.get('ADMIN_EMAIL', 'admin@livex.com');
+      this.notificationService.sendAgentVinculatedNotifyAdmin(
+        adminEmail,
+        {
+          resortName: event.resortName,
+          agentName: event.agentName,
+        }
+      );
+      this.logger.log(`Agent vinculated notification sent to admin for agent ${event.agentId}`);
+    } catch (error) {
+      this.logger.error(`Failed to send agent vinculated notification to admin for ${event.agentId}:`, error);
+    }
+  }
+
+  @OnEvent('agent.vinculated.notify.agent')
+  handleAgentVinculatedNotifyAgent(event: AgentVinculatedNotifyAgentEvent) {
+    try {
+      this.notificationService.sendAgentVinculatedNotifyAgent(
+        event.agentEmail,
+        {
+          resortName: event.resortName,
+          agentName: event.agentName,
+        }
+      );
+      this.logger.log(`Agent vinculated notification sent to agent ${event.agentId}`);
+    } catch (error) {
+      this.logger.error(`Failed to send agent vinculated notification to agent ${event.agentId}:`, error);
     }
   }
 
