@@ -17,6 +17,8 @@ import { CreateAgentDto } from './dto/create-agent.dto';
 import { UsersService } from '../users/users.service';
 import { PasswordHashService } from '../auth/services/password-hash.service';
 import { UploadService } from '../upload/upload.service';
+import { NotificationService } from '../notifications/services/notification.service';
+import { ConfigService } from '@nestjs/config';
 @Injectable()
 export class AgentsService {
     constructor(
@@ -24,6 +26,8 @@ export class AgentsService {
         private readonly usersService: UsersService,
         private readonly passwordHashService: PasswordHashService,
         private readonly uploadService: UploadService,
+        private readonly notificationService: NotificationService,
+        private readonly configService: ConfigService,
     ) { }
 
     async createAgent(dto: CreateAgentDto, requesterId: string) {
@@ -33,9 +37,11 @@ export class AgentsService {
         // Only if requester is provided. If admin creates? Assuming this flow is for Resort Owner.
         // User feedback implies checking ownership.
         const resortRes = await this.db.query(
-            'SELECT id FROM resorts WHERE owner_user_id = $1 LIMIT 1',
+            'SELECT id, name as resort_name FROM resorts WHERE owner_user_id = $1 LIMIT 1',
             [requesterId]
         );
+        const resortName = resortRes.rows[0]?.resort_name;
+        console.log(`Resort name: ${resortName}`);
 
         if (resortRes.rows.length > 0) {
             resortId = resortRes.rows[0].id as string;
@@ -86,6 +92,21 @@ export class AgentsService {
             [resortId, newUser.id, businessProfileId],
         );
 
+        const adminEmail = this.configService.get<string>('ADMIN_EMAIL', 'admin@livex.com');
+
+        // 6. Send notification to admin
+        this.notificationService.sendAgentCreatedNotifyAdmin(adminEmail, {
+            resortName: resortName || '',
+            agentName: dto.fullName,
+        });
+
+        this.notificationService.sendAgentCreatedNotifyAgent(newUser.email, {
+            resortName: resortName || '',
+            agentName: dto.fullName,
+            agentEmail: dto.email,
+            agentPassword: dto.password,
+        });
+
         return {
             ...newUser,
             resortId,
@@ -127,6 +148,33 @@ export class AgentsService {
         if (userResult.rows.length === 0) {
             throw new NotFoundException('User not found');
         }
+
+        const resultQuery = await this.db.query(
+            `SELECT 
+                    r.name as resortName, 
+                    u.full_name as agentName,
+                    u.email as agentEmail
+                FROM resorts r 
+                JOIN resort_agents ra ON r.id = ra.resort_id 
+                JOIN users u ON ra.user_id = u.id 
+                WHERE ra.user_id = $1`,
+            [dto.userId],
+        );
+
+        const resortName = resultQuery.rows[0].resortName;
+        const agentName = resultQuery.rows[0].agentName;
+        const agentEmail = resultQuery.rows[0].agentEmail;
+        const adminEmail = this.configService.get('ADMIN_EMAIL', 'admin@livex.com');
+
+        this.notificationService.sendAgentVinculatedNotifyAdmin(adminEmail, {
+            resortName,
+            agentName,
+        });
+
+        this.notificationService.sendAgentVinculatedNotifyAgent(agentEmail, {
+            resortName,
+            agentName,
+        });
 
         try {
             const result = await this.db.query(
@@ -275,6 +323,38 @@ export class AgentsService {
             throw new NotFoundException('Agent not found');
         }
 
+        const resultQuery = await this.db.query(
+            `SELECT 
+              r.name as resort_name, 
+              u.full_name as agent_name,
+              u.email as agent_email
+            FROM resort_agents ra
+            JOIN resorts r ON r.id = ra.resort_id 
+            JOIN users u ON ra.user_id = u.id 
+            WHERE ra.user_id = $1 AND ra.resort_id = $2`,
+            [userId, resortId],
+        );
+
+
+        if (resultQuery.rows.length === 0) {
+            throw new NotFoundException('Agent information not found');
+        }
+
+        const { resort_name, agent_name, agent_email } = resultQuery.rows[0];
+
+        const adminEmail = this.configService.get('ADMIN_EMAIL', 'admin@livex.com');
+
+        this.notificationService.sendAgentApprovedNotifyAgent(agent_email, {
+            resortName: resort_name,
+            agentName: agent_name,
+        });
+
+        this.notificationService.sendAgentApprovedNotifyAdmin(adminEmail, {
+            resortName: resort_name,
+            agentName: agent_name,
+        });
+
+
         return result.rows[0];
     }
 
@@ -299,6 +379,40 @@ export class AgentsService {
         if (result.rows.length === 0) {
             throw new NotFoundException('Agent not found');
         }
+
+        const resultQuery = await this.db.query(
+            `SELECT 
+              r.name as resort_name, 
+              u.full_name as agent_name,
+              u.email as agent_email
+            FROM resort_agents ra
+            JOIN resorts r ON r.id = ra.resort_id 
+            JOIN users u ON ra.user_id = u.id 
+            WHERE ra.user_id = $1 AND ra.resort_id = $2`,
+            [userId, resortId],
+        );
+
+
+        if (resultQuery.rows.length === 0) {
+            throw new NotFoundException('Agent information not found');
+        }
+
+        const { resort_name, agent_name, agent_email } = resultQuery.rows[0];
+
+        const adminEmail = this.configService.get('ADMIN_EMAIL', 'admin@livex.com');
+
+        this.notificationService.sendAgentRejectedNotifyAgent(agent_email, {
+            resortName: resort_name,
+            agentName: agent_name,
+            reason: reason,
+        });
+
+        this.notificationService.sendAgentRejectedNotifyAdmin(adminEmail, {
+            resortName: resort_name,
+            agentName: agent_name,
+            reason: reason,
+        });
+
 
         return result.rows[0];
     }
@@ -567,6 +681,27 @@ export class AgentsService {
             doc = result.rows[0];
         }
 
+        const resultQuery = await this.db.query(
+            `SELECT 
+              r.name as resort_name, 
+              u.full_name as agent_name,
+              r.contact_email as resort_email
+            FROM resorts r 
+            JOIN resort_agents ra ON r.id = ra.resort_id 
+            JOIN users u ON ra.user_id = u.id 
+            WHERE ra.user_id = $1`,
+            [userId],
+        );
+
+        const resortEmail = resultQuery.rows[0].resort_email;
+        const resortName = resultQuery.rows[0].resort_name;
+        const agentName = resultQuery.rows[0].agent_name;
+
+        this.notificationService.sendAgentUnderReviewNotifytoResort(resortEmail, {
+            resortName: resortName,
+            agentName: agentName,
+        });
+
         return {
             document: {
                 id: doc.id,
@@ -629,9 +764,19 @@ export class AgentsService {
         await this.checkResortOwnership(resortId, requesterId);
 
         // Verify the document belongs to an agent of this resort
-        const docCheck = await this.db.query<{ id: string }>(`
-            SELECT bd.id FROM business_documents bd
+        const docCheck = await this.db.query<{
+            id: string,
+            agentName: string;
+            agentEmail: string;
+            resortName: string;
+        }>(`
+            SELECT bd.id, 
+            u.full_name as "agentName",
+            u.email as "agentEmail",
+            r.name as "resortName" FROM business_documents bd
             JOIN resort_agents ra ON ra.business_profile_id = bd.business_profile_id
+            JOIN users u ON ra.user_id = u.id
+            JOIN resorts r ON ra.resort_id = r.id
             WHERE bd.id = $1 AND ra.resort_id = $2
         `, [docId, resortId]);
 
@@ -646,6 +791,21 @@ export class AgentsService {
             RETURNING id, status
         `, [docId]);
 
+
+        const { agentName, agentEmail, resortName } = docCheck.rows[0];
+        const adminEmail = this.configService.get('ADMIN_EMAIL', 'admin@livex.com');
+
+        this.notificationService.sendAgentApprovedDocumentsNotifyAgent(agentEmail,
+            {
+                agentName: agentName,
+            }
+        );
+
+        this.notificationService.sendAgentApprovedDocumentsNotifyAdmin(adminEmail, {
+            resortName: resortName,
+            agentName: agentName,
+        });
+
         return result.rows[0];
     }
 
@@ -659,9 +819,20 @@ export class AgentsService {
         await this.checkResortOwnership(resortId, requesterId);
 
         // Verify the document belongs to an agent of this resort
-        const docCheck = await this.db.query<{ id: string }>(`
-            SELECT bd.id FROM business_documents bd
+        const docCheck = await this.db.query<{
+            id: string,
+            agentName: string;
+            agentEmail: string;
+            resortName: string;
+        }>(`
+            SELECT bd.id, 
+            u.full_name as "agentName",
+            u.email as "agentEmail",
+            r.name as "resortName" 
+            FROM business_documents bd
             JOIN resort_agents ra ON ra.business_profile_id = bd.business_profile_id
+            JOIN users u ON ra.user_id = u.id
+            JOIN resorts r ON ra.resort_id = r.id
             WHERE bd.id = $1 AND ra.resort_id = $2
         `, [docId, resortId]);
 
@@ -675,6 +846,23 @@ export class AgentsService {
             WHERE id = $2
             RETURNING id, status, rejection_reason
         `, [rejectionReason, docId]);
+
+
+        const { agentName, agentEmail, resortName } = docCheck.rows[0];
+        const adminEmail = this.configService.get('ADMIN_EMAIL', 'admin@livex.com');
+
+        this.notificationService.sendAgentRejectedDocumentsNotifyAgent(agentEmail,
+            {
+                agentName: agentName,
+                reason: rejectionReason,
+            }
+        );
+
+        this.notificationService.sendAgentRejectedDocumentsNotifyAdmin(adminEmail, {
+            resortName: resortName,
+            agentName: agentName,
+            reason: rejectionReason,
+        });
 
         return result.rows[0];
     }

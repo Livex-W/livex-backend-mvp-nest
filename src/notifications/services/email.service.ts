@@ -417,6 +417,7 @@ export class EmailService {
         `,
         text: 'Experiencia {{experienceName}} no fue aprobada. Motivo: {{rejectionReason}}'
       },
+
       [EmailTemplateType.WELCOME]: {
         subject: '🎉 ¡Bienvenido a LIVEX!',
         html: `
@@ -701,6 +702,142 @@ export class EmailService {
            </ul>
         `,
         text: 'Reporte Mensual {{month}}: {{totalBookings}} reservas, ${{totalVolume}} volumen.'
+      },
+
+      [EmailTemplateType.AGENT_CREATED_NOTIFY_ADMIN]: {
+        subject: '✅ Agente Creado - LIVEX',
+        html: `
+        <h2>¡Nuevo/a agente creado/a!</h2>
+        <p>El resort: {{resortName}},</p>
+        <p>Ha creado el/la agente <strong>{{agentName}}</strong>.</p>
+        <p>Se ha enviado el/la agente a revision.</p>
+      `,
+        text: 'El/la agente: {{agentName}}, ha sido creado/a. Se ha enviado el/la agente a revision.'
+      },
+
+      [EmailTemplateType.AGENT_CREATED_NOTIFY_AGENT]: {
+        subject: '✅ Agente Creado - LIVEX',
+        html: `
+        <h2>¡Hola! {{agentName}}</h2>
+        <p>El resort {{resortName}} ha sido el encargado de la creación de su usuario, por lo que se ha enviado a revision.</p>
+        <p>Inicie sesion en la plataforma con el email: <strong>{{agentEmail}}</strong> y contraseña <strong>{{agentPassword}}</strong> cambie la contraseña al iniciar sesion.</p>
+        <p>Suba los documentos requeridos para que sea aprobado.</p>
+        <p>Gracias por usar LIVEX</p>
+      `,
+        text: 'El/la agente: {{agentName}}, ha sido creado/a. Se ha enviado el/la agente a revision.'
+      },
+
+      [EmailTemplateType.AGENT_VINCULATED_NOTIFY_ADMIN]: {
+        subject: '✅ Agente vinculado - LIVEX',
+        html: `
+        <h2>¡Nuevo/a agente vindulado/a!</h2>
+        <p>El resort: {{resortName}},</p>
+        <p>Ha vinculado a el/la agente <strong>{{agentName}}</strong>.</p>
+        <p>Se ha enviado el/la agente a revision.</p>
+      `,
+        text: 'El/la agente: {{agentName}}, ha sido vinculado/a. Se ha enviado el/la agente a revision.'
+      },
+
+      [EmailTemplateType.AGENT_VINCULATED_NOTIFY_AGENT]: {
+        subject: '✅ Agente vinculado - LIVEX',
+        html: `
+        <h2>¡Hola! {{agentName}}</h2>
+        <p>El resort {{resortName}} ha sido el encargado de tu vinculacion, por lo que se ha enviado a revision.</p>
+        <p>Inicie sesion en la plataforma con tu email y contraseña</p>
+        <p>Suba los documentos requeridos para que sea aprobado.</p>
+        <p>Gracias por usar LIVEX</p>
+      `,
+        text: 'El/la agente: {{agentName}}, ha sido vinculado/a. Se ha enviado el/la agente a revision.'
+      },
+
+      [EmailTemplateType.AGENT_UNDER_REVIEW_DOCUMENTS_NOTIFY_OWNER_RESORT]: {
+        subject: '✅ Agente bajo revision - LIVEX',
+        html: `
+        <h2>¡Hola! {{resortName}}</h2>
+        <p>El agente {{agentName}} ha subido un documento para revision.</p>
+      `,
+        text: 'El/la agente: {{agentName}}, ha subido un documento para revision.'
+      },
+
+      [EmailTemplateType.AGENT_APPROVED_NOTIFY_ADMIN]: {
+        subject: '✅ Agente aprobado - LIVEX',
+        html: `
+        <h2>Agente aprobado</h2>
+        <p>El agente {{agentName}} ha sido aprobado por el resort {{resortName}}.</p>
+      `,
+        text: 'El/la agente: {{agentName}}, ha sido aprobado por el resort {{resortName}}.'
+      },
+
+      [EmailTemplateType.AGENT_APPROVED_NOTIFY_AGENT]: {
+        subject: '✅ Agente aprobado - LIVEX',
+        html: `
+        <h2>¡Hola! {{agentName}}</h2>
+        <p>Has sido aprobado por el resort {{resortName}}.</p>
+        <p>Ya puedes  reservar y obtener el catalgo de experiencias de tu resort.</p>
+        <p>Gracias por usar LIVEX</p>
+      `,
+        text: 'Has sido aprobado por el resort {{resortName}}.'
+      },
+
+
+      [EmailTemplateType.AGENT_REJECTED_NOTIFY_ADMIN]: {
+        subject: '❌ Agente rechazado - LIVEX',
+        html: `
+        <h2>Agente rechazado</h2>
+        <p>El agente {{agentName}} ha sido rechazado por el resort {{resortName}}.</p>
+        <p>La razon del rechazo es: {{reason}}</p>
+      `,
+        text: 'El/la agente: {{agentName}}, ha sido rechazado por el resort {{resortName}}.'
+      },
+
+      [EmailTemplateType.AGENT_REJECTED_NOTIFY_AGENT]: {
+        subject: '❌ Agente rechazado - LIVEX',
+        html: `
+        <h2>¡Hola! {{agentName}}</h2>
+        <p>Has sido rechazado por el resort {{resortName}}.</p>
+        <P>la razon del rechazo es: {{reason}}</P>
+        <p>Si tienes alguna queja o sugerencia, por favor contacta a soporte@livex.com</p>
+        <p>Gracias por usar LIVEX</p>
+      `,
+        text: 'El/la agente: {{agentName}}, ha sido rechazado por el resort {{resortName}}.'
+      },
+
+      [EmailTemplateType.AGENT_APPROVED_DOCUMENTS_NOTIFY_ADMIN]: {
+        subject: '✅ Documento aprobado - LIVEX',
+        html: `
+        <h2>Documento aprobado</h2>
+        <p>El documento del agente {{agentName}} ha sido aprobado por el resort {{resortName}}.</p>
+      `,
+        text: 'El/la agente: {{agentName}}, ha sido aprobado por el resort {{resortName}}.'
+      },
+
+      [EmailTemplateType.AGENT_APPROVED_DOCUMENTS_NOTIFY_AGENT]: {
+        subject: '✅ Documento aprobado - LIVEX',
+        html: `
+        <h2>¡Hola! {{agentName}}</h2>
+        <p>El documento ha sido aprobado.</p>
+      `,
+        text: 'El/la agente: {{agentName}}, ha sido aprobado por el resort {{resortName}}.'
+      },
+
+      [EmailTemplateType.AGENT_REJECTED_DOCUMENTS_NOTIFY_ADMIN]: {
+        subject: '❌ Documento rechazado - LIVEX',
+        html: `
+        <h2>Documento rechazado</h2>
+        <p>El documento del agente {{agentName}} ha sido rechazado por el resort {{resortName}}.</p>
+        <p>La razon del rechazo del documento es: {{reason}}</p>
+      `,
+        text: 'El/la agente: {{agentName}}, ha sido rechazado por el resort {{resortName}}.'
+      },
+
+      [EmailTemplateType.AGENT_REJECTED_DOCUMENTS_NOTIFY_AGENT]: {
+        subject: '❌ Documento rechazado - LIVEX',
+        html: `
+        <h2>Hola {{agentName}}</h2>
+        <p>El documento ha sido rechazado.</p>
+        <p>La razon del rechazo del documento es: {{reason}}</p>
+      `,
+        text: 'El/la agente: {{agentName}}, ha sido rechazado por el resort {{resortName}}.'
       },
     };
 

@@ -271,3 +271,118 @@ export class ExperienceRejectedNotifyAdminEvent implements NotificationEvent {
     public readonly rejectionReason: string,
   ) { }
 }
+
+export class AgentCreatedNotifyAdminEvent implements NotificationEvent {
+  constructor(
+    public readonly agentId: string,
+    public readonly resortName: string,
+    public readonly agentName: string,
+  ) { }
+}
+
+export class AgentCreatedNotifyAgentEvent implements NotificationEvent {
+  constructor(
+    public readonly agentId: string,
+    public readonly agentEmail: string,
+    public readonly resortName: string,
+    public readonly agentName: string,
+    public readonly agentPassword: string,
+  ) { }
+}
+
+export class AgentUnderReviewNotifyResortEvent implements NotificationEvent {
+  constructor(
+    public readonly resortId: string,
+    public readonly resortEmail: string,
+    public readonly resortName: string,
+    public readonly agentName: string,
+  ) { }
+}
+
+export class AgentApprovedNotifyAdminEvent implements NotificationEvent {
+  constructor(
+    public readonly agentId: string,
+    public readonly resortName: string,
+    public readonly agentName: string,
+  ) { }
+}
+
+export class AgentApprovedNotifyAgentEvent implements NotificationEvent {
+  constructor(
+    public readonly agentId: string,
+    public readonly agentEmail: string,
+    public readonly resortName: string,
+    public readonly agentName: string,
+  ) { }
+}
+
+export class AgentRejectedNotifyAdminEvent implements NotificationEvent {
+  constructor(
+    public readonly agentId: string,
+    public readonly resortName: string,
+    public readonly agentName: string,
+    public readonly reason: string,
+  ) { }
+}
+
+export class AgentRejectedNotifyAgentEvent implements NotificationEvent {
+  constructor(
+    public readonly agentId: string,
+    public readonly agentEmail: string,
+    public readonly resortName: string,
+    public readonly agentName: string,
+    public readonly reason: string,
+  ) { }
+}
+
+export class AgentApprovedDocumentsNotifyAgentEvent implements NotificationEvent {
+  constructor(
+    public readonly agentId: string,
+    public readonly agentEmail: string,
+    public readonly agentName: string,
+  ) { }
+}
+
+export class AgentApprovedDocumentsNotifyAdminEvent implements NotificationEvent {
+  constructor(
+    public readonly agentId: string,
+    public readonly resortName: string,
+    public readonly agentName: string,
+  ) { }
+}
+
+export class AgentRejectedDocumentsNotifyAgentEvent implements NotificationEvent {
+  constructor(
+    public readonly agentId: string,
+    public readonly agentEmail: string,
+    public readonly resortName: string,
+    public readonly agentName: string,
+    public readonly reason: string,
+  ) { }
+}
+
+export class AgentRejectedDocumentsNotifyAdminEvent implements NotificationEvent {
+  constructor(
+    public readonly agentId: string,
+    public readonly resortName: string,
+    public readonly agentName: string,
+    public readonly reason: string,
+  ) { }
+}
+
+export class AgentVinculatedNotifyAdminEvent implements NotificationEvent {
+  constructor(
+    public readonly agentId: string,
+    public readonly resortName: string,
+    public readonly agentName: string,
+  ) { }
+}
+
+export class AgentVinculatedNotifyAgentEvent implements NotificationEvent {
+  constructor(
+    public readonly agentId: string,
+    public readonly agentEmail: string,
+    public readonly resortName: string,
+    public readonly agentName: string,
+  ) { }
+}
