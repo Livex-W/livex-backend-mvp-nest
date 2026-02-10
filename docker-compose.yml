@@ -5,7 +5,7 @@ services:
     image: postgres:16-alpine
     container_name: livex_db
     env_file:
-      - ${ENV_FILE:-.env.development} # <- aquí están tus POSTGRES_*
+      - ${ENV_FILE:-.env} # <- aquí están tus POSTGRES_*
     environment:
       PGTZ: America/Bogota # (opcional) algo que NO pise POSTGRES_*
     ports:
@@ -74,7 +74,7 @@ services:
       rabbitmq:
         condition: service_healthy
     env_file:
-      - ${ENV_FILE:-.env.development}
+      - ${ENV_FILE:-.env}
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       PORT: ${PORT:-3000}
@@ -107,7 +107,7 @@ services:
       rabbitmq:
         condition: service_healthy
     env_file:
-      - ${ENV_FILE:-.env.development}
+      - ${ENV_FILE:-.env}
     environment:
       NODE_ENV: ${NODE_ENV:-development}
     command: ["sh", "-c", "echo '⏳ Esperando a que la DB se estabilice...' && sleep 15 && ${WORKER_COMMAND:-npm run dev}"]
@@ -135,7 +135,7 @@ services:
       mailpit:
         condition: service_healthy
     env_file:
-      - ${ENV_FILE:-.env.development}
+      - ${ENV_FILE:-.env}
     environment:
       NODE_ENV: ${NODE_ENV:-development}
     command: ["sh", "-c", "echo '⏳ Esperando a que la DB se estabilice...' && sleep 15 && ${WORKER_COMMAND:-npm run notification-worker:dev}"]
@@ -159,7 +159,7 @@ services:
       db:
         condition: service_healthy
     env_file:
-      - ${ENV_FILE:-.env.development}
+      - ${ENV_FILE:-.env}
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       BOOKING_PENDING_TTL_MINUTES: ${BOOKING_PENDING_TTL_MINUTES:-15}
@@ -189,7 +189,7 @@ services:
       db:
         condition: service_healthy
     env_file:
-      - ${ENV_FILE:-.env.development}
+      - ${ENV_FILE:-.env}
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       RECONCILIATION_INTERVAL_MS: ${RECONCILIATION_INTERVAL_MS:-86400000}
