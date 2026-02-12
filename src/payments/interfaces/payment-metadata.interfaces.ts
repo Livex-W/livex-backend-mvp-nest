@@ -12,7 +12,7 @@ export interface PSEMetadata {
 }
 
 export interface CardMetadata {
-    paymentSourceId?: string;
+    paymentSourceId?: string | number;
     installments?: number;
 }
 
