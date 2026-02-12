@@ -407,6 +407,7 @@ export class BookingsService {
 
         return {
           bookingId: bookingRow.id,
+          bookingCode: bookingRow.code,
           lockId: lockRow.id,
           status: 'pending',
           expiresAt,
@@ -490,6 +491,7 @@ export class BookingsService {
 
         return {
           bookingId,
+          bookingCode: booking.code,
           lockId: lockRow.id,
           status: 'pending',
           expiresAt,
@@ -909,6 +911,7 @@ export class BookingsService {
     },
   ): Promise<{
     id: string;
+    code: string;
   }> {
     const totalCents = params.dto.subtotalCents + params.dto.taxCents;
 
@@ -1004,7 +1007,7 @@ export class BookingsService {
       // Total = commission (online) + resort net (presencial)
       const actualTotalCents = params.dto.commissionCents + params.dto.resortNetCents;
 
-      const bookingInsert = await client.query<{ id: string }>(
+      const bookingInsert = await client.query<{ id: string; code: string }>(
         `INSERT INTO bookings (
           user_id,
           experience_id,
@@ -1023,7 +1026,7 @@ export class BookingsService {
           agent_id,
           referral_code_id
         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'pending',$12,$13,$14,$15)
-        RETURNING id`,
+        RETURNING id, code`,
         [
           params.userId,
           params.dto.experienceId,

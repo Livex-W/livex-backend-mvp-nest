@@ -50,7 +50,7 @@ interface PasswordResetTokenRow extends QueryResultRow {
 }
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { PasswordResetRequestedEvent, ResortCreatedEvent, UserRegisteredEvent } from '../notifications/events/notification.events';
+import { PasswordResetRequestedEvent, UserRegisteredEvent } from '../notifications/events/notification.events';
 
 @Injectable()
 export class AuthService {
@@ -168,11 +168,11 @@ export class AuthService {
     async login(dto: LoginDto, context: TokenContext): Promise<AuthResult> {
         const user = await this.usersService.findByEmail(dto.email);
         if (!user) {
-            throw new UnauthorizedException('Invalid credentials');
+            throw new UnauthorizedException('Credenciales inválidas');
         }
 
         if (!user.passwordHash) {
-            throw new UnauthorizedException('Invalid credentials');
+            throw new UnauthorizedException('Credenciales inválidas');
         }
 
         const isPasswordValid = await this.passwordHashService.comparePassword(dto.password, user.passwordHash);
@@ -184,7 +184,7 @@ export class AuthService {
                 ip: context.ip || undefined,
                 userAgent: context.userAgent || undefined
             });
-            throw new UnauthorizedException('Invalid credentials');
+            throw new UnauthorizedException('Credenciales inválidas');
         }
 
         // Log successful login

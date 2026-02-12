@@ -116,6 +116,9 @@ export class PayPalProvider implements PaymentProvider {
       // Convertir centavos a formato decimal
       const amount = (intent.amount / 100).toFixed(2);
 
+      const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'https://dev.livex.com.co';
+      this.logger.log(`Using FRONTEND_URL for PayPal redirects: ${frontendUrl}`);
+
       // Crear orden de PayPal
       const orderData = {
         intent: 'CAPTURE',
@@ -134,8 +137,8 @@ export class PayPalProvider implements PaymentProvider {
           landing_page: 'BILLING',
           shipping_preference: 'NO_SHIPPING',
           user_action: 'PAY_NOW',
-          return_url: `${this.configService.get('FRONTEND_URL', 'http://localhost:3000')}/payment/success`,
-          cancel_url: `${this.configService.get('FRONTEND_URL', 'http://localhost:3000')}/payment/cancel`,
+          return_url: `${frontendUrl}/api/v1/payments/success${intent.metadata?.bookingId ? `?bookingId=${intent.metadata.bookingId}` : ''}`,
+          cancel_url: `${frontendUrl}/api/v1/payments/cancel${intent.metadata?.bookingId ? `?bookingId=${intent.metadata.bookingId}` : ''}`,
         },
       };
 
@@ -591,7 +594,7 @@ export class PayPalProvider implements PaymentProvider {
     }
   }
 
-   
+
   private async validateWebhookSignature(payload: any, headers: any): Promise<boolean> {
     if (!this.config.webhookId) {
       this.logger.warn('PAYPAL_WEBHOOK_ID not configured. Skipping signature validation.');

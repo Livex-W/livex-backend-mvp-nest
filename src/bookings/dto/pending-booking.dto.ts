@@ -107,4 +107,8 @@ export class PendingBookingResultDto {
 
     @IsString()
     currency!: string;
+
+    @IsOptional()
+    @IsString()
+    bookingCode?: string;
 }

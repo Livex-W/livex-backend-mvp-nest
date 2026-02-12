@@ -128,6 +128,78 @@ export class WompiProvider implements PaymentProvider {
     }
   }
 
+  /**
+   * Tokenizes a card using Wompi's tokenization API (uses public key).
+   */
+  private async tokenizeCard(cardData: {
+    number: string;
+    cvc: string;
+    expMonth: string;
+    expYear: string;
+    cardHolder: string;
+  }): Promise<string> {
+    const url = `${this.config.baseUrl}/v1/tokens/cards`;
+    this.logger.log('Tokenizing card via Wompi...');
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${this.config.publicKey}`,
+      },
+      body: JSON.stringify({
+        number: cardData.number,
+        cvc: cardData.cvc,
+        exp_month: cardData.expMonth,
+        exp_year: cardData.expYear,
+        card_holder: cardData.cardHolder,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      this.logger.error(`Card tokenization failed: ${response.status} - ${errorText}`);
+      throw new Error(`Card tokenization failed: HTTP ${response.status}: ${errorText}`);
+    }
+
+    const data: { data?: { id?: string } } = await response.json();
+    const token = data.data?.id;
+    if (!token) {
+      throw new Error('Token ID not found in Wompi tokenization response');
+    }
+
+    this.logger.log(`Card tokenized successfully: ${token.substring(0, 10)}...`);
+    return token;
+  }
+
+  /**
+   * Creates a payment source from a card token (uses private key).
+   */
+  private async createPaymentSource(
+    token: string,
+    customerEmail: string,
+    acceptanceToken: string,
+  ): Promise<number> {
+    this.logger.log('Creating payment source from card token...');
+
+    const response = await this.makeRequest<{
+      data: { id: number; status: string; type: string };
+    }>('POST', '/v1/payment_sources', {
+      type: 'CARD',
+      token,
+      customer_email: customerEmail,
+      acceptance_token: acceptanceToken,
+    });
+
+    const sourceId = response.data?.id;
+    if (!sourceId) {
+      throw new Error('Payment source ID not found in Wompi response');
+    }
+
+    this.logger.log(`Payment source created: ${sourceId}`);
+    return sourceId;
+  }
+
   async createPayment(intent: PaymentIntent): Promise<PaymentResult> {
     try {
       const paymentMethod = (intent.metadata?.paymentMethod as WompiPaymentMethod) || 'CARD';
@@ -136,10 +208,34 @@ export class WompiProvider implements PaymentProvider {
       // 1. Acceptance token
       const acceptanceToken = await this.getAcceptanceToken();
 
-      // 2. Estrategia
+      // 2. For CARD: tokenize card and create payment source first
+      if (paymentMethod === 'CARD' && intent.metadata?.number) {
+        const token = await this.tokenizeCard({
+          number: intent.metadata.number as string,
+          cvc: intent.metadata.cvc as string,
+          expMonth: intent.metadata.expMonth as string,
+          expYear: intent.metadata.expYear as string,
+          cardHolder: intent.metadata.cardHolder as string,
+        });
+
+        const customerEmail = (intent.metadata?.customerEmail as string) || '';
+        const paymentSourceId = await this.createPaymentSource(
+          token,
+          customerEmail,
+          acceptanceToken,
+        );
+
+        // Inject the payment source ID into metadata for the strategy
+        intent.metadata = {
+          ...intent.metadata,
+          paymentSourceId,
+        };
+      }
+
+      // 3. Estrategia
       const strategy = this.paymentStrategyFactory.getStrategy(paymentMethod);
 
-      // 3. Payload
+      // 4. Payload
       const payload = await strategy.buildPaymentPayload({
         amountCents: intent.amount,
         currency: intent.currency,
@@ -151,7 +247,7 @@ export class WompiProvider implements PaymentProvider {
         metadata: intent.metadata,
       });
 
-      // 4. Public key + signature
+      // 5. Public key + signature
       payload.public_key = this.config.publicKey;
       payload.signature = this.calculateIntegritySignature(
         intent.id,
@@ -159,10 +255,10 @@ export class WompiProvider implements PaymentProvider {
         intent.currency
       );
 
-      // 5. Request a Wompi
+      // 6. Request a Wompi
       const response = await this.makeRequest<WompiPaymentResponse>('POST', '/v1/transactions', payload);
 
-      // 6. Obtener URL de checkout (con polling para PSE)
+      // 7. Obtener URL de checkout (con polling para PSE)
       const userRedirectUrl = intent.metadata?.redirectUrl as string | undefined;
       const checkoutUrl = await this.resolveCheckoutUrl(
         response,
@@ -170,7 +266,7 @@ export class WompiProvider implements PaymentProvider {
         userRedirectUrl
       );
 
-      // 7. Instrucciones
+      // 8. Instrucciones
       const instructions = this.buildPaymentInstructions(paymentMethod, response, checkoutUrl);
 
       return {

@@ -11,7 +11,9 @@ import {
   HttpCode,
   HttpStatus,
   Logger,
-  BadRequestException
+  BadRequestException,
+  Query,
+  Res
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -34,6 +36,112 @@ export class PaymentsController {
     private readonly paymentsService: PaymentsService,
     private readonly pseBanksService: PSEBanksService,
   ) { }
+
+  @Public()
+  @Get('success')
+  handleSuccess(
+    @Query('bookingId') bookingId: string,
+    @Query('token') token: string,
+    @Query('PayerID') payerId: string,
+    @Res() res: any,
+  ) {
+    this.logger.log(`Handling PayPal success redirect. BookingId: ${bookingId}, Token: ${token}, PayerID: ${payerId}`);
+
+    const deepLinkUrl = `livex://livex.com/payment-return?bookingId=${bookingId || ''}&status=success&token=${token || ''}&PayerID=${payerId || ''}`;
+
+    this.logger.log(`Redirecting to deep link: ${deepLinkUrl}`);
+
+    return res.header('Content-Type', 'text/html').send(`
+      <html>
+        <head>
+          <title>Payment Successful</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <style>
+            body { font-family: sans-serif; text-align: center; padding: 20px; }
+            .btn { display: inline-block; background-color: #0070ba; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; margin-top: 20px; }
+          </style>
+          <meta http-equiv="refresh" content="2;url=${deepLinkUrl}">
+        </head>
+        <body>
+          <script>
+            setTimeout(function() {
+              window.location.href = '${deepLinkUrl}';
+            }, 1000);
+          </script>
+        </body>
+      </html>
+    `);
+  }
+
+  @Public()
+  @Get('payment-return')
+  handlePaymentReturn(
+    @Query('bookingId') bookingId: string,
+    @Query('id') transactionId: string,
+    @Res() res: any,
+  ) {
+    this.logger.log(`Handling payment return redirect. BookingId: ${bookingId}, TransactionId: ${transactionId}`);
+
+    const deepLinkUrl = `livex://livex.com/payment-return?bookingId=${bookingId || ''}&status=processing&transactionId=${transactionId || ''}`;
+
+    this.logger.log(`Redirecting to deep link: ${deepLinkUrl}`);
+
+    return res.header('Content-Type', 'text/html').send(`
+      <html>
+        <head>
+          <title>Payment Cancelled</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <style>
+            body { font-family: sans-serif; text-align: center; padding: 20px; }
+            .btn { display: inline-block; background-color: #6c757d; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; margin-top: 20px; }
+          </style>
+          <meta http-equiv="refresh" content="2;url=${deepLinkUrl}">
+        </head>
+        <body>
+          <script>
+            setTimeout(function() {
+              window.location.href = '${deepLinkUrl}';
+            }, 100);
+          </script>
+        </body>
+      </html>
+    `);
+  }
+
+  @Public()
+  @Get('cancel')
+  handleCancel(
+    @Query('bookingId') bookingId: string,
+    @Query('token') token: string,
+    @Res() res: any,
+  ) {
+    this.logger.log(`Handling PayPal cancel redirect. BookingId: ${bookingId}, Token: ${token}`);
+
+    const deepLinkUrl = `livex://livex.com/payment-return?bookingId=${bookingId || ''}&status=cancelled&token=${token || ''}`;
+
+    this.logger.log(`Redirecting to deep link: ${deepLinkUrl}`);
+
+    return res.header('Content-Type', 'text/html').send(`
+      <html>
+        <head>
+          <title>Payment Cancelled</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <style>
+            body { font-family: sans-serif; text-align: center; padding: 20px; }
+            .btn { display: inline-block; background-color: #6c757d; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; margin-top: 20px; }
+          </style>
+          <meta http-equiv="refresh" content="2;url=${deepLinkUrl}">
+        </head>
+        <body>
+          <script>
+            setTimeout(function() {
+              window.location.href = '${deepLinkUrl}';
+            }, 100);
+          </script>
+        </body>
+      </html>
+    `);
+  }
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -313,7 +421,7 @@ export class PaymentsController {
   // Endpoint para listar métodos disponibles
   @Get('wompi/methods')
   @Public()
-  async getWompiMethods() {
+  getWompiMethods() {
     return {
       methods: ['NEQUI', 'PSE', 'CARD'],
       descriptions: {
