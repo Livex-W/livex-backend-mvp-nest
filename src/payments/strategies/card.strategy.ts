@@ -9,10 +9,12 @@ export class CardStrategy implements PaymentMethodStrategy {
 
     validatePaymentData(metadata?: WompiMetadata): void {
         const cardData = metadata as CardMetadata;
-        // Para Card, Wompi puede usar tokenización o un flujo hosted
-        // Si requieres token, valídalo aquí
-        if (cardData?.paymentSourceId && typeof cardData.paymentSourceId !== 'string') {
-            throw new BadRequestException('Invalid payment source ID for card payment');
+        // paymentSourceId can be a number (from Wompi API) or a string
+        if (cardData?.paymentSourceId !== undefined && cardData?.paymentSourceId !== null) {
+            const id = cardData.paymentSourceId;
+            if (typeof id !== 'number' && typeof id !== 'string') {
+                throw new BadRequestException('Invalid payment source ID for card payment');
+            }
         }
     }
 
