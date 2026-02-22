@@ -106,7 +106,7 @@ export class PdfController {
                 // Verify agent is assigned to this resort
                 const assignmentResult = await this.db.query<{ resort_id: string }>(
                     `SELECT resort_id FROM resort_agents 
-                     WHERE user_id = $1 AND resort_id = $2 AND is_active = true`,
+                     WHERE user_id = $1 AND resort_id = $2 AND status = 'approved'`,
                     [userId, body.resortId],
                 );
 
@@ -167,6 +167,7 @@ export class PdfController {
                 child_min_age: number;
                 child_max_age: number;
                 includes: string;
+                excludes: string;
                 status: string;
                 currency: string;
                 main_image_url: string;
@@ -184,6 +185,7 @@ export class PdfController {
                     e.child_min_age,
                     e.child_max_age,
                     e.includes,
+                    e.excludes,
                     e.status,
                     e.currency,
                     (SELECT url FROM experience_images ei WHERE ei.experience_id = e.id ORDER BY sort_order LIMIT 1) as main_image_url,
@@ -212,6 +214,7 @@ export class PdfController {
                     : '',
                 status: getStatusName(exp.status),
                 includes: exp.includes || '',
+                excludes: exp.excludes || '',
                 description: exp.description || '',
                 currency: exp.currency || 'COP',
             }));
@@ -220,12 +223,12 @@ export class PdfController {
 
             // Generate PDF
             const pdfBuffer = await this.pdfService.generateExperiencesCatalog({
-                resort_name: resortName!,
+                resort_name: resortName,
                 experiences,
             });
 
             // Send PDF response
-            const filename = `catalogo-experiencias-${resortName!.replace(/\s+/g, '-').toLowerCase()}.pdf`;
+            const filename = `catalogo-experiencias-${resortName.replace(/\s+/g, '-').toLowerCase()}.pdf`;
 
             return res
                 .header('Content-Type', 'application/pdf')

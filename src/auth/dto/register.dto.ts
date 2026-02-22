@@ -1,5 +1,6 @@
 import { Transform } from 'class-transformer';
 import { IsEmail, IsEnum, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
+import { IsValidNit } from '../../common/validators/is-valid-nit.validator';
 import { USER_ROLES } from '../../common/constants/roles';
 import type { UserRole } from '../../common/constants/roles';
 import { PASSWORD_REGEX } from '../constants/auth.constants';
@@ -60,7 +61,7 @@ export class RegisterDto {
 
     @IsOptional()
     @IsString()
-    @Matches(/^\d{9}-\d$/, { message: 'NIT must be in format: 800098813-6' })
+    @IsValidNit()
     nit?: string;
 
     @IsOptional()

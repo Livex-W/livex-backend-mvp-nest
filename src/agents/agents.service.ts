@@ -68,15 +68,13 @@ export class AgentsService {
         // 4. Create business_profile for the agent
         const businessProfileResult = await this.db.query(
             `INSERT INTO business_profiles (
-                entity_type, name, nit, rnt, contact_email, contact_phone, status
-            ) VALUES ('agent', $1, $2, $3, $4, $5, 'draft')
+                entity_type, name, nit, rnt, status
+            ) VALUES ('agent', $1, $2, $3, 'draft')
             RETURNING id`,
             [
                 `${dto.fullName} - Agente`,
                 dto.nit || null,
                 dto.rnt || null,
-                dto.email,
-                dto.phone,
             ]
         );
         const businessProfileId = businessProfileResult.rows[0].id as string;
@@ -531,15 +529,13 @@ export class AgentsService {
                 // Create new business_profile
                 const newBpResult = await this.db.query(
                     `INSERT INTO business_profiles (
-                        entity_type, name, nit, rnt, contact_email, contact_phone, status
-                    ) VALUES ('agent', $1, $2, $3, $4, $5, 'draft')
+                        entity_type, name, nit, rnt, status
+                    ) VALUES ('agent', $1, $2, $3, 'draft')
                     RETURNING id`,
                     [
                         `${user?.full_name || 'Agent'} - Agente`,
                         dto.nit ?? null,
                         dto.rnt ?? null,
-                        user?.email ?? null,
-                        user?.phone ?? null,
                     ]
                 );
                 businessProfileId = newBpResult.rows[0].id as string;
@@ -579,7 +575,7 @@ export class AgentsService {
             `SELECT r.id, r.name, r.city, r.country
              FROM resorts r
              INNER JOIN resort_agents ra ON ra.resort_id = r.id
-             WHERE ra.user_id = $1 AND ra.is_active = true AND ra.status = 'approved'
+             WHERE ra.user_id = $1 AND ra.status = 'approved'
              ORDER BY r.name ASC`,
             [userId],
         );
@@ -619,10 +615,10 @@ export class AgentsService {
 
             // Create business profile for the agent
             const createBpResult = await this.db.query<{ id: string }>(`
-                INSERT INTO business_profiles (entity_type, name, contact_email, status)
-                VALUES ('agent', $1, $2, 'draft')
+                INSERT INTO business_profiles (entity_type, name, status)
+                VALUES ('agent', $1, 'draft')
                 RETURNING id
-            `, [user.full_name, user.email]);
+            `, [user.full_name]);
 
             businessProfileId = createBpResult.rows[0].id;
 
@@ -683,12 +679,13 @@ export class AgentsService {
 
         const resultQuery = await this.db.query(
             `SELECT 
-              r.name as resort_name, 
-              u.full_name as agent_name,
-              r.contact_email as resort_email
+              r.name as resort_name,
+            u.full_name as agent_name,
+            u_resort.email as resort_email
             FROM resorts r 
             JOIN resort_agents ra ON r.id = ra.resort_id 
             JOIN users u ON ra.user_id = u.id 
+            JOIN users u_resort ON r.owner_user_id = u_resort.id
             WHERE ra.user_id = $1`,
             [userId],
         );
@@ -719,7 +716,7 @@ export class AgentsService {
             SELECT business_profile_id FROM resort_agents 
             WHERE user_id = $1 AND business_profile_id IS NOT NULL 
             LIMIT 1
-        `, [userId]);
+            `, [userId]);
 
         if (raResult.rows.length === 0 || !raResult.rows[0].business_profile_id) {
             throw new NotFoundException('Business profile not found');
@@ -745,7 +742,7 @@ export class AgentsService {
             try {
                 await this.uploadService.deleteFile('', blobName);
             } catch (error) {
-                console.warn(`Failed to delete blob ${blobName}:`, error instanceof Error ? error.message : 'Unknown');
+                console.warn(`Failed to delete blob ${blobName}: `, error instanceof Error ? error.message : 'Unknown');
             }
         }
 
@@ -770,7 +767,7 @@ export class AgentsService {
             agentEmail: string;
             resortName: string;
         }>(`
-            SELECT bd.id, 
+            SELECT bd.id,
             u.full_name as "agentName",
             u.email as "agentEmail",
             r.name as "resortName" FROM business_documents bd
@@ -778,7 +775,7 @@ export class AgentsService {
             JOIN users u ON ra.user_id = u.id
             JOIN resorts r ON ra.resort_id = r.id
             WHERE bd.id = $1 AND ra.resort_id = $2
-        `, [docId, resortId]);
+            `, [docId, resortId]);
 
         if (docCheck.rows.length === 0) {
             throw new NotFoundException('Document not found or does not belong to an agent of this resort');
@@ -789,7 +786,7 @@ export class AgentsService {
             SET status = 'approved', reviewed_at = now(), updated_at = now()
             WHERE id = $1
             RETURNING id, status
-        `, [docId]);
+            `, [docId]);
 
 
         const { agentName, agentEmail, resortName } = docCheck.rows[0];
@@ -825,7 +822,7 @@ export class AgentsService {
             agentEmail: string;
             resortName: string;
         }>(`
-            SELECT bd.id, 
+            SELECT bd.id,
             u.full_name as "agentName",
             u.email as "agentEmail",
             r.name as "resortName" 
@@ -834,7 +831,7 @@ export class AgentsService {
             JOIN users u ON ra.user_id = u.id
             JOIN resorts r ON ra.resort_id = r.id
             WHERE bd.id = $1 AND ra.resort_id = $2
-        `, [docId, resortId]);
+            `, [docId, resortId]);
 
         if (docCheck.rows.length === 0) {
             throw new NotFoundException('Document not found or does not belong to an agent of this resort');
@@ -845,7 +842,7 @@ export class AgentsService {
             SET status = 'rejected', rejection_reason = $1, reviewed_at = now(), updated_at = now()
             WHERE id = $2
             RETURNING id, status, rejection_reason
-        `, [rejectionReason, docId]);
+            `, [rejectionReason, docId]);
 
 
         const { agentName, agentEmail, resortName } = docCheck.rows[0];
@@ -881,12 +878,12 @@ export class AgentsService {
         }
 
         const result = await this.db.query(
-            `INSERT INTO referral_codes (
+            `INSERT INTO referral_codes(
                 owner_user_id, code, code_type, discount_type, discount_value,
                 commission_override_bps, usage_limit, expires_at, description,
                 allow_stacking, min_purchase_cents, max_discount_cents
-            ) VALUES ($1, UPPER($2), $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-            RETURNING *`,
+            ) VALUES($1, UPPER($2), $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+            RETURNING * `,
             [
                 userId,
                 dto.code,
@@ -921,8 +918,8 @@ export class AgentsService {
             `SELECT * FROM referral_codes 
              WHERE UPPER(code) = UPPER($1) 
              AND is_active = true
-             AND (expires_at IS NULL OR expires_at > NOW())
-             AND (usage_limit IS NULL OR usage_count < usage_limit)`,
+             AND(expires_at IS NULL OR expires_at > NOW())
+             AND(usage_limit IS NULL OR usage_count < usage_limit)`,
             [code],
         );
 
@@ -945,7 +942,7 @@ export class AgentsService {
             `UPDATE referral_codes 
              SET is_active = $1, updated_at = NOW()
              WHERE id = $2 AND owner_user_id = $3
-             RETURNING *`,
+             RETURNING * `,
             [isActive, codeId, userId],
         );
 
@@ -970,10 +967,10 @@ export class AgentsService {
         }
 
         const result = await this.db.query(
-            `INSERT INTO referral_code_restrictions (
+            `INSERT INTO referral_code_restrictions(
                 referral_code_id, restriction_type, experience_id, category_slug, resort_id
-            ) VALUES ($1, $2, $3, $4, $5)
-            RETURNING *`,
+            ) VALUES($1, $2, $3, $4, $5)
+            RETURNING * `,
             [
                 codeId,
                 dto.restrictionType,
@@ -998,10 +995,10 @@ export class AgentsService {
         const result = await this.db.query(
             `DELETE FROM referral_code_restrictions 
              WHERE id = $1 
-             AND referral_code_id IN (
-                 SELECT id FROM referral_codes WHERE owner_user_id = $2
-             )
-             RETURNING *`,
+             AND referral_code_id IN(
+                SELECT id FROM referral_codes WHERE owner_user_id = $2
+            )
+             RETURNING * `,
             [restrictionId, userId],
         );
 
@@ -1036,10 +1033,10 @@ export class AgentsService {
         }
 
         const result = await this.db.query(
-            `INSERT INTO referral_code_variants (
+            `INSERT INTO referral_code_variants(
                 parent_code_id, variant_name, code, discount_value, commission_override_bps
-            ) VALUES ($1, $2, UPPER($3), $4, $5)
-            RETURNING *`,
+            ) VALUES($1, $2, UPPER($3), $4, $5)
+            RETURNING * `,
             [
                 parentCodeId,
                 dto.variantName,
@@ -1070,7 +1067,7 @@ export class AgentsService {
              WHERE v.id = $2 
              AND v.parent_code_id = rc.id
              AND rc.owner_user_id = $3
-             RETURNING v.*`,
+             RETURNING v.* `,
             [isActive, variantId, userId],
         );
 
@@ -1087,7 +1084,7 @@ export class AgentsService {
         let query = `
             SELECT * FROM v_referral_code_analytics 
             WHERE owner_user_id = $1
-        `;
+            `;
         const params: any[] = [userId];
 
         if (codeId) {
@@ -1115,19 +1112,19 @@ export class AgentsService {
         const result = await this.db.query(
             `SELECT 
                 v.id,
-                v.variant_name,
-                v.code,
-                v.usage_count,
-                v.conversion_count,
-                CASE 
+            v.variant_name,
+            v.code,
+            v.usage_count,
+            v.conversion_count,
+            CASE 
                     WHEN v.usage_count > 0 
-                    THEN ROUND((v.conversion_count::numeric / v.usage_count::numeric) * 100, 2)
-                    ELSE 0 
-                END as conversion_rate_pct,
-                v.discount_value,
-                v.commission_override_bps,
-                v.is_active,
-                v.created_at
+                    THEN ROUND((v.conversion_count:: numeric / v.usage_count:: numeric) * 100, 2)
+                    ELSE 0
+        END as conversion_rate_pct,
+            v.discount_value,
+            v.commission_override_bps,
+            v.is_active,
+            v.created_at
              FROM referral_code_variants v
              WHERE v.parent_code_id = $1
              ORDER BY v.conversion_rate_pct DESC, v.usage_count DESC`,

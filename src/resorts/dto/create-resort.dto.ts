@@ -1,4 +1,5 @@
-import { IsString, IsOptional, IsEmail, IsNumber, IsBoolean, MinLength, MaxLength, Matches } from 'class-validator';
+import { IsString, IsOptional, IsNumber, MinLength, MaxLength, Matches } from 'class-validator';
+import { IsValidNit } from '../../common/validators/is-valid-nit.validator';
 
 export class CreateResortDto {
   @IsString()
@@ -17,15 +18,6 @@ export class CreateResortDto {
   description?: string;
 
   @IsOptional()
-  @IsEmail()
-  contact_email?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(20)
-  contact_phone?: string;
-
-  @IsOptional()
   @IsString()
   @MaxLength(200)
   address_line?: string;
@@ -42,7 +34,7 @@ export class CreateResortDto {
 
   @IsOptional()
   @IsString()
-  @Matches(/^\d{9}-\d$/, { message: 'NIT must be in format: 800098813-6' })
+  @IsValidNit()
   nit?: string;
 
   @IsOptional()
@@ -57,8 +49,4 @@ export class CreateResortDto {
   @IsOptional()
   @IsNumber()
   longitude?: number;
-
-  @IsOptional()
-  @IsBoolean()
-  is_active?: boolean;
 }

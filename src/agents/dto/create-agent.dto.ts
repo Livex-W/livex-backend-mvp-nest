@@ -1,4 +1,5 @@
 import { IsEmail, IsOptional, IsString, IsUUID, MinLength, IsIn, Matches } from 'class-validator';
+import { IsValidNit } from '../../common/validators/is-valid-nit.validator';
 
 export class CreateAgentDto {
     @IsEmail()
@@ -25,7 +26,7 @@ export class CreateAgentDto {
 
     @IsOptional()
     @IsString()
-    @Matches(/^\d{9}-\d$/, { message: 'NIT must be in format: 800098813-6' })
+    @IsValidNit()
     nit?: string;
 
     @IsOptional()

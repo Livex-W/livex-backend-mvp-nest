@@ -140,6 +140,12 @@ export class ExperiencesController {
     return this.experiencesService.remove(id);
   }
 
+  @Patch(':id/activate')
+  @HttpCode(HttpStatus.OK)
+  async activate(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
+    return this.experiencesService.activate(id);
+  }
+
   @Get(':id/reviews')
   async getReviews(@Param('id', ParseUUIDPipe) id: string) {
     return this.experiencesService.getReviews(id);

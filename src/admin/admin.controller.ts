@@ -11,6 +11,7 @@ import {
   ParseUUIDPipe,
   HttpCode,
   HttpStatus,
+  Delete,
 } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { ApproveExperienceDto, RejectExperienceDto } from './dto/approve-experience.dto';
@@ -40,6 +41,35 @@ export class AdminController {
     private readonly adminService: AdminService,
     private readonly logger: CustomLoggerService,
   ) { }
+
+  // ========== USER MANAGEMENT ==========
+
+  @Delete('users/:id')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  async deactivateUser(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Request() req: AuthenticatedRequest
+  ) {
+    this.logger.logRequest({
+      method: 'DELETE',
+      url: '/v1/admin/users/:id',
+      userId: req.user.id,
+      role: req.user.role,
+      targetUserId: id
+    });
+
+    await this.adminService.deactivateUser(id, req.user.id);
+
+    this.logger.logResponse({
+      method: 'DELETE',
+      url: '/v1/admin/users/:id',
+      userId: req.user.id,
+      statusCode: 200
+    });
+
+    return { success: true, message: 'Usuario desactivado correctamente' };
+  }
 
   // ========== DASHBOARD ==========
 

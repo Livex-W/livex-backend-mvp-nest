@@ -13,6 +13,7 @@ export interface ExperienceForPdf {
     child_age_range: string;
     status: string;
     includes: string;
+    excludes: string;
     description: string;
     currency: string;
 }

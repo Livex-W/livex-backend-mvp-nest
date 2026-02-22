@@ -5,8 +5,6 @@ export interface Resort {
   name: string;
   description?: string;
   website?: string;
-  contact_email?: string;
-  contact_phone?: string;
   address_line?: string;
   city?: string;
   country?: string;
@@ -14,7 +12,6 @@ export interface Resort {
   longitude?: number;
   owner_user_id?: string;
   business_profile_id?: string;
-  is_active: boolean;
   status: ResortStatus;
   approved_by?: string;
   approved_at?: Date;

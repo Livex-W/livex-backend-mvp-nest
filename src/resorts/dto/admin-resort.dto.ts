@@ -1,5 +1,4 @@
 import { IsOptional, IsIn } from 'class-validator';
-import { Transform } from 'class-transformer';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 
 export class AdminResortQueryDto extends PaginationDto {
@@ -8,13 +7,6 @@ export class AdminResortQueryDto extends PaginationDto {
         message: 'status must be one of: draft, under_review, approved, rejected',
     })
     status?: string;
-
-    @IsOptional()
-    @Transform(({ value }) => {
-        if (value === undefined || value === null || value === '') return undefined;
-        return value === 'true' || value === true;
-    })
-    is_active?: boolean;
 }
 
 export class AdminStatsResponseDto {

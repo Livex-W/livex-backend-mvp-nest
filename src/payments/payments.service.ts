@@ -833,7 +833,7 @@ export class PaymentsService {
            s.start_time::TIME as booking_time,
            e.title as experience_name,
            rfd.amount_cents,
-           res.contact_email as resort_email,
+           owner.email as resort_email,
            res.name as resort_name,
            p.provider
          FROM refunds rfd
@@ -843,6 +843,7 @@ export class PaymentsService {
          JOIN experiences e ON e.id = b.experience_id
          JOIN availability_slots s ON s.id = b.slot_id
          JOIN resorts res ON res.id = e.resort_id
+         JOIN users owner ON owner.id = res.owner_user_id
          WHERE rfd.id = $1`,
         [refundId]
       );
@@ -1127,7 +1128,7 @@ export class PaymentsService {
          b.commission_cents,
          s.start_time::DATE as slot_date,
          s.start_time::TIME as slot_time,
-         r.contact_email as resort_email, 
+         owner.email as resort_email, 
          r.name as resort_name,
          r.city,
          e.title as experience_name,
@@ -1136,6 +1137,7 @@ export class PaymentsService {
        JOIN users u ON u.id = b.user_id
        JOIN experiences e ON e.id = b.experience_id
        JOIN resorts r ON r.id = e.resort_id
+       JOIN users owner ON owner.id = r.owner_user_id
        LEFT JOIN availability_slots s ON s.id = b.slot_id
        LEFT JOIN experience_locations el ON el.experience_id = e.id
        WHERE b.id = $1
