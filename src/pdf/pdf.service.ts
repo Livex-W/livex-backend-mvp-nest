@@ -48,11 +48,6 @@ export class PdfService {
                 });
             }
 
-            console.log({
-                pdfServiceUrl: this.pdfServiceUrl,
-                request
-            });
-
             const response = await axios.post(
                 `${this.pdfServiceUrl}/api/v1/pdf/experiences`,
                 request,

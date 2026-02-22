@@ -159,7 +159,7 @@ export class ExperiencesService {
     }
   }
 
-  async findAll(queryDto: QueryExperiencesDto): Promise<PaginatedResult<ExperienceWithImages>> {
+  async findAll(queryDto: QueryExperiencesDto, includeDeleted: boolean = false): Promise<PaginatedResult<ExperienceWithImages>> {
     const options: PaginationOptions = {
       page: queryDto.page ?? 1,
       limit: queryDto.limit ?? 10,
@@ -168,15 +168,21 @@ export class ExperiencesService {
       sort: queryDto.sort,
     };
 
-    // Build WHERE conditions - always filter by is_active and exclude under_review/draft for public listing
-    const conditions: string[] = ['e.is_active = true'];
+    // Build WHERE conditions
+    const conditions: string[] = [];
     const params: any[] = [];
     let paramIndex = 1;
 
     // For public listing, only show active experiences (not under_review, draft, or rejected)
     // Unless include_all_statuses is set (used by management endpoint)
-    if (!queryDto.status && !queryDto.include_all_statuses) {
-      conditions.push(`e.status = 'active'`);
+    if (!queryDto.include_all_statuses && !includeDeleted) {
+      conditions.push('e.is_active = true');
+      if (!queryDto.status) {
+        conditions.push(`e.status = 'active'`);
+      }
+    } else if (queryDto.status) {
+      // If asking for a specific status, even in management, allow it.
+      // E.g., if you only want 'draft' statuses. This is handled below.
     }
 
     // Search functionality
@@ -313,7 +319,7 @@ export class ExperiencesService {
     );
     const orderByClause = this.paginationService.buildOrderByClause(
       sortOptions,
-      'e.created_at DESC',
+      'e.created_at DESC, COALESCE(e.updated_at, e.created_at) DESC',
     );
 
     // Build base query - get main_image_url from experience_images where image_type = 'hero'
@@ -795,7 +801,7 @@ export class ExperiencesService {
 
     // Soft delete: set is_active to false
     const result = await this.db.query(
-      'UPDATE experiences SET is_active = false WHERE id = $1 AND is_active = true',
+      'UPDATE experiences SET is_active = false, status = "rejected" WHERE id = $1 AND is_active = true',
       [id],
     );
 
@@ -810,6 +816,29 @@ export class ExperiencesService {
       title: experience.title,
       status: experience.status,
       softDelete: true
+    });
+  }
+
+  async activate(id: string): Promise<void> {
+    // Get experience data before activation for logging
+    const experience = await this.findManagedOne(id, false);
+
+    // Restore: set is_active to true
+    const result = await this.db.query(
+      'UPDATE experiences SET is_active = true, status = "active" WHERE id = $1 AND is_active = false',
+      [id],
+    );
+
+    if (result.rowCount === 0) {
+      throw new NotFoundException('Experience not found or already active');
+    }
+
+    // Log business event
+    this.logger.logBusinessEvent('experience_activated', {
+      experienceId: id,
+      resortId: experience.resort_id,
+      title: experience.title,
+      status: experience.status,
     });
   }
 
