@@ -9,6 +9,7 @@ export type UserEntity = {
   phone: string | null;
   avatar: string | null;
   role: UserRole;
+  isActive: boolean;
   documentType: string | null;
   documentNumber: string | null;
   createdAt: Date;

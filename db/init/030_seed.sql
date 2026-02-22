@@ -46,6 +46,27 @@ WITH u AS (
      'resort', 
      'NIT', '900555666'),
 
+    ('draft@resort.co', 
+     '$2b$10$AUoDb4ExvjeUGT7r0kjkeuezbtKLalTUj.YRLcg0wHtMIdG4OxWye', 
+     'Resort en Draft', 
+     '+573044444444', 
+     'resort', 
+     'NIT', '900777888'),
+     
+    ('review@resort.co', 
+     '$2b$10$AUoDb4ExvjeUGT7r0kjkeuezbtKLalTUj.YRLcg0wHtMIdG4OxWye', 
+     'Resort en Revision', 
+     '+573055555555', 
+     'resort', 
+     'NIT', '900888999'),
+     
+    ('rejected@resort.co', 
+     '$2b$10$AUoDb4ExvjeUGT7r0kjkeuezbtKLalTUj.YRLcg0wHtMIdG4OxWye', 
+     'Resort Rechazado', 
+     '+573066666666', 
+     'resort', 
+     'NIT', '900000111'),
+
     -- 3. AGENTE DE VENTAS
     ('carlos.ventas@livex.app', 
      '$2b$10$AUoDb4ExvjeUGT7r0kjkeuezbtKLalTUj.YRLcg0wHtMIdG4OxWye', 
@@ -135,48 +156,81 @@ up AS (
   SELECT id, 'es', 'COP' FROM u WHERE email = 'operador@marysol.co'
   UNION ALL
   SELECT id, 'es', 'COP' FROM u WHERE email = 'carlos.ventas@livex.app'
+  UNION ALL
+  SELECT id, 'es', 'COP' FROM u WHERE email = 'draft@resort.co'
+  UNION ALL
+  SELECT id, 'es', 'COP' FROM u WHERE email = 'review@resort.co'
+  UNION ALL
+  SELECT id, 'es', 'COP' FROM u WHERE email = 'rejected@resort.co'
 ),
 
 -- 2. Business Profiles para Resorts
 bp_resorts AS (
-  INSERT INTO business_profiles (entity_type, name, nit, rnt, contact_email, contact_phone, status, approved_by, approved_at)
+  INSERT INTO business_profiles (entity_type, name, nit, rnt, status, approved_by, approved_at)
   VALUES
-    ('resort'::business_entity_type, 'Mar y Sol Cartagena', '900111222-1', '12345', 'contacto@marysol.co', '+57 300 1111111', 'approved'::resort_status, (SELECT id FROM u WHERE email='admin@livex.app'), now()),
-    ('resort'::business_entity_type, 'Isla Brisa Resort', '900333444-2', '23456', 'hola@islabrisa.co', '+57 300 2222222', 'approved'::resort_status, (SELECT id FROM u WHERE email='admin@livex.app'), now()),
-    ('resort'::business_entity_type, 'Náutica Bahía Club', '900555666-3', '34567', 'info@nauticabahia.co', '+57 300 3333333', 'approved'::resort_status, (SELECT id FROM u WHERE email='admin@livex.app'), now())
+    ('resort'::business_entity_type, 'Mar y Sol Cartagena', '900111222-1', '12345', 'approved'::resort_status, (SELECT id FROM u WHERE email='admin@livex.app'), now()),
+    ('resort'::business_entity_type, 'Isla Brisa Resort', '900333444-2', '23456', 'approved'::resort_status, (SELECT id FROM u WHERE email='admin@livex.app'), now()),
+    ('resort'::business_entity_type, 'Náutica Bahía Club', '900555666-3', '34567', 'approved'::resort_status, (SELECT id FROM u WHERE email='admin@livex.app'), now()),
+    ('resort'::business_entity_type, 'Draft Resort Demo', '900777888-4', '45678', 'draft'::resort_status, NULL, NULL),
+    ('resort'::business_entity_type, 'Review Resort Demo', '900888999-5', '56789', 'under_review'::resort_status, NULL, NULL),
+    ('resort'::business_entity_type, 'Rejected Resort Demo', '900000111-6', '67890', 'rejected'::resort_status, NULL, NULL)
   RETURNING id, name
 ),
 
 -- 3. Prestadores (Resorts) con referencia a business_profiles
 r AS (
   INSERT INTO resorts (
-    name, description, website, contact_email, contact_phone,
+    name, description, website,
     address_line, city, country, latitude, longitude,
-    owner_user_id, business_profile_id, is_active, status, approved_by, approved_at
+    owner_user_id, business_profile_id, status, approved_by, approved_at
   )
   SELECT
-    'Mar y Sol Cartagena', 'Operador de actividades de playa y city tours', 'https://marysol.co', 'contacto@marysol.co', '+57 300 1111111',
+    'Mar y Sol Cartagena', 'Operador de actividades de playa y city tours', 'https://marysol.co',
     'Bocagrande Cra 1 #1-23', 'Cartagena', 'Colombia', 10.400000, -75.550000,
     (SELECT id FROM u WHERE email='operaciones@marysol.co'), 
     (SELECT id FROM bp_resorts WHERE name='Mar y Sol Cartagena'),
-    true, 'approved'::resort_status,
+    'approved'::resort_status,
     (SELECT id FROM u WHERE email='admin@livex.app'), now()
   UNION ALL
   SELECT
-    'Isla Brisa Resort', 'Resort boutique en Islas del Rosario', 'https://islabrisa.co', 'hola@islabrisa.co', '+57 300 2222222',
+    'Isla Brisa Resort', 'Resort boutique en Islas del Rosario', 'https://islabrisa.co',
     'Muelle La Bodeguita', 'Cartagena', 'Colombia', 10.411100, -75.545000,
     (SELECT id FROM u WHERE email='coordinacion@islabrisa.co'),
     (SELECT id FROM bp_resorts WHERE name='Isla Brisa Resort'),
-    true, 'approved'::resort_status,
+    'approved'::resort_status,
     (SELECT id FROM u WHERE email='admin@livex.app'), now()
   UNION ALL
   SELECT
-    'Náutica Bahía Club', 'Club náutico con experiencias de vela y atardecer', 'https://nauticabahia.co', 'info@nauticabahia.co', '+57 300 3333333',
+    'Náutica Bahía Club', 'Club náutico con experiencias de vela y atardecer', 'https://nauticabahia.co',
     'Marina Santa Cruz', 'Cartagena', 'Colombia', 10.420000, -75.530000,
     (SELECT id FROM u WHERE email='reservas@nauticabahia.co'),
     (SELECT id FROM bp_resorts WHERE name='Náutica Bahía Club'),
-    true, 'approved'::resort_status,
+    'approved'::resort_status,
     (SELECT id FROM u WHERE email='admin@livex.app'), now()
+  UNION ALL
+  SELECT
+    'Draft Resort Demo', 'Resort de prueba en estado draft', NULL,
+    'Bocagrande', 'Cartagena', 'Colombia', 10.400000, -75.550000,
+    (SELECT id FROM u WHERE email='draft@resort.co'),
+    (SELECT id FROM bp_resorts WHERE name='Draft Resort Demo'),
+    'draft'::resort_status,
+    NULL, NULL
+  UNION ALL
+  SELECT
+    'Review Resort Demo', 'Resort de prueba en estado under_review', NULL,
+    'Centro Histórico', 'Cartagena', 'Colombia', 10.420000, -75.540000,
+    (SELECT id FROM u WHERE email='review@resort.co'),
+    (SELECT id FROM bp_resorts WHERE name='Review Resort Demo'),
+    'under_review'::resort_status,
+    NULL, NULL
+  UNION ALL
+  SELECT
+    'Rejected Resort Demo', 'Resort de prueba en estado rejected', NULL,
+    'Castillogrande', 'Cartagena', 'Colombia', 10.390000, -75.545000,
+    (SELECT id FROM u WHERE email='rejected@resort.co'),
+    (SELECT id FROM bp_resorts WHERE name='Rejected Resort Demo'),
+    'rejected'::resort_status,
+    NULL, NULL
   RETURNING id, name
 ),
 
@@ -680,14 +734,12 @@ INSERT INTO users (email, password_hash, full_name, phone, role)
 VALUES ('agente.carlos@gmail.com', '$2b$10$j54QekkMZucJ.hKpcRMmqe4SnETnpr.8OxLyRfAZVLnSVkBgP4eFS', 'Carlos El Vendedor', '+573005555555', 'agent');
 
 -- 4.1.1 Business Profile para el Agente
-INSERT INTO business_profiles (entity_type, name, nit, rnt, contact_email, contact_phone, status, approved_by, approved_at)
+INSERT INTO business_profiles (entity_type, name, nit, rnt, status, approved_by, approved_at)
 SELECT
   'agent'::business_entity_type, 
   'Carlos El Vendedor - Agente', 
   '72345678-9',
   '45678',
-  'agente.carlos@gmail.com', 
-  '+573005555555', 
   'approved'::resort_status, 
   (SELECT id FROM users WHERE email='admin@livex.app'), 
   now();
@@ -703,12 +755,11 @@ SELECT
   now();
 
 -- 4.2 Acuerdo Comercial (Carlos con Mar y Sol)
-INSERT INTO resort_agents (resort_id, user_id, business_profile_id, is_active)
+INSERT INTO resort_agents (resort_id, user_id, business_profile_id)
 SELECT 
   (SELECT id FROM resorts WHERE name='Mar y Sol Cartagena'),
   (SELECT id FROM users WHERE email='agente.carlos@gmail.com'),
-  (SELECT id FROM business_profiles WHERE name='Carlos El Vendedor - Agente'),
-  true;
+  (SELECT id FROM business_profiles WHERE name='Carlos El Vendedor - Agente');
 
 -- 4.3 Crear Reserva por Agente (Confirmada)
 -- Usando el nuevo modelo: commission_cents = pago online, resort_net_cents = pago presencial

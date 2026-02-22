@@ -42,15 +42,13 @@ export class ResortsService {
       // 1. Create business_profile first
       const businessProfileResult = await this.db.query(
         `INSERT INTO business_profiles (
-          entity_type, name, nit, rnt, contact_email, contact_phone, status
-        ) VALUES ('resort', $1, $2, $3, $4, $5, 'draft')
+          entity_type, name, nit, rnt, status
+        ) VALUES ('resort', $1, $2, $3, 'draft')
         RETURNING id`,
         [
           createResortDto.name,
           createResortDto.nit || null,
           createResortDto.rnt || null,
-          createResortDto.contact_email || null,
-          createResortDto.contact_phone || null,
         ]
       );
       const businessProfileId = businessProfileResult.rows[0].id as string;
@@ -58,16 +56,14 @@ export class ResortsService {
       // 2. Create resort with reference to business_profile (NIT/RNT now only in business_profiles)
       const result = await this.db.query(
         `INSERT INTO resorts (
-          name, description, contact_email, contact_phone, 
+          name, description, 
           address_line, city, country, latitude, longitude, 
-          owner_user_id, business_profile_id, is_active, status
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'draft')
+          owner_user_id, business_profile_id, status
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'draft')
         RETURNING *`,
         [
           createResortDto.name,
           createResortDto.description || null,
-          createResortDto.contact_email || null,
-          createResortDto.contact_phone || null,
           createResortDto.address_line || null,
           createResortDto.city || null,
           createResortDto.country || null,
@@ -75,7 +71,6 @@ export class ResortsService {
           createResortDto.longitude || null,
           userId,
           businessProfileId,
-          createResortDto.is_active ?? true,
         ]
       );
 
@@ -91,10 +86,13 @@ export class ResortsService {
 
 
 
+      const resultWithEmail = await this.db.query(`SELECT email FROM users WHERE id = $1`, [userId]);
+      const ownerEmail = (resultWithEmail.rows[0]?.email as string) || "";
+
       this.notificationService.sendResortCreatedNotifyAdmin(adminEmail, {
         resortId: resort.id,
         resortName: resort.name,
-        ownerEmail: createResortDto.contact_email || "",
+        ownerEmail: ownerEmail,
         ownerName: createResortDto.name,
       });
 
@@ -279,7 +277,7 @@ export class ResortsService {
         let paramIndex = 1;
 
         // Campos que van en resorts
-        const resortFields = ['name', 'description', 'website', 'contact_email', 'contact_phone', 'address_line', 'city', 'country', 'latitude', 'longitude'];
+        const resortFields = ['name', 'description', 'website', 'address_line', 'city', 'country', 'latitude', 'longitude'];
 
         resortFields.forEach(field => {
           if (updateResortDto[field] !== undefined) {
@@ -318,19 +316,6 @@ export class ResortsService {
           if (updateResortDto.rnt !== undefined) {
             businessUpdateFields.push(`rnt = $${bParamIndex}`);
             businessUpdateValues.push(updateResortDto.rnt);
-            bParamIndex++;
-          }
-
-          // También actualizar contact_email y contact_phone en business_profiles
-          if (updateResortDto.contact_email !== undefined) {
-            businessUpdateFields.push(`contact_email = $${bParamIndex}`);
-            businessUpdateValues.push(updateResortDto.contact_email);
-            bParamIndex++;
-          }
-
-          if (updateResortDto.contact_phone !== undefined) {
-            businessUpdateFields.push(`contact_phone = $${bParamIndex}`);
-            businessUpdateValues.push(updateResortDto.contact_phone);
             bParamIndex++;
           }
 
@@ -396,8 +381,8 @@ export class ResortsService {
     }
 
     // Check current status
-    if (currentResort.status !== 'draft') {
-      throw new BadRequestException('Only draft resorts can be submitted for review');
+    if (currentResort.status !== 'draft' && currentResort.status !== 'rejected') {
+      throw new BadRequestException('Only draft or rejected resorts can be submitted for review');
     }
 
     const result = await this.db.query(
@@ -416,14 +401,20 @@ export class ResortsService {
 
     const adminEmail = this.configService.get<string>('ADMIN_EMAIL', 'admin@livex.com');
 
+    const resultWithEmail = await this.db.query(
+      `SELECT email FROM users WHERE id = $1`,
+      [currentResort.owner_user_id]
+    );
+    const ownerEmail = (resultWithEmail.rows[0]?.email as string) || "";
+
     this.notificationService.sendResortUnderReviewNotifyAdmin(adminEmail, {
       resortId: id,
       resortName: currentResort.name,
-      ownerEmail: currentResort.contact_email || "",
+      ownerEmail: ownerEmail,
       ownerName: currentResort.name,
     });
 
-    this.notificationService.sendResortUnderReviewNotifyOwnerResort(currentResort.contact_email || "", {
+    this.notificationService.sendResortUnderReviewNotifyOwnerResort(ownerEmail, {
       resortName: currentResort.name,
     });
 
@@ -553,7 +544,7 @@ export class ResortsService {
 
     // Get agents with user info
     const agentsResult = await this.db.query(
-      `SELECT ra.id, ra.resort_id, ra.user_id, ra.is_active, ra.created_at, ra.updated_at,
+      `SELECT ra.id, ra.resort_id, ra.user_id, ra.created_at, ra.updated_at,
               u.email as agent_email, u.full_name as agent_name
        FROM resort_agents ra
        LEFT JOIN users u ON ra.user_id = u.id
@@ -571,8 +562,6 @@ export class ResortsService {
       name: resort.name as string,
       description: resort.description as string | undefined,
       website: resort.website as string | undefined,
-      contact_email: resort.contact_email as string | undefined,
-      contact_phone: resort.contact_phone as string | undefined,
       address_line: resort.address_line as string | undefined,
       city: resort.city as string | undefined,
       country: resort.country as string | undefined,
@@ -581,7 +570,6 @@ export class ResortsService {
       latitude: resort.latitude as number | undefined,
       longitude: resort.longitude as number | undefined,
       owner_user_id: resort.owner_user_id as string,
-      is_active: resort.is_active as boolean,
       status: resort.status as ResortProfileDto['status'],
       approved_by: resort.approved_by as string | undefined,
       approved_at: resort.approved_at ? (resort.approved_at as Date).toISOString() : undefined,
@@ -603,7 +591,6 @@ export class ResortsService {
         id: agent.id as string,
         resort_id: agent.resort_id as string | undefined,
         user_id: agent.user_id as string,
-        is_active: agent.is_active as boolean,
         agent_email: agent.agent_email as string | undefined,
         agent_name: agent.agent_name as string | undefined,
         created_at: (agent.created_at as Date).toISOString(),
@@ -1170,7 +1157,7 @@ export class ResortsService {
     const agentsResult = await this.db.query(`
       SELECT COUNT(DISTINCT ra.user_id) as total 
       FROM resort_agents ra
-      WHERE ra.is_active = true
+      WHERE ra.status = 'approved'
     `);
 
     const resortsStats = resortsStatsResult.rows[0];
@@ -1196,33 +1183,25 @@ export class ResortsService {
     limit?: number;
     search?: string;
     status?: string;
-    is_active?: boolean;
   }): Promise<PaginatedResult<Resort>> {
-    const { page = 1, limit = 10, search, status, is_active } = queryDto;
+    const { page = 1, limit = 10, search, status } = queryDto;
     const offset = (page - 1) * limit;
 
     const conditions: string[] = [];
-    const orderClause = 'ORDER BY created_at DESC';
+    const orderClause = 'ORDER BY r.created_at DESC';
     const queryParams: unknown[] = [];
     let paramIndex = 1;
 
     // Status filter
     if (status) {
-      conditions.push(`status = $${paramIndex}`);
+      conditions.push(`r.status = $${paramIndex}`);
       queryParams.push(status);
-      paramIndex++;
-    }
-
-    // Active filter
-    if (is_active !== undefined) {
-      conditions.push(`is_active = $${paramIndex}`);
-      queryParams.push(is_active);
       paramIndex++;
     }
 
     // Search functionality
     if (search) {
-      conditions.push(`(name ILIKE $${paramIndex} OR city ILIKE $${paramIndex} OR contact_email ILIKE $${paramIndex})`);
+      conditions.push(`(r.name ILIKE $${paramIndex} OR r.city ILIKE $${paramIndex} OR u.email ILIKE $${paramIndex})`);
       queryParams.push(`%${search}%`);
       paramIndex++;
     }
@@ -1230,13 +1209,19 @@ export class ResortsService {
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
     // Get total count
-    const countQuery = `SELECT COUNT(*) FROM resorts ${whereClause}`;
+    const countQuery = `
+      SELECT COUNT(*) FROM resorts r
+      LEFT JOIN users u ON r.owner_user_id = u.id
+      ${whereClause}
+    `;
     const countResult = await this.db.query(countQuery, queryParams);
     const total = parseInt(countResult.rows[0].count as string);
 
     // Get paginated results
     const dataQuery = `
-      SELECT * FROM resorts 
+      SELECT r.*, u.email as owner_email, u.phone as owner_phone, u.is_active as owner_is_active
+      FROM resorts r
+      LEFT JOIN users u ON r.owner_user_id = u.id
       ${whereClause} 
       ${orderClause} 
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}

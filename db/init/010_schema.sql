@@ -112,6 +112,7 @@ CREATE TABLE IF NOT EXISTS users (
   document_number text,
   created_at      timestamptz NOT NULL DEFAULT now(),
   updated_at      timestamptz NOT NULL DEFAULT now(),
+  is_active       boolean NOT NULL DEFAULT true,
 
   CONSTRAINT uq_users_document UNIQUE (document_type, document_number)
 );
@@ -185,8 +186,6 @@ CREATE TABLE IF NOT EXISTS business_profiles (
   name               text NOT NULL,
   nit                text,  -- Format: 800098813-6
   rnt                text,  -- Format: 23412 (5 digits)
-  contact_email      citext,
-  contact_phone      text,
   
   -- Estado y Aprobación
   status             resort_status NOT NULL DEFAULT 'draft',
@@ -237,8 +236,6 @@ CREATE TABLE IF NOT EXISTS resorts (
   name           text NOT NULL,
   description    text,
   website        text,
-  contact_email  citext,
-  contact_phone  text,
   address_line   text,
   city           text,
   country        text,
@@ -248,7 +245,6 @@ CREATE TABLE IF NOT EXISTS resorts (
   business_profile_id uuid REFERENCES business_profiles(id) ON DELETE SET NULL,
   
   -- Estado y Aprobación
-  is_active      boolean NOT NULL DEFAULT true,
   status         resort_status NOT NULL DEFAULT 'draft',
   approved_by    uuid REFERENCES users(id) ON DELETE SET NULL,
   approved_at    timestamptz,
@@ -258,7 +254,7 @@ CREATE TABLE IF NOT EXISTS resorts (
   updated_at     timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_resorts_city ON resorts(city);
-CREATE INDEX IF NOT EXISTS idx_resorts_status_active ON resorts(status, is_active);
+CREATE INDEX IF NOT EXISTS idx_resorts_status ON resorts(status);
 CREATE TRIGGER trg_resorts_updated_at BEFORE UPDATE ON resorts FOR EACH ROW EXECUTE FUNCTION set_updated_at();
        
 CREATE TABLE IF NOT EXISTS resort_bank_info (
@@ -281,7 +277,6 @@ CREATE TABLE IF NOT EXISTS resort_agents (
     resort_id uuid REFERENCES resorts(id), -- Nullable for global agents/influencers
     user_id uuid NOT NULL REFERENCES users(id),
     business_profile_id uuid REFERENCES business_profiles(id) ON DELETE SET NULL, -- Agent's business docs
-    is_active boolean DEFAULT true,
     
     -- Estado y Aprobación (igual que resorts)
     status resort_status NOT NULL DEFAULT 'draft',

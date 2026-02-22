@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsEmail, IsNumber, IsBoolean, MinLength, MaxLength, Matches } from 'class-validator';
+import { IsString, IsOptional, IsNumber, MinLength, MaxLength, Matches } from 'class-validator';
 
 export class CreateResortDto {
   @IsString()
@@ -15,15 +15,6 @@ export class CreateResortDto {
   @IsString()
   @MaxLength(1000)
   description?: string;
-
-  @IsOptional()
-  @IsEmail()
-  contact_email?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(20)
-  contact_phone?: string;
 
   @IsOptional()
   @IsString()
@@ -57,8 +48,4 @@ export class CreateResortDto {
   @IsOptional()
   @IsNumber()
   longitude?: number;
-
-  @IsOptional()
-  @IsBoolean()
-  is_active?: boolean;
 }

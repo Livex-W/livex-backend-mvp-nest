@@ -15,6 +15,7 @@ interface UserRow extends QueryResultRow {
     phone: string | null;
     avatar: string | null;
     role: string;
+    is_active: boolean;
     document_type: string | null;
     document_number: string | null;
     created_at: Date;
@@ -30,7 +31,7 @@ export class UsersService {
 
     async findByEmail(email: string): Promise<UserEntity | null> {
         const result = await this.db.query<UserRow>(
-            `SELECT id, email, password_hash, firebase_uid, full_name, phone, avatar, role, document_type, document_number, created_at, updated_at
+            `SELECT id, email, password_hash, firebase_uid, full_name, phone, avatar, role, is_active, document_type, document_number, created_at, updated_at
             FROM users WHERE email = $1`,
             [email],
         );
@@ -44,7 +45,7 @@ export class UsersService {
 
     async findByFirebaseUid(uid: string): Promise<UserEntity | null> {
         const result = await this.db.query<UserRow>(
-            `SELECT id, email, password_hash, firebase_uid, full_name, phone, avatar, role, document_type, document_number, created_at, updated_at
+            `SELECT id, email, password_hash, firebase_uid, full_name, phone, avatar, role, is_active, document_type, document_number, created_at, updated_at
             FROM users WHERE firebase_uid = $1`,
             [uid],
         );
@@ -58,7 +59,7 @@ export class UsersService {
 
     async findById(id: string): Promise<UserEntity | null> {
         const result = await this.db.query<UserRow>(
-            `SELECT id, email, password_hash, firebase_uid, full_name, phone, avatar, role, document_type, document_number, created_at, updated_at
+            `SELECT id, email, password_hash, firebase_uid, full_name, phone, avatar, role, is_active, document_type, document_number, created_at, updated_at
             FROM users WHERE id = $1`,
             [id],
         );
@@ -85,7 +86,7 @@ export class UsersService {
             const result = await this.db.query<UserRow>(
                 `INSERT INTO users (email, password_hash, firebase_uid, full_name, phone, avatar, document_type, document_number, role)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-                RETURNING id, email, password_hash, firebase_uid, full_name, phone, avatar, role, document_type, document_number, created_at, updated_at`,
+                RETURNING id, email, password_hash, firebase_uid, full_name, phone, avatar, role, is_active, document_type, document_number, created_at, updated_at`,
                 [
                     params.email,
                     params.passwordHash ?? null,
@@ -184,7 +185,7 @@ export class UsersService {
             `UPDATE users
             SET ${updates.join(', ')}
             WHERE id = $${placeholderIndex}
-            RETURNING id, email, password_hash, firebase_uid, full_name, phone, avatar, role, document_type, document_number, created_at, updated_at`,
+            RETURNING id, email, password_hash, firebase_uid, full_name, phone, avatar, role, is_active, document_type, document_number, created_at, updated_at`,
             values,
         );
 
@@ -221,7 +222,7 @@ export class UsersService {
             `UPDATE users
              SET ${updates.join(', ')}
              WHERE id = $1
-             RETURNING id, email, password_hash, firebase_uid, full_name, phone, avatar, role, document_type, document_number, created_at, updated_at`,
+             RETURNING id, email, password_hash, firebase_uid, full_name, phone, avatar, role, is_active, document_type, document_number, created_at, updated_at`,
             values,
         );
 
@@ -263,7 +264,7 @@ export class UsersService {
             `UPDATE users
              SET ${updates.join(', ')}
              WHERE id = $1
-             RETURNING id, email, password_hash, firebase_uid, full_name, phone, avatar, role, document_type, document_number, created_at, updated_at`,
+             RETURNING id, email, password_hash, firebase_uid, full_name, phone, avatar, role, is_active, document_type, document_number, created_at, updated_at`,
             values,
         );
 
@@ -309,6 +310,26 @@ export class UsersService {
         });
     }
 
+    async deactivateUser(userId: string): Promise<void> {
+        const result = await this.db.query(
+            `UPDATE users
+            SET is_active = false,
+                updated_at = now()
+            WHERE id = $1`,
+            [userId],
+        );
+
+        if (result.rowCount === 0) {
+            throw new NotFoundException('User not found');
+        }
+
+        // Log security event
+        this.logger.logSecurityEvent('user_deactivated', {
+            userId,
+            timestamp: new Date().toISOString()
+        });
+    }
+
     toSafeUser(user: UserEntity): SafeUser {
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { passwordHash, ...safeUser } = user;
@@ -325,6 +346,7 @@ export class UsersService {
             phone: row.phone,
             avatar: row.avatar,
             role: row.role as UserEntity['role'],
+            isActive: row.is_active,
             documentType: row.document_type,
             documentNumber: row.document_number,
             createdAt: row.created_at,

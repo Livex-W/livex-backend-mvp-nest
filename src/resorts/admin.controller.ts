@@ -82,14 +82,16 @@ export class AdminController {
                 r.*,
                 bp.nit,
                 bp.rnt,
-                bp.contact_email as bp_contact_email,
-                bp.contact_phone as bp_contact_phone,
                 bp.status as bp_status,
                 bp.approved_by as bp_approved_by,
                 bp.approved_at as bp_approved_at,
-                bp.rejection_reason as bp_rejection_reason
+                bp.rejection_reason as bp_rejection_reason,
+                u.email as owner_email,
+                u.phone as owner_phone,
+                u.is_active as owner_is_active
             FROM resorts r
             LEFT JOIN business_profiles bp ON r.business_profile_id = bp.id
+            LEFT JOIN users u ON r.owner_user_id = u.id
             WHERE r.id = $1
         `;
         const resortResult = await this.db.query(resortQuery, [id]);
@@ -222,7 +224,7 @@ export class AdminController {
                 r.name as resort_name,
                 r.id as resort_id,
                 r.city as resort_city,
-                r.contact_phone as resort_phone,
+                owner.phone as resort_phone,
                 u.full_name as client_name,
                 u.email as client_email,
                 u.phone as client_phone,
@@ -236,6 +238,7 @@ export class AdminController {
             LEFT JOIN resorts r ON e.resort_id = r.id
             LEFT JOIN users u ON b.user_id = u.id
             LEFT JOIN users agent ON b.agent_id = agent.id
+            LEFT JOIN users owner ON r.owner_user_id = owner.id
             LEFT JOIN availability_slots s ON b.slot_id = s.id
             WHERE b.id = $1
         `;
@@ -300,8 +303,9 @@ export class AdminController {
                 u.phone,
                 u.document_type,
                 u.document_number,
+                u.is_active,
                 u.created_at,
-                (SELECT COUNT(*) FROM resort_agents ra WHERE ra.user_id = u.id AND ra.is_active = true) as resort_count,
+                (SELECT COUNT(*) FROM resort_agents ra WHERE ra.user_id = u.id AND ra.status = 'approved') as resort_count,
                 (SELECT COUNT(*) FROM bookings b WHERE b.agent_id = u.id) as booking_count,
                 (SELECT COALESCE(SUM(b.agent_commission_cents), 0) FROM bookings b WHERE b.agent_id = u.id AND b.status = 'confirmed') as total_commission_cents
             FROM users u
@@ -348,6 +352,7 @@ export class AdminController {
                 u.phone,
                 u.document_type,
                 u.document_number,
+                u.is_active,
                 u.created_at,
                 u.updated_at,
                 (SELECT COUNT(*) FROM bookings b WHERE b.agent_id = u.id) as total_bookings,
@@ -372,7 +377,7 @@ export class AdminController {
                 r.status,
                 ra.commission_bps,
                 ra.commission_fixed_cents,
-                ra.is_active,
+                ra.status as ra_status,
                 ra.created_at as associated_at
             FROM resort_agents ra
             JOIN resorts r ON ra.resort_id = r.id

@@ -119,8 +119,6 @@ export class AuthService {
                 createdResort = await this.resortsService.create(
                     {
                         name: resortName,
-                        contact_email: dto.email,
-                        contact_phone: dto.phone,
                         nit: dto.nit,
                         rnt: dto.rnt,
                         // Other fields will remain null/default, to be completed later
@@ -171,6 +169,10 @@ export class AuthService {
             throw new UnauthorizedException('Credenciales inválidas');
         }
 
+        if (user.isActive === false) {
+            throw new UnauthorizedException('Su cuenta fue inactivada porque infringe las politicas y condiciones');
+        }
+
         if (!user.passwordHash) {
             throw new UnauthorizedException('Credenciales inválidas');
         }
@@ -214,10 +216,17 @@ export class AuthService {
 
         let user = await this.usersService.findByFirebaseUid(firebaseUid);
 
+        if (user && user.isActive === false) {
+            throw new UnauthorizedException('Su cuenta fue inactivada porque infringe las politicas y condiciones');
+        }
+
         if (!user) {
             const existingUser = await this.usersService.findByEmail(email);
 
             if (existingUser) {
+                if (existingUser.isActive === false) {
+                    throw new UnauthorizedException('Su cuenta fue inactivada porque infringe las politicas y condiciones');
+                }
                 // Link existing account with Google data
                 user = await this.usersService.updateGoogleInfo(existingUser.id, {
                     firebaseUid,
@@ -264,6 +273,10 @@ export class AuthService {
         const user = await this.usersService.findById(payload.sub);
         if (!user) {
             throw new UnauthorizedException('User not found');
+        }
+
+        if (user.isActive === false) {
+            throw new UnauthorizedException('Su cuenta fue inactivada porque infringe las politicas y condiciones');
         }
 
         const refreshTokenRecord = await this.getRefreshTokenByJti(payload.jti!);

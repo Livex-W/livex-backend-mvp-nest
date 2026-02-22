@@ -21,6 +21,42 @@ export class AdminService {
 
   ) { }
 
+  // ========== USER MANAGEMENT ==========
+
+  async deactivateUser(userId: string, adminUserId: string): Promise<void> {
+    const result = await this.db.query(
+      `UPDATE users
+      SET is_active = false,
+          updated_at = now()
+      WHERE id = $1
+      RETURNING id, full_name, email`,
+      [userId]
+    );
+
+    if (result.rowCount === 0) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+
+    const user = result.rows[0];
+
+    // Log the action
+    this.logger.logBusinessEvent('admin_deactivated_user', {
+      adminUserId,
+      targetUserId: userId,
+      targetUserEmail: user.email
+    });
+
+    // Create audit log
+    await this.createAuditLog(
+      adminUserId,
+      'UPDATE',
+      'users',
+      userId,
+      { is_active: true },
+      { is_active: false }
+    );
+  }
+
   // ========== RESORT MANAGEMENT ==========
 
   async getResortsForReview(paginationDto: PaginationDto): Promise<PaginatedResult<Resort>> {
@@ -47,8 +83,8 @@ export class AdminService {
       SELECT r.*, u.email as owner_email, u.full_name as owner_name
       FROM resorts r
       LEFT JOIN users u ON r.owner_user_id = u.id
-      ${whereClause} 
-      ${orderClause} 
+      ${whereClause}
+      ${orderClause}
       LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}
     `;
 
@@ -92,7 +128,7 @@ export class AdminService {
            rejection_reason = NULL,
            updated_at = NOW()
        WHERE id = $2 
-       RETURNING *`,
+       RETURNING *, (SELECT email FROM users WHERE users.id = resorts.owner_user_id) as owner_email`,
       [adminUserId, id]
     );
 
@@ -116,14 +152,15 @@ export class AdminService {
 
     const adminEmail = this.configService.get<string>('ADMIN_EMAIL', 'admin@livex.com');
 
+    const resortData = resort as Resort & { owner_email: string };
     this.notificationService.sendResortApprovedNotifyAdmin(adminEmail, {
       resortId: resort.id,
       resortName: resort.name,
-      ownerEmail: resort.contact_email || "",
+      ownerEmail: resortData.owner_email || "",
       ownerName: resort.name,
     });
 
-    this.notificationService.sendResortApprovedNotifyOwnerResort(resort.contact_email || "", {
+    this.notificationService.sendResortApprovedNotifyOwnerResort(resortData.owner_email || "", {
       resortName: resort.name,
     });
 
@@ -178,15 +215,16 @@ export class AdminService {
 
     const adminEmail = this.configService.get<string>('ADMIN_EMAIL', 'admin@livex.com');
 
+    const resortData = resort as Resort & { owner_email: string };
     this.notificationService.sendResortRejectedNotifyAdmin(adminEmail, {
       resortId: resort.id,
       resortName: resort.name,
-      ownerEmail: resort.contact_email || "",
+      ownerEmail: resortData.owner_email || "",
       ownerName: resort.name,
       rejectionReason: rejectDto.rejection_reason
     });
 
-    this.notificationService.sendResortRejectedNotifyOwnerResort(resort.contact_email || "", {
+    this.notificationService.sendResortRejectedNotifyOwnerResort(resortData.owner_email || "", {
       resortName: resort.name,
       rejectionReason: rejectDto.rejection_reason
     });
@@ -207,7 +245,7 @@ export class AdminService {
       throw new NotFoundException('Document not found');
     }
 
-    const document = docResult.rows[0];
+    const document = docResult.rows[0] as { id: string; status: string; doc_type: string; resort_id: string };
 
     const resortQuery = await this.db.query(
       `SELECT  
@@ -223,7 +261,7 @@ export class AdminService {
       [document.id]
     );
 
-    const resort = resortQuery.rows[0];
+    const resort = resortQuery.rows[0] as { resort_id: string; resort_name: string; owner_name: string; owner_email: string };
 
     // Update document status
     const result = await this.db.query(
@@ -284,11 +322,12 @@ export class AdminService {
       throw new NotFoundException('Document not found');
     }
 
-    const document = docResult.rows[0];
+    const document = docResult.rows[0] as { id: string; status: string; doc_type: string; resort_id: string };
 
     const resortQuery = await this.db.query(
       `SELECT  
         r.id as resort_id,
+        r.status as resort_status,
         bp.name as resort_name,
         u.full_name as owner_name,
         u.email as owner_email
@@ -300,7 +339,7 @@ export class AdminService {
       [document.id]
     );
 
-    const resort = resortQuery.rows[0];
+    const resort = resortQuery.rows[0] as { resort_id: string; resort_status: string; resort_name: string; owner_name: string; owner_email: string };
 
     // Update document status
     const result = await this.db.query(
@@ -347,6 +386,55 @@ export class AdminService {
       resortName: resort.resort_name,
       rejectionReason: rejectionReason
     });
+
+    // Auto-reject resort if it is under review
+    if (resort && resort.resort_status === 'under_review') {
+      const docTypeLabel = document.doc_type.replace(/_/g, ' ');
+      const autoRejectReason = `Documento rechazado (${docTypeLabel}): ${rejectionReason}`;
+
+      await this.db.query(
+        `UPDATE resorts 
+         SET status = 'rejected', 
+             approved_by = $1, 
+             approved_at = NOW(),
+             rejection_reason = $2,
+             updated_at = NOW()
+         WHERE id = $3`,
+        [adminUserId, autoRejectReason, resort.resort_id]
+      );
+
+      this.logger.logBusinessEvent('admin_resort_auto_rejected_by_document', {
+        adminUserId,
+        resortId: resort.resort_id,
+        resortName: resort.resort_name,
+        documentId: id,
+        docType: document.doc_type,
+        rejectionReason: autoRejectReason,
+      });
+
+      await this.createAuditLog(
+        adminUserId,
+        'reject',
+        'resort',
+        resort.resort_id,
+        { status: 'under_review' },
+        { status: 'rejected', rejection_reason: autoRejectReason, triggered_by: `document_${id}` }
+      );
+
+      // Send resort rejection notifications
+      this.notificationService.sendResortRejectedNotifyAdmin(adminEmail, {
+        resortId: resort.resort_id,
+        resortName: resort.resort_name,
+        ownerEmail: resort.owner_email || "",
+        ownerName: resort.owner_name,
+        rejectionReason: autoRejectReason
+      });
+
+      this.notificationService.sendResortRejectedNotifyOwnerResort(resort.owner_email || "", {
+        resortName: resort.resort_name,
+        rejectionReason: autoRejectReason
+      });
+    }
 
     return result.rows[0];
   }
@@ -433,10 +521,11 @@ export class AdminService {
     const resortQuery = await this.db.query(
       `SELECT 
           r.name as resort_name,
-          r.contact_email as email_resort,
+          u.email as email_resort,
           e.id as experience_id,
           e.title as experience_name
       FROM resorts r
+      JOIN users u ON r.owner_user_id = u.id
       JOIN experiences e on e.resort_id  = r.id
       WHERE e.id = $1`,
       [experience.id]
@@ -460,7 +549,7 @@ export class AdminService {
       { status: 'active', approved_by: adminUserId, notes: approveDto.notes }
     );
 
-    const resort = resortQuery.rows[0];
+    const resort = resortQuery.rows[0] as { resort_name: string; experience_name: string; experience_id: string; email_resort: string };
     const adminEmail = this.configService.get<string>('ADMIN_EMAIL', 'admin@livex.com');
 
     this.notificationService.sendExperienceApprovedNotifyToAdmin(adminEmail, {
@@ -509,10 +598,11 @@ export class AdminService {
     const resortQuery = await this.db.query(
       `SELECT 
 	        r.name as resort_name,
-          r.contact_email as email_resort,
+          u.email as email_resort,
           e.id as experience_id,
 	        e.title as experience_name
       FROM resorts r
+      JOIN users u ON r.owner_user_id = u.id
       JOIN experiences e on e.resort_id  = r.id
       WHERE e.id = $1`,
       [experience.id]
@@ -536,7 +626,7 @@ export class AdminService {
       { status: 'rejected', rejection_reason: rejectDto.rejection_reason }
     );
 
-    const resort = resortQuery.rows[0];
+    const resort = resortQuery.rows[0] as { resort_name: string; experience_name: string; experience_id: string; email_resort: string };
     const adminEmail = this.configService.get<string>('ADMIN_EMAIL', 'admin@livex.com');
 
     this.notificationService.sendExperienceRejectedNotifyToAdmin(adminEmail, {
@@ -555,7 +645,7 @@ export class AdminService {
 
   // ========== DASHBOARD & METRICS ==========
 
-  async getDashboardMetrics(adminUserId: string): Promise<any> {
+  async getDashboardMetrics(adminUserId: string): Promise<Record<string, unknown>> {
     this.logger.logBusinessEvent('admin_dashboard_accessed', { adminUserId });
 
     // Get counts for different statuses
@@ -577,7 +667,7 @@ export class AdminService {
     };
   }
 
-  private async getResortsStats(): Promise<any> {
+  private async getResortsStats(): Promise<Record<string, number>> {
     const result = await this.db.query(`
       SELECT 
         status,
@@ -594,15 +684,17 @@ export class AdminService {
       total: 0
     };
 
-    result.rows.forEach((row: any) => {
-      stats[row.status as keyof typeof stats] = parseInt(row.count);
+    result.rows.forEach((row: { status: string; count: string }) => {
+      if (row.status in stats) {
+        stats[row.status as keyof typeof stats] = parseInt(row.count);
+      }
       stats.total += parseInt(row.count);
     });
 
     return stats;
   }
 
-  private async getExperiencesStats(): Promise<any> {
+  private async getExperiencesStats(): Promise<Record<string, number>> {
     const result = await this.db.query(`
       SELECT 
         status,
@@ -619,15 +711,17 @@ export class AdminService {
       total: 0
     };
 
-    result.rows.forEach((row: any) => {
-      stats[row.status as keyof typeof stats] = parseInt(row.count);
+    result.rows.forEach((row: { status: string; count: string }) => {
+      if (row.status in stats) {
+        stats[row.status as keyof typeof stats] = parseInt(row.count);
+      }
       stats.total += parseInt(row.count);
     });
 
     return stats;
   }
 
-  private async getRecentActivity(): Promise<any[]> {
+  private async getRecentActivity(): Promise<Record<string, unknown>[]> {
     const result = await this.db.query(`
       SELECT 
         action,
@@ -758,7 +852,7 @@ export class AdminService {
 
     const dataQuery = `
       SELECT 
-        u.id, u.email, u.full_name, u.phone, u.created_at,
+        u.id, u.email, u.full_name, u.phone, u.is_active, u.created_at,
         (SELECT COUNT(*) FROM referral_codes rc WHERE rc.owner_user_id = u.id) as codes_count,
         (SELECT COALESCE(SUM(b.total_cents), 0) FROM bookings b 
          JOIN referral_codes rc ON b.referral_code_id = rc.id 
@@ -786,7 +880,7 @@ export class AdminService {
   async getPartnerById(partnerId: string): Promise<any> {
     // Get partner info
     const partnerResult = await this.db.query(
-      `SELECT id, email, full_name, phone, created_at
+      `SELECT id, email, full_name, phone, is_active, created_at
        FROM users WHERE id = $1 AND role = 'partner'`,
       [partnerId]
     );

@@ -1,4 +1,4 @@
-import { IsString, IsBoolean, IsOptional, IsNumber, IsUUID, IsArray, ValidateNested, IsDateString } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsUUID, IsArray, ValidateNested, IsDateString } from 'class-validator';
 import { Type } from 'class-transformer';
 
 // Document types matching schema enum
@@ -48,9 +48,6 @@ export class ResortAgentDto {
     @IsUUID()
     user_id: string;
 
-    @IsBoolean()
-    is_active: boolean;
-
     // User info joined from users table
     @IsOptional()
     @IsString()
@@ -85,14 +82,6 @@ export class ResortProfileDto {
 
     @IsOptional()
     @IsString()
-    contact_email?: string;
-
-    @IsOptional()
-    @IsString()
-    contact_phone?: string;
-
-    @IsOptional()
-    @IsString()
     address_line?: string;
 
     @IsOptional()
@@ -121,9 +110,6 @@ export class ResortProfileDto {
 
     @IsUUID()
     owner_user_id: string;
-
-    @IsBoolean()
-    is_active: boolean;
 
     @IsString()
     status: ResortStatus;
