@@ -13,6 +13,7 @@ export interface ExperienceForPdf {
     child_age_range: string;
     status: string;
     includes: string;
+    excludes: string;
     description: string;
     currency: string;
 }
@@ -46,6 +47,11 @@ export class PdfService {
                     minute: '2-digit',
                 });
             }
+
+            console.log({
+                pdfServiceUrl: this.pdfServiceUrl,
+                request
+            });
 
             const response = await axios.post(
                 `${this.pdfServiceUrl}/api/v1/pdf/experiences`,

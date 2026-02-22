@@ -1,4 +1,5 @@
 import { IsString, IsOptional, IsNumber, MinLength, MaxLength, Matches } from 'class-validator';
+import { IsValidNit } from '../../common/validators/is-valid-nit.validator';
 
 export class CreateResortDto {
   @IsString()
@@ -33,7 +34,7 @@ export class CreateResortDto {
 
   @IsOptional()
   @IsString()
-  @Matches(/^\d{9}-\d$/, { message: 'NIT must be in format: 800098813-6' })
+  @IsValidNit()
   nit?: string;
 
   @IsOptional()
