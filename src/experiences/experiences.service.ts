@@ -176,7 +176,6 @@ export class ExperiencesService {
     // For public listing, only show active experiences (not under_review, draft, or rejected)
     // Unless include_all_statuses is set (used by management endpoint)
     if (!queryDto.include_all_statuses && !includeDeleted) {
-      conditions.push('e.is_active = true');
       if (!queryDto.status) {
         conditions.push(`e.status = 'active'`);
       }
@@ -414,7 +413,7 @@ export class ExperiencesService {
          ORDER BY start_time ASC
          LIMIT 1
        ) s ON true
-       WHERE e.id = $1 AND e.is_active = true`,
+       WHERE e.id = $1 AND e.status = 'active'`,
       [id],
     );
 
@@ -459,7 +458,7 @@ export class ExperiencesService {
          ORDER BY start_time ASC
          LIMIT 1
        ) s ON true
-       WHERE e.resort_id = $1 AND e.slug = $2 AND e.is_active = true`,
+       WHERE e.resort_id = $1 AND e.slug = $2 AND e.status = 'active'`,
       [resortId, slug],
     );
 
@@ -528,7 +527,7 @@ export class ExperiencesService {
          ORDER BY start_time ASC
          LIMIT 1
        ) s ON true
-       WHERE e.status = 'active' AND e.is_active = true
+       WHERE e.status = 'active'
        ORDER BY e.rating_avg DESC, e.rating_count DESC 
        LIMIT $1`,
       [limit],
@@ -663,7 +662,7 @@ export class ExperiencesService {
   }
 
   /**
-   * Find one experience for management (ignores is_active status and keeps base currency)
+   * Find one experience for management (keeps base currency)
    */
   async findManagedOne(id: string, includeImages = false): Promise<ExperienceWithImages> {
     const result = await this.db.query<Experience>(
@@ -681,7 +680,7 @@ export class ExperiencesService {
          ORDER BY start_time ASC
          LIMIT 1
        ) s ON true
-       WHERE e.id = $1`, // Removed is_active check for management
+       WHERE e.id = $1`,
       [id],
     );
 
@@ -799,9 +798,9 @@ export class ExperiencesService {
     // Get experience data before soft deletion for logging
     const experience = await this.findOne(id);
 
-    // Soft delete: set is_active to false
+    // Soft delete: set status to inactive
     const result = await this.db.query(
-      'UPDATE experiences SET is_active = false, status = "rejected" WHERE id = $1 AND is_active = true',
+      'UPDATE experiences SET status = \'inactive\' WHERE id = $1 AND status != \'inactive\'',
       [id],
     );
 
@@ -823,9 +822,9 @@ export class ExperiencesService {
     // Get experience data before activation for logging
     const experience = await this.findManagedOne(id, false);
 
-    // Restore: set is_active to true
+    // Restore: set status to active
     const result = await this.db.query(
-      'UPDATE experiences SET is_active = true, status = "active" WHERE id = $1 AND is_active = false',
+      'UPDATE experiences SET status = \'active\' WHERE id = $1 AND status = \'inactive\'',
       [id],
     );
 

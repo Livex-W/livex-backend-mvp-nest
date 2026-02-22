@@ -58,7 +58,7 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
     "exceljs": "^4.4.0",
-    "fast-xml-parser": "^5.3.4",
+    "fast-xml-parser": "^5.3.6",
     "fastify": "^5.7.4",
     "firebase-admin": "^13.6.0",
     "handlebars": "^4.7.8",
@@ -70,7 +70,7 @@
     "prom-client": "^15.1.3",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
-    "tar": "^7.5.7",
+    "tar": "^7.5.8",
     "winston": "^3.18.3",
     "winston-daily-rotate-file": "^5.0.0"
   },
@@ -122,6 +122,7 @@
     "testEnvironment": "node"
   },
   "resolutions": {
-    "tar": "^7.5.7"
+    "tar": "^7.5.8",
+    "minimatch": "^10.2.1"
   }
 }

@@ -40,7 +40,7 @@ DO $$ BEGIN
 
     -- Experiencias
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'experience_status') THEN
-        CREATE TYPE experience_status AS ENUM ('draft','under_review','active','rejected');
+        CREATE TYPE experience_status AS ENUM ('draft','under_review','active','rejected', 'inactive');
     END IF;
 
     -- Flujo de Reservas y Pagos
@@ -332,7 +332,6 @@ CREATE TABLE IF NOT EXISTS experiences (
   approved_by     uuid REFERENCES users(id) ON DELETE SET NULL,
   approved_at     timestamptz,
   rejection_reason text,
-  is_active       boolean NOT NULL DEFAULT true,
   
   -- Métricas
   rating_avg      numeric(3,2) NOT NULL DEFAULT 0.0,
