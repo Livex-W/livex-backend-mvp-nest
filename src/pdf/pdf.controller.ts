@@ -194,7 +194,7 @@ export class PdfController {
                     (SELECT commission_per_adult_cents FROM availability_slots s WHERE s.experience_id = e.id ORDER BY start_time LIMIT 1) as commission_per_adult_cents,
                     (SELECT commission_per_child_cents FROM availability_slots s WHERE s.experience_id = e.id ORDER BY start_time LIMIT 1) as commission_per_child_cents
                 FROM experiences e
-                WHERE e.resort_id = $1 AND e.is_active = true AND e.status = 'active'
+                WHERE e.resort_id = $1 AND e.status = 'active'
                 ORDER BY e.title`,
                 [resortId],
             );
