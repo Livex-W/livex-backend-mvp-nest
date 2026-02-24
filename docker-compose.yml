@@ -53,6 +53,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      localstack:
+        condition: service_started
     env_file:
       - ${ENV_FILE:-.env.development}
     environment:
@@ -84,6 +86,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      localstack:
+        condition: service_started
     env_file:
       - ${ENV_FILE:-.env.development}
     environment:
@@ -110,6 +114,8 @@ services:
         condition: service_healthy
       mailpit:
         condition: service_healthy
+      localstack:
+        condition: service_started
     env_file:
       - ${ENV_FILE:-.env.development}
     environment:
@@ -134,6 +140,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      localstack:
+        condition: service_started
     env_file:
       - ${ENV_FILE:-.env.development}
     environment:
@@ -164,11 +172,13 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      localstack:
+        condition: service_started
     env_file:
       - ${ENV_FILE:-.env.development}
     environment:
       NODE_ENV: ${NODE_ENV:-development}
-      RECONCILIATION_INTERVAL_MS: ${RECONCILIATION_INTERVAL_MS:-10000} # 10 segundos para pruebas. En produccion debe ser 60000 (un minuto) o 30000 (30 segundos)
+      RECONCILIATION_INTERVAL_MS: ${RECONCILIATION_INTERVAL_MS:-60000} # 10 segundos para pruebas. En produccion debe ser 60000 (un minuto) o 30000()
     command:
       [
         "sh",
@@ -204,6 +214,24 @@ services:
     networks:
       - livex_net
 
+  # LocalStack para emular SQS y S3 localmente
+  localstack:
+    image: localstack/localstack:latest
+    container_name: livex_localstack
+    ports:
+      - "4566:4566"            # LocalStack Gateway
+      - "4510-4559:4510-4559"  # external services port range
+    environment:
+      - SERVICES=sqs,s3
+      - DEBUG=${DEBUG:-0}
+      - DEFAULT_REGION=us-east-1
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    volumes:
+      - "./scripts/localstack:/etc/localstack/init/ready.d" # Scripts de inicialización
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    networks:
+      - livex_net
+
   nginx:
     image: nginx:1.27-alpine
     container_name: livex_nginx
@@ -216,9 +244,6 @@ services:
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
       - ./nginx/static:/usr/share/nginx/html/static:ro
       - ./fotos_experiencias:/usr/share/nginx/html/images:ro
-      # Descomenta si usas Basic Auth:
-      # - ./nginx/htpasswd:/etc/nginx/htpasswd:ro
-    # restart: unless-stopped
     networks:
       - livex_net
 
