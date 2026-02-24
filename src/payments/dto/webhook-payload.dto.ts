@@ -1,10 +1,11 @@
-import { IsString, IsNotEmpty, IsObject, IsOptional, MaxLength } from 'class-validator';
+import { IsString, IsNotEmpty, IsObject, IsOptional, MaxLength, IsEnum } from 'class-validator';
+import { EPaymentProvider } from '../providers/payment-provider.factory';
 
 export class WebhookPayloadDto {
-  @IsString()
+  @IsEnum(EPaymentProvider)
   @IsNotEmpty()
   @MaxLength(50)
-  provider: string;
+  provider: EPaymentProvider;
 
   @IsObject()
   @IsNotEmpty()

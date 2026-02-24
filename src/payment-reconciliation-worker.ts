@@ -6,16 +6,10 @@ import { AppModule } from './app.module';
 import { DatabaseClient } from './database/database.client';
 import { PaymentProviderFactory } from './payments/providers/payment-provider.factory';
 import { ConfigService } from '@nestjs/config';
-
-interface PaymentSummary {
-  provider: string;
-  date: string;
-  total_payments: number;
-  total_amount_cents: number;
-  reconciled_payments: number;
-  reconciled_amount_cents: number;
-  discrepancies_count: number;
-}
+import { SqsService } from './common/services/sqs.service';
+import { PaymentsService } from './payments/payments.service';
+import { AwsConfig } from './config/aws.config';
+import { EPaymentProvider } from './payments/providers/payment-provider.factory';
 
 class PaymentReconciliationWorker {
   private readonly logger = new Logger(PaymentReconciliationWorker.name);
@@ -23,24 +17,21 @@ class PaymentReconciliationWorker {
 
   constructor(
     private readonly db: DatabaseClient,
+    private readonly sqsService: SqsService,
+    private readonly paymentsService: PaymentsService,
     private readonly paymentProviderFactory: PaymentProviderFactory,
     private readonly configService: ConfigService,
   ) { }
 
   async start(): Promise<void> {
-    this.logger.log('Starting Payment Reconciliation Worker');
+    this.logger.log('Starting Payment Reconciliation Worker (Producer & Consumer)');
     this.isRunning = true;
 
-    // Ejecutar inmediatamente y luego cada 24 horas
-    await this.runReconciliation();
+    // Iniciar el Productor: Busca pagos pendientes periódicamente y los encola
+    void this.startProducer();
 
-    const intervalMs = this.configService.get<number>('RECONCILIATION_INTERVAL_MS', 24 * 60 * 60 * 1000); // 24 horas
-
-    setInterval(async () => {
-      if (this.isRunning) {
-        await this.runReconciliation();
-      }
-    }, intervalMs);
+    // Iniciar el Consumidor: Procesa la cola de reconciliación
+    void this.startConsumer();
   }
 
   stop(): void {
@@ -48,203 +39,141 @@ class PaymentReconciliationWorker {
     this.isRunning = false;
   }
 
-  private async runReconciliation(): Promise<void> {
-    try {
-      this.logger.log('Starting payment reconciliation process');
+  /**
+   * PRODUCER: Busca pagos pendientes y los envía a SQS
+   */
+  private async startProducer(): Promise<void> {
+    const intervalMs = this.configService.get<number>('RECONCILIATION_INTERVAL_MS', 24 * 60 * 60 * 1000);
 
-      // Reconciliar para ayer (para asegurar que todos los pagos del día están completos)
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      const reconciliationDate = yesterday.toISOString().split('T')[0];
+    while (this.isRunning) {
+      try {
+        this.logger.log('Producer: Sweeping for pending payments to reconcile...');
 
-      const providers = this.paymentProviderFactory.getAvailableProviders();
+        // Buscamos pagos en estado 'pending' o 'authorized' de las últimas 24 horas
+        // que no hayan sido actualizados en la última hora.
+        // con unintervalo de 24 horas
+        // y que no hayan sido actualizados en la última hora
+        // en desarrollo se probrara en intervalos de 1 hora 'INTERVAL '1 hour'' y actualizacion de 1 minuto 'INTERVAL '1 minute''
+        const pendingPayments = await this.db.query(`
+          SELECT id, provider 
+          FROM payments 
+          WHERE status IN ('pending', 'authorized')
+            AND created_at > NOW() - INTERVAL '24 hours'
+            AND updated_at < NOW() - INTERVAL '1 hour'
+        `);
 
-      for (const providerType of providers) {
-        await this.reconcileProvider(providerType, reconciliationDate);
+
+        this.logger.log(`Producer: Found ${pendingPayments.rows.length} payments to verify`);
+
+        const awsConfig = this.configService.get<AwsConfig>('aws');
+        const queueUrl = awsConfig?.sqsReconciliationUrl;
+
+        if (!queueUrl) {
+          this.logger.error('Producer: SQS_RECONCILIATION_URL not configured');
+        } else {
+          for (const payment of pendingPayments.rows) {
+            await this.sqsService.sendMessage(queueUrl, {
+              paymentId: payment.id,
+              provider: payment.provider,
+              timestamp: new Date().toISOString()
+            });
+          }
+          this.logger.log(`Producer: Enqueued ${pendingPayments.rows.length} messages to ${queueUrl}`);
+        }
+
+      } catch (error) {
+        this.logger.error('Producer error:', error);
       }
 
-      this.logger.log('Payment reconciliation process completed');
-    } catch (error) {
-      this.logger.error('Error in payment reconciliation process', error);
+      // Esperar hasta el próximo ciclo
+      await new Promise(res => setTimeout(res, intervalMs));
     }
   }
 
-  private async reconcileProvider(providerType: string, date: string): Promise<void> {
-    return await this.db.transaction(async (client) => {
+  /**
+   * CONSUMER: Lee de SQS y procesa cada verificación de pago
+   */
+  private async startConsumer(): Promise<void> {
+    const awsConfig = this.configService.get<AwsConfig>('aws');
+    const queueUrl = awsConfig?.sqsReconciliationUrl;
 
-      this.logger.log(`Reconciling payments for provider: ${providerType}, date: ${date}`);
-
-      // Verificar si ya existe una reconciliación para esta fecha y proveedor
-      const existingReconciliation = await client.query(
-        'SELECT id FROM payment_reconciliations WHERE provider = $1 AND reconciliation_date = $2',
-        [providerType, date]
-      );
-
-      if (existingReconciliation.rows.length > 0) {
-        this.logger.log(`Reconciliation already exists for ${providerType} on ${date}`);
-        return;
-      }
-
-      // Obtener resumen de pagos del día
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const paymentSummary = await this.getPaymentSummary(client, providerType, date);
-
-      // Verificar estados de pagos con el proveedor
-      await this.verifyPaymentStatuses(client, providerType, date);
-
-      // Recalcular resumen después de la verificación
-      const updatedSummary = await this.getPaymentSummary(client, providerType, date);
-
-      // Crear registro de reconciliación
-      await client.query(
-        `INSERT INTO payment_reconciliations (
-          reconciliation_date, provider, total_payments, total_amount_cents,
-          reconciled_payments, reconciled_amount_cents, discrepancies_count,
-          status, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())`,
-        [
-          date,
-          providerType,
-          updatedSummary.total_payments,
-          updatedSummary.total_amount_cents,
-          updatedSummary.reconciled_payments,
-          updatedSummary.reconciled_amount_cents,
-          updatedSummary.discrepancies_count,
-          updatedSummary.discrepancies_count === 0 ? 'completed' : 'failed',
-        ]
-      );
-
-      this.logger.log(`Reconciliation completed for ${providerType} on ${date}: ${updatedSummary.reconciled_payments}/${updatedSummary.total_payments} payments reconciled`);
-
-      if (updatedSummary.discrepancies_count > 0) {
-        this.logger.warn(`Found ${updatedSummary.discrepancies_count} discrepancies for ${providerType} on ${date}`);
-      }
-    });
-  }
-
-  private async getPaymentSummary(client: any, provider: string, date: string): Promise<PaymentSummary> {
-    const result = await client.query(
-      `SELECT 
-        COUNT(*) as total_payments,
-        COALESCE(SUM(amount_cents), 0) as total_amount_cents,
-        COUNT(CASE WHEN status IN ('paid', 'authorized') THEN 1 END) as reconciled_payments,
-        COALESCE(SUM(CASE WHEN status IN ('paid', 'authorized') THEN amount_cents ELSE 0 END), 0) as reconciled_amount_cents,
-        COUNT(CASE WHEN status IN ('pending', 'failed') AND created_at < NOW() - INTERVAL '1 hour' THEN 1 END) as discrepancies_count
-       FROM payments 
-       WHERE provider = $1 
-         AND DATE(created_at) = $2`,
-      [provider, date]
-    );
-
-    const row = result.rows[0];
-    return {
-      provider,
-      date,
-      total_payments: parseInt(row.total_payments),
-      total_amount_cents: parseInt(row.total_amount_cents),
-      reconciled_payments: parseInt(row.reconciled_payments),
-      reconciled_amount_cents: parseInt(row.reconciled_amount_cents),
-      discrepancies_count: parseInt(row.discrepancies_count),
-    };
-  }
-
-  private async verifyPaymentStatuses(client: any, providerType: string, date: string): Promise<void> {
-    // Obtener pagos pendientes o con estados inconsistentes
-    const paymentsToVerify = await client.query(
-      `SELECT id, provider_payment_id, status 
-       FROM payments 
-       WHERE provider = $1 
-         AND DATE(created_at) = $2
-         AND provider_payment_id IS NOT NULL
-         AND (
-           status IN ('pending', 'authorized') 
-           OR (status = 'failed' AND failed_at IS NULL)
-         )`,
-      [providerType, date]
-    );
-
-    if (paymentsToVerify.rows.length === 0) {
+    if (!queueUrl) {
+      this.logger.error('Consumer: SQS_RECONCILIATION_URL not configured. Polling skipped.');
       return;
     }
 
-    this.logger.log(`Verifying ${paymentsToVerify.rows.length} payments with provider ${providerType}`);
+    this.logger.log(`Consumer: Polling from ${queueUrl}...`);
 
-    const provider = this.paymentProviderFactory.getProvider(providerType as any);
-
-    for (const payment of paymentsToVerify.rows) {
+    while (this.isRunning) {
       try {
-        const providerStatus = await provider.getPaymentStatus(payment.provider_payment_id);
+        const messages = await this.sqsService.receiveMessages(queueUrl, 5, 20);
 
-        if (providerStatus.status !== payment.status) {
-          this.logger.log(`Updating payment ${payment.id} status from ${payment.status} to ${providerStatus.status}`);
+        for (const message of messages) {
+          if (!this.isRunning) break;
 
-          const updateFields: string[] = [];
-          const updateValues: any[] = [];
-          let paramIndex = 1;
+          const job = this.sqsService.parseMessageBody<{ paymentId: string; provider: string }>(message);
 
-          updateFields.push(`status = $${paramIndex++}`);
-          updateValues.push(providerStatus.status);
-
-          updateFields.push(`provider_metadata = $${paramIndex++}`);
-          updateValues.push(JSON.stringify(providerStatus.metadata));
-
-          updateFields.push(`updated_at = NOW()`);
-
-          // Actualizar timestamps según el estado
-          if (providerStatus.status === 'authorized') {
-            updateFields.push(`authorized_at = NOW()`);
-          } else if (providerStatus.status === 'paid') {
-            updateFields.push(`paid_at = NOW()`);
-          } else if (providerStatus.status === 'failed') {
-            updateFields.push(`failed_at = NOW()`);
-            updateFields.push(`failure_reason = $${paramIndex++}`);
-            updateValues.push(providerStatus.metadata?.error || 'Payment failed');
+          if (job && job.paymentId) {
+            await this.processReconciliationJob(job.paymentId, job.provider);
           }
 
-          updateValues.push(payment.id);
-
-          await client.query(
-            `UPDATE payments SET ${updateFields.join(', ')} WHERE id = $${paramIndex}`,
-            updateValues
-          );
-
-          // Si el pago fue exitoso, confirmar el booking
-          if (providerStatus.status === 'paid') {
-            await this.confirmBookingPayment(client, payment.id);
+          // Eliminar mensaje después de procesar
+          if (message.ReceiptHandle) {
+            await this.sqsService.deleteMessage(queueUrl, message.ReceiptHandle);
           }
         }
       } catch (error) {
-        this.logger.error(`Error verifying payment ${payment.id} with provider`, error);
+        this.logger.error('Consumer polling error:', error);
+        await new Promise(res => setTimeout(res, 5000));
       }
     }
   }
 
-  private async confirmBookingPayment(client: any, paymentId: string): Promise<void> {
-    // Obtener booking_id del pago
-    const paymentResult = await client.query(
-      'SELECT booking_id FROM payments WHERE id = $1',
-      [paymentId]
-    );
+  private async processReconciliationJob(paymentId: string, providerType: string): Promise<void> {
+    try {
+      this.logger.log(`Consumer: Verifying payment ${paymentId} (${providerType})`);
 
-    if (paymentResult.rows.length === 0) {
-      return;
+      await this.db.transaction(async (client) => {
+        // 1. Obtener datos actuales del pago
+        const paymentRes = await client.query(
+          'SELECT id, provider_payment_id, status, booking_id FROM payments WHERE id = $1',
+          [paymentId]
+        );
+
+        if (paymentRes.rows.length === 0) return;
+        const payment = paymentRes.rows[0];
+
+        // 2. Preguntar al proveedor (Wompi/PayPal)
+        const provider = this.paymentProviderFactory.getProvider(providerType as EPaymentProvider);
+        const providerStatus = await provider.getPaymentStatus(payment.provider_payment_id);
+
+        // 3. Si el estado cambió, actualizar
+        if (providerStatus.status !== payment.status) {
+          this.logger.log(`Consumer: Updating payment ${paymentId} status: ${payment.status} -> ${providerStatus.status}`);
+
+          await client.query(`
+            UPDATE payments 
+            SET status = $1::payment_status, 
+                provider_metadata = $2, 
+                updated_at = NOW(),
+                paid_at = CASE WHEN $1::payment_status = 'paid' THEN NOW() ELSE paid_at END,
+                authorized_at = CASE WHEN $1::payment_status = 'authorized' THEN NOW() ELSE authorized_at END,
+                failed_at = CASE WHEN $1::payment_status = 'failed' THEN NOW() ELSE failed_at END
+            WHERE id = $3
+          `, [providerStatus.status, JSON.stringify(providerStatus.metadata), paymentId]);
+
+          // 4. USAR LA LÓGICA CENTRALIZADA SI ESTÁ PAGADO
+          if (providerStatus.status === 'paid') {
+            this.logger.log(`Consumer: Payment ${paymentId} is PAID. Triggering complete booking confirmation.`);
+            await this.paymentsService.confirmBookingPayment(client, payment.booking_id);
+          }
+        } else {
+          this.logger.log(`Consumer: Payment ${paymentId} status remains ${payment.status}`);
+        }
+      });
+    } catch (error) {
+      this.logger.error(`Error processing job for payment ${paymentId}:`, error);
     }
-
-    const bookingId = paymentResult.rows[0].booking_id;
-
-    // Confirmar booking si aún está pending
-    await client.query(
-      'UPDATE bookings SET status = $1, updated_at = NOW() WHERE id = $2 AND status = $3',
-      ['confirmed', bookingId, 'pending']
-    );
-
-    // Consumir inventory lock
-    await client.query(
-      'UPDATE inventory_locks SET consumed_at = NOW() WHERE booking_id = $1 AND consumed_at IS NULL',
-      [bookingId]
-    );
-
-    this.logger.log(`Booking ${bookingId} confirmed via reconciliation`);
   }
 }
 
@@ -252,21 +181,27 @@ async function bootstrap() {
   const app = await NestFactory.createApplicationContext(AppModule);
 
   const db = DatabaseClient.getInstance();
+  const sqsService = app.get(SqsService);
+  const paymentsService = app.get(PaymentsService);
   const paymentProviderFactory = app.get(PaymentProviderFactory);
   const configService = app.get(ConfigService);
 
-  const worker = new PaymentReconciliationWorker(db, paymentProviderFactory, configService);
+  const worker = new PaymentReconciliationWorker(
+    db,
+    sqsService,
+    paymentsService,
+    paymentProviderFactory,
+    configService
+  );
 
   // Manejar señales de terminación
   process.on('SIGINT', async () => {
-    console.log('Received SIGINT, shutting down gracefully');
     worker.stop();
     await app.close();
     process.exit(0);
   });
 
   process.on('SIGTERM', async () => {
-    console.log('Received SIGTERM, shutting down gracefully');
     worker.stop();
     await app.close();
     process.exit(0);
@@ -275,6 +210,4 @@ async function bootstrap() {
   await worker.start();
 }
 
-if (require.main === module) {
-  bootstrap().catch(console.error);
-}
+bootstrap().catch(console.error);

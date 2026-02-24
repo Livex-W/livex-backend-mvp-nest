@@ -842,6 +842,7 @@ CREATE TABLE IF NOT EXISTS webhook_events (
   provider_event_id text,
   event_type        text,
   payload           jsonb NOT NULL,
+  headers           jsonb,
   signature_valid   boolean NOT NULL DEFAULT false,
   status            webhook_status NOT NULL DEFAULT 'pending',
   received_at       timestamptz NOT NULL DEFAULT now(),

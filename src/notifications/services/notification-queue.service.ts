@@ -1,7 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
-import * as amqplib from 'amqplib';
-import { ChannelModel, Channel } from 'amqplib';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { SqsService } from '../../common/services/sqs.service';
 import { EmailNotification } from '../interfaces/email-template.interface';
+import { AwsConfig } from '../../config/aws.config';
 
 export interface NotificationJob {
   id: string;
@@ -15,78 +16,49 @@ export interface NotificationJob {
 }
 
 @Injectable()
-export class NotificationQueueService {
+export class NotificationQueueService implements OnModuleInit {
   private readonly logger = new Logger(NotificationQueueService.name);
-  private connection: ChannelModel;
-  private channel: Channel;
 
-  // Nombres de exchanges y colas
-  private readonly EXCHANGE_NOTIFICATIONS = 'notifications';
-  private readonly EXCHANGE_DLX = 'notifications.dlx';
-  private readonly QUEUE_EMAIL_HIGH = 'notifications.email.high';
-  private readonly QUEUE_EMAIL_MEDIUM = 'notifications.email.medium';
-  private readonly QUEUE_EMAIL_LOW = 'notifications.email.low';
-  private readonly QUEUE_EMAIL_SCHEDULED = 'notifications.email.scheduled';
-  private readonly QUEUE_EMAIL_RETRY = 'notifications.email.retry';
+  // SQS queue URLs por prioridad
+  private queueUrls: Record<string, string> = {};
 
-  async initialize(): Promise<void> {
-    try {
-      const amqpUrl = process.env.AMQP_URL || 'amqp://livex:livex@rabbitmq:5672';
-      this.connection = await amqplib.connect(amqpUrl);
-      this.channel = await this.connection.createChannel();
+  constructor(
+    private readonly sqsService: SqsService,
+    private readonly configService: ConfigService,
+  ) { }
 
-      await this.setupExchangesAndQueues();
+  onModuleInit() {
+    const awsConfig = this.configService.get<AwsConfig>('aws');
 
-      this.logger.log('Notification queue service initialized');
-    } catch (error) {
-      this.logger.error('Failed to initialize notification queue service:', error);
-      throw error;
+    if (!awsConfig) {
+      this.logger.warn('AWS config no disponible, notification queue no funcionará');
+      return;
     }
+
+    this.queueUrls = {
+      high: awsConfig.sqsNotificationsHighUrl || '',
+      medium: awsConfig.sqsNotificationsMediumUrl || '',
+      low: awsConfig.sqsNotificationsLowUrl || '',
+    };
+
+    const configuredQueues = Object.entries(this.queueUrls)
+      .filter(([, url]) => !!url)
+      .map(([priority]) => priority);
+
+    this.logger.log(`Notification queue service inicializado con colas SQS: [${configuredQueues.join(', ')}]`);
   }
 
-  private async setupExchangesAndQueues(): Promise<void> {
-    // Crear exchanges
-    await this.channel.assertExchange(this.EXCHANGE_NOTIFICATIONS, 'topic', { durable: true });
-    await this.channel.assertExchange(this.EXCHANGE_DLX, 'fanout', { durable: true });
-
-    // Cola de alta prioridad
-    await this.channel.assertQueue(this.QUEUE_EMAIL_HIGH, {
-      durable: true,
-      deadLetterExchange: this.EXCHANGE_DLX,
-    });
-    await this.channel.bindQueue(this.QUEUE_EMAIL_HIGH, this.EXCHANGE_NOTIFICATIONS, 'email.high');
-
-    // Cola de prioridad media
-    await this.channel.assertQueue(this.QUEUE_EMAIL_MEDIUM, {
-      durable: true,
-      deadLetterExchange: this.EXCHANGE_DLX,
-    });
-    await this.channel.bindQueue(this.QUEUE_EMAIL_MEDIUM, this.EXCHANGE_NOTIFICATIONS, 'email.medium');
-
-    // Cola de baja prioridad
-    await this.channel.assertQueue(this.QUEUE_EMAIL_LOW, {
-      durable: true,
-      deadLetterExchange: this.EXCHANGE_DLX,
-    });
-    await this.channel.bindQueue(this.QUEUE_EMAIL_LOW, this.EXCHANGE_NOTIFICATIONS, 'email.low');
-
-    // Cola para emails programados (con TTL)
-    await this.channel.assertQueue(this.QUEUE_EMAIL_SCHEDULED, {
-      durable: true,
-      deadLetterExchange: this.EXCHANGE_NOTIFICATIONS,
-    });
-
-    // Cola de reintentos
-    await this.channel.assertQueue(this.QUEUE_EMAIL_RETRY, {
-      durable: true,
-      messageTtl: 60000, // 1 minuto
-      deadLetterExchange: this.EXCHANGE_NOTIFICATIONS,
-    });
-    await this.channel.bindQueue(this.QUEUE_EMAIL_RETRY, this.EXCHANGE_DLX, '');
-
-    this.logger.log('Exchanges and queues setup completed');
+  /**
+   * Inicializa el servicio. Llamado por NotificationService.
+   */
+  async initialize(): Promise<void> {
+    this.onModuleInit();
   }
 
+  /**
+   * Encola una notificación de email en la cola SQS apropiada según prioridad.
+   * Retorna el jobId generado.
+   */
   queueEmailNotification(notification: EmailNotification): string {
     const jobId = this.generateJobId();
     const priority = notification.priority || 'medium';
@@ -102,129 +74,63 @@ export class NotificationQueueService {
       createdAt: new Date(),
     };
 
-    try {
-      if (notification.scheduledAt && notification.scheduledAt > new Date()) {
-        // Email programado
-        this.queueScheduledEmail(job);
-      } else {
-        // Email inmediato
-        this.queueImmediateEmail(job);
-      }
+    const queueUrl = this.queueUrls[priority];
+    if (!queueUrl) {
+      this.logger.error(`No hay queue URL configurada para prioridad: ${priority}`);
+      throw new Error(`SQS queue URL no configurada para prioridad: ${priority}`);
+    }
 
-      this.logger.log(`Email notification queued: ${jobId}`, {
-        to: notification.to,
-        templateType: notification.templateType,
-        priority,
-        scheduled: !!notification.scheduledAt,
+    // Calcular delay si es un email programado (máx 900 seg = 15 min en SQS)
+    let delaySeconds: number | undefined;
+    if (notification.scheduledAt && notification.scheduledAt > new Date()) {
+      const delayMs = notification.scheduledAt.getTime() - Date.now();
+      delaySeconds = Math.min(Math.floor(delayMs / 1000), 900); // SQS máx 15 min
+    }
+
+    // Enviar de forma fire-and-forget 
+    this.sqsService
+      .sendMessage(queueUrl, job, delaySeconds)
+      .then((messageId) => {
+        this.logger.log(`Email notification encolada: ${jobId} (SQS MessageId: ${messageId})`, {
+          to: notification.to,
+          templateType: notification.templateType,
+          priority,
+          scheduled: !!notification.scheduledAt,
+        });
+      })
+      .catch((error) => {
+        this.logger.error(`Error encolando email notification: ${jobId}`, error);
       });
 
-      return jobId;
-    } catch (error) {
-      this.logger.error(`Failed to queue email notification: ${jobId}`, error);
-      throw error;
-    }
-  }
-
-  private queueImmediateEmail(job: NotificationJob): void {
-    const routingKey = `email.${job.priority}`;
-    const message = Buffer.from(JSON.stringify(job));
-
-    this.channel.publish(
-      this.EXCHANGE_NOTIFICATIONS,
-      routingKey,
-      message,
-      {
-        persistent: true,
-        messageId: job.id,
-        timestamp: Date.now(),
-      }
-    );
-  }
-
-  private queueScheduledEmail(job: NotificationJob): void {
-    const delay = job.scheduledAt!.getTime() - Date.now();
-    const message = Buffer.from(JSON.stringify(job));
-
-    this.channel.sendToQueue(
-      this.QUEUE_EMAIL_SCHEDULED,
-      message,
-      {
-        persistent: true,
-        messageId: job.id,
-        expiration: delay.toString(),
-        timestamp: Date.now(),
-      }
-    );
-  }
-
-  private requeueFailedJob(job: NotificationJob): void {
-    job.attempts += 1;
-
-    if (job.attempts >= job.maxAttempts) {
-      this.logger.error(`Job ${job.id} exceeded max attempts, moving to DLQ`);
-      return;
-    }
-
-    // Calcular delay exponencial: 2^attempts * 30 segundos
-    const delay = Math.pow(2, job.attempts) * 30 * 1000;
-    const message = Buffer.from(JSON.stringify(job));
-
-    this.channel.sendToQueue(
-      this.QUEUE_EMAIL_RETRY,
-      message,
-      {
-        persistent: true,
-        messageId: job.id,
-        expiration: delay.toString(),
-        timestamp: Date.now(),
-      }
-    );
-
-    this.logger.warn(`Job ${job.id} requeued for retry ${job.attempts}/${job.maxAttempts}`);
+    return jobId;
   }
 
   private generateJobId(): string {
     return `email_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
+  /**
+   * Obtiene estadísticas de todas las colas de notificaciones
+   */
   async getQueueStats(): Promise<Record<string, any>> {
     try {
-      const stats = {};
+      const stats: Record<string, any> = {};
 
-      const queues = [
-        this.QUEUE_EMAIL_HIGH,
-        this.QUEUE_EMAIL_MEDIUM,
-        this.QUEUE_EMAIL_LOW,
-        this.QUEUE_EMAIL_SCHEDULED,
-        this.QUEUE_EMAIL_RETRY,
-      ];
+      for (const [priority, queueUrl] of Object.entries(this.queueUrls)) {
+        if (!queueUrl) continue;
 
-      for (const queueName of queues) {
-        const queueInfo = await this.channel.checkQueue(queueName);
-        stats[queueName] = {
-          messageCount: queueInfo.messageCount,
-          consumerCount: queueInfo.consumerCount,
+        const attributes = await this.sqsService.getQueueAttributes(queueUrl);
+        stats[`notifications.email.${priority}`] = {
+          messageCount: parseInt(attributes.ApproximateNumberOfMessages || '0'),
+          messagesInFlight: parseInt(attributes.ApproximateNumberOfMessagesNotVisible || '0'),
+          messagesDelayed: parseInt(attributes.ApproximateNumberOfMessagesDelayed || '0'),
         };
       }
 
       return stats;
     } catch (error) {
-      this.logger.error('Failed to get queue stats:', error);
+      this.logger.error('Error obteniendo stats de colas SQS:', error);
       return {};
-    }
-  }
-
-  async close(): Promise<void> {
-    try {
-      if (this.channel) {
-        await this.channel.close();
-      }
-      if (this.connection) {
-        await this.connection.close();
-      }
-      this.logger.log('Notification queue service closed');
-    } catch (error) {
-      this.logger.error('Error closing notification queue service:', error);
     }
   }
 }

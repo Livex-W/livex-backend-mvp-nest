@@ -307,10 +307,11 @@ export class PaymentsController {
           throw new BadRequestException('Invalid Wompi webhook payload');
         }
 
-        // Wompi: Validar header de firma (solo en producción)
-        const wompiSignature = headers['x-event-signature'] || headers['x-signature'] || headers['wompi-signature'];
+        // Wompi: Validar firma (puede venir en header o en payload.signature.checksum)
+        const wompiSignature = headers['x-event-signature'] || headers['x-signature'] || headers['wompi-signature'] || headers['x-event-checksum'];
+        const hasPayloadSignature = !!payload.signature?.checksum;
 
-        if (!wompiSignature) {
+        if (!wompiSignature && !hasPayloadSignature) {
           const isProduction = process.env.NODE_ENV === 'production';
 
           if (isProduction) {
@@ -330,7 +331,7 @@ export class PaymentsController {
         signature = undefined; // Se pasarán todos los headers
       } else if (sanitizedProvider === EPaymentProvider.WOMPI) {
         // Wompi usa x-event-signature (o fallback a otros nombres)
-        signature = headers['x-event-signature'] || headers['x-signature'] || headers['wompi-signature'];
+        signature = headers['x-event-signature'] || headers['x-signature'] || headers['wompi-signature'] || headers['x-event-checksum'];
       }
 
       // 5. Construir payload para el servicio

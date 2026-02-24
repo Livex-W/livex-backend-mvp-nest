@@ -116,32 +116,36 @@ export class CustomLoggerService implements LoggerService {
     this.context = context;
   }
 
-  log(message: string, context?: LogContext): void {
+  log(message: string, context?: string | LogContext): void {
+    const contextObj = typeof context === 'string' ? { contextOverride: context } : context;
     this.winston.info(message, {
       context: this.context,
-      ...context,
+      ...contextObj,
     });
   }
 
-  error(message: string, trace?: string, context?: LogContext): void {
+  error(message: string, trace?: string, context?: string | LogContext): void {
+    const contextObj = typeof context === 'string' ? { contextOverride: context } : context;
     this.winston.error(message, {
       context: this.context,
       trace,
-      ...context,
+      ...contextObj,
     });
   }
 
-  warn(message: string, context?: LogContext): void {
+  warn(message: string, context?: string | LogContext): void {
+    const contextObj = typeof context === 'string' ? { contextOverride: context } : context;
     this.winston.warn(message, {
       context: this.context,
-      ...context,
+      ...contextObj,
     });
   }
 
-  debug(message: string, context?: LogContext): void {
+  debug(message: string, context?: string | LogContext): void {
+    const contextObj = typeof context === 'string' ? { contextOverride: context } : context;
     this.winston.debug(message, {
       context: this.context,
-      ...context,
+      ...contextObj,
     });
   }
 
