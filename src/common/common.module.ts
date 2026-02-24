@@ -5,6 +5,7 @@ import { MetricsController } from './controllers/metrics.controller';
 import { LoggingInterceptor } from './interceptors/logging.interceptor';
 import { DatabaseModule } from '../database/database.module';
 import { PaginationService } from './services/pagination.service';
+import { SqsService } from './services/sqs.service';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { PaginationService } from './services/pagination.service';
     MetricsService,
     LoggingInterceptor,
     PaginationService,
+    SqsService,
   ],
   exports: [
     CustomLoggerService,
@@ -39,6 +41,7 @@ import { PaginationService } from './services/pagination.service';
     ThrottlerModule,
     PaginationService,
     DatabaseModule,
+    SqsService,
   ],
 })
 export class CommonModule { }

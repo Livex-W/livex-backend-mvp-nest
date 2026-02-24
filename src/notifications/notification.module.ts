@@ -5,9 +5,11 @@ import { EmailService } from './services/email.service';
 import { NotificationQueueService } from './services/notification-queue.service';
 import { NotificationListener } from './listeners/notification.listener';
 import { NotificationController } from './controllers/notification.controller';
+import { CommonModule } from '../common/common.module';
 
 @Module({
   imports: [
+    CommonModule,
     EventEmitterModule.forRoot({
       // Configuración del event emitter
       wildcard: false,
@@ -32,4 +34,4 @@ import { NotificationController } from './controllers/notification.controller';
     NotificationQueueService,
   ],
 })
-export class NotificationModule {}
+export class NotificationModule { }

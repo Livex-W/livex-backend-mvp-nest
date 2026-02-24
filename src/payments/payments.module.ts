@@ -16,6 +16,8 @@ import { PSEStrategy } from './strategies/pse.strategy';
 import { CardStrategy } from './strategies/card.strategy';
 import { PSEBanksService } from './pse-banks.service';
 
+import { CommonModule } from '../common/common.module';
+
 @Module({
   imports: [
     ConfigModule,
@@ -24,6 +26,7 @@ import { PSEBanksService } from './pse-banks.service';
     CouponsModule,
     UserPreferencesModule,
     ExchangeRatesModule,
+    CommonModule,
   ],
   controllers: [PaymentsController],
   providers: [

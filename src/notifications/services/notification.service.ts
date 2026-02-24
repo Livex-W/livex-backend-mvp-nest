@@ -6,7 +6,6 @@ import {
   EmailTemplateType,
   EmailTemplateData
 } from '../interfaces/email-template.interface';
-import { Exception } from 'handlebars';
 
 @Injectable()
 export class NotificationService implements OnModuleInit {

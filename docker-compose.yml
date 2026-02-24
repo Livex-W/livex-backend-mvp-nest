@@ -26,24 +26,6 @@ services:
     networks:
       - livex_net
 
-  rabbitmq:
-    image: rabbitmq:3.13-management
-    container_name: livex_rabbit
-    environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-livex}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-livex}
-      RABBITMQ_ERLANG_COOKIE: ${RABBITMQ_ERLANG_COOKIE:-secret_cookie_123}
-    ports:
-      - "5672:5672" # AMQP
-      - "15672:15672" # UI
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    networks:
-      - livex_net
-
   # SMTP para pruebas (solo dev/staging)
   mailpit:
     image: axllent/mailpit:latest
@@ -70,8 +52,6 @@ services:
     restart: always
     depends_on:
       db:
-        condition: service_healthy
-      rabbitmq:
         condition: service_healthy
     env_file:
       - ${ENV_FILE:-.env.development}
@@ -104,13 +84,11 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
     env_file:
       - ${ENV_FILE:-.env.development}
     environment:
       NODE_ENV: ${NODE_ENV:-development}
-    command: ["sh", "-c", "echo '⏳ Esperando a que la DB se estabilice...' && sleep 15 && ${WORKER_COMMAND:-npm run dev}"]
+    command: ["sh", "-c", "echo '⏳ Esperando a que la DB se estabilice...' && sleep 15 && ${WORKER_COMMAND:-npm run worker:dev}"]
     volumes:
       - type: bind
         source: .
@@ -129,8 +107,6 @@ services:
     restart: always
     depends_on:
       db:
-        condition: service_healthy
-      rabbitmq:
         condition: service_healthy
       mailpit:
         condition: service_healthy
@@ -192,7 +168,7 @@ services:
       - ${ENV_FILE:-.env.development}
     environment:
       NODE_ENV: ${NODE_ENV:-development}
-      RECONCILIATION_INTERVAL_MS: ${RECONCILIATION_INTERVAL_MS:-86400000}
+      RECONCILIATION_INTERVAL_MS: ${RECONCILIATION_INTERVAL_MS:-10000} # 10 segundos para pruebas. En produccion debe ser 60000 (un minuto) o 30000 (30 segundos)
     command:
       [
         "sh",

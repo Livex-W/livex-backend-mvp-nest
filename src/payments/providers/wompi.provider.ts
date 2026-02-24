@@ -577,7 +577,8 @@ export class WompiProvider implements PaymentProvider {
         ? signatureOrHeaders
         : (signatureOrHeaders?.['x-event-signature'] ||
           signatureOrHeaders?.['x-signature'] ||
-          signatureOrHeaders?.['wompi-signature'] || '');
+          signatureOrHeaders?.['wompi-signature'] ||
+          signatureOrHeaders?.['x-event-checksum'] || '');
 
       if (this.config.webhookSecret && signature) {
         const isValid = await this.validateWebhookSignature(payload, signature);
@@ -686,27 +687,68 @@ export class WompiProvider implements PaymentProvider {
 
     try {
       const crypto = await import('crypto');
+      const properties = payload.signature?.properties || ['transaction.id', 'transaction.status', 'transaction.amount_in_cents'];
 
-      const transaction = payload.data?.transaction || payload.data;
-      const timestamp = payload.timestamp;
+      this.logger.debug(`Building Wompi signature using properties: ${properties.join(', ')}`);
 
-      const signatureString = `${transaction.id}${transaction.status}${transaction.amount_in_cents}${timestamp}${this.config.webhookSecret}`;
+      // Build the string by resolving each property in the payload
+      let signatureString = '';
+      for (const prop of properties) {
+        const value = this.resolvePropertyPath(payload.data, prop);
+        if (value !== undefined && value !== null) {
+          signatureString += String(value);
+        }
+      }
 
-      this.logger.log(`Signature string: ${signatureString.substring(0, 50)}...`);
+      // Wompi's webhook formula ALWAYS includes the timestamp at the end
+      if (payload.timestamp) {
+        signatureString += String(payload.timestamp);
+      }
+
+      // Always append the secret at the end
+      signatureString += this.config.webhookSecret;
 
       const calculatedSignature = crypto.createHash('sha256').update(signatureString).digest('hex');
-
       const payloadChecksum = payload.signature?.checksum;
 
       if (payloadChecksum) {
-        return calculatedSignature === payloadChecksum;
+        const isValid = calculatedSignature === payloadChecksum;
+        if (!isValid) {
+          this.logger.error(`Payload checksum mismatch. Expected: ${payloadChecksum}, Calculated: ${calculatedSignature}`);
+        }
+        return isValid;
       }
 
-      return calculatedSignature === signature;
+      const isValidWithHeader = calculatedSignature === signature;
+      if (!isValidWithHeader && signature) {
+        this.logger.error(`Header signature mismatch. Expected: ${signature}, Calculated: ${calculatedSignature}`);
+      }
+      return isValidWithHeader;
     } catch (error) {
       this.logger.error('Error calculating webhook signature', error);
       return false;
     }
+  }
+
+  /**
+   * Helper to resolve dotted paths like 'transaction.id' in an object
+   */
+  private resolvePropertyPath(obj: any, path: string): any {
+    // Wompi usually starts paths from the root or 'transaction'
+    // If the path starts with 'transaction.', we look inside transaction
+    // If the path refers to 'transaction.id', it's usually inside data.transaction
+
+    const parts = path.split('.');
+    let current = obj;
+
+    for (const part of parts) {
+      if (current && typeof current === 'object' && part in current) {
+        current = current[part];
+      } else {
+        return undefined;
+      }
+    }
+    return current;
   }
 
   private calculateIntegritySignature(

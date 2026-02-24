@@ -32,6 +32,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.965.0",
+    "@aws-sdk/client-sqs": "^3.995.0",
     "@aws-sdk/s3-request-presigner": "^3.965.0",
     "@fastify/cors": "^11.1.0",
     "@fastify/helmet": "^13.0.2",
@@ -52,7 +53,6 @@
     "@nestjs/schedule": "^6.1.0",
     "@nestjs/throttler": "^6.5.0",
     "@types/nodemailer": "^7.0.2",
-    "amqplib": "^0.10.9",
     "axios": "^1.13.5",
     "bcrypt": "^5.1.1",
     "class-transformer": "^0.5.1",
@@ -80,7 +80,6 @@
     "@nestjs/cli": "^11.0.0",
     "@nestjs/schematics": "^11.0.0",
     "@nestjs/testing": "^11.0.1",
-    "@types/amqplib": "^0.10.7",
     "@types/bcrypt": "^5.0.2",
     "@types/cors": "^2.8.19",
     "@types/cron": "^2.4.3",
